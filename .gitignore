@@ -1,0 +1,10 @@
+# Derived/regenerated - not needed in version control, rebuilt automatically
+# from resume.md + job_preferences.md by compile_rubric()
+data/compatibility_rubric.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Local-only tool permission overrides (see .claude/settings.json for shared config)
+.claude/settings.local.json

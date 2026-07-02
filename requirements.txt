@@ -1,0 +1,12 @@
+# === AI + Agent ===
+aisuite==0.1.11
+anthropic
+groq
+tavily-python>=0.7.12
+
+# === Utilities ===
+pydantic
+python-dotenv
+requests
+tabulate
+tinydb

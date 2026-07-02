@@ -1,0 +1,9 @@
+services:
+  notebook:
+    build: .
+    volumes:
+      - .:/workspace
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
