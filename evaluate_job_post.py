@@ -8,47 +8,19 @@ import os
 import re
 import sys
 
-import requests
 from tavily import TavilyClient
-import aisuite as ai
-
 from dotenv import load_dotenv
+
+from llm import _ask_json, _ask_json_with_tools
+from commute import commute_score, FULLY_REMOTE
 
 load_dotenv()
 
-ORS_API_KEY = os.environ["ORS_API_KEY"]
-HOME_ADDRESS = os.environ["HOME_ADDRESS"]
-ORS_BASE_URL = "https://api.openrouteservice.org"
-EXTRACTION_MODEL = "anthropic:claude-haiku-4-5-20251001"
-FULLY_REMOTE = "Fully Remote"
+EXTRACTION_MODEL_MAX_TOKENS = 4096
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 RESUME_PATH = os.path.join(DATA_DIR, "resume.md")
 JOB_PREFERENCES_PATH = os.path.join(DATA_DIR, "job_preferences.md")
 RUBRIC_PATH = os.path.join(DATA_DIR, "compatibility_rubric.json")
-
-
-def _parse_json_reply(content):
-    """ extract JSON from a model reply that may include a code fence and/or leading prose """
-    fence_match = re.search(r"```(?:json)?\s*(.*?)```", content, re.DOTALL)
-    if fence_match:
-        content = fence_match.group(1)
-    else:
-        brace_match = re.search(r"\{.*\}", content, re.DOTALL)
-        if brace_match:
-            content = brace_match.group(0)
-    return json.loads(content.strip())
-
-
-def _ask_json(prompt, max_tokens=1024):
-    """ send a prompt to the extraction model and parse its JSON reply """
-    client = ai.Client()
-    messages = [{"role": "user", "content": prompt}]
-    response = client.chat.completions.create(
-        model=EXTRACTION_MODEL,
-        messages=messages,
-        max_tokens=max_tokens,
-    )
-    return _parse_json_reply(response.choices[0].message.content)
 
 
 def read_resume():
@@ -104,32 +76,6 @@ TOOLS = {
 }
 
 
-def _ask_json_with_tools(prompt, tool_names, max_tokens=1024, max_iterations=10):
-    """ run an agentic tool-call loop, letting the model call the given tools before answering """
-    client = ai.Client()
-    tool_specs = [TOOLS[name]["spec"] for name in tool_names]
-    messages = [{"role": "user", "content": prompt}]
-
-    for _ in range(max_iterations):
-        response = client.chat.completions.create(
-            model=EXTRACTION_MODEL,
-            messages=messages,
-            tools=tool_specs,
-            max_tokens=max_tokens,
-        )
-        message = response.choices[0].message
-        if not message.tool_calls:
-            return _parse_json_reply(message.content)
-
-        messages.append({"role": "assistant", "content": message.content, "tool_calls": message.tool_calls})
-        for tool_call in message.tool_calls:
-            args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
-            result = TOOLS[tool_call.function.name]["impl"](**args)
-            messages.append({"role": "tool", "tool_call_id": tool_call.id, "content": str(result)})
-
-    raise RuntimeError("tool-call loop did not converge within max_iterations")
-
-
 def scrape_post(url):
     """given a web address with a job post, extract job title, company, location relevant data and description"""
     tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
@@ -145,66 +91,8 @@ def scrape_post(url):
         "Description should collect the full job and company description, including the remote policy information available."
         "Respond with only the JSON object, no other text.\n\n"
         f"{page_text}",
-        max_tokens=4096,
+        max_tokens=EXTRACTION_MODEL_MAX_TOKENS,
     )
-
-
-def classify_location(company, location):
-    """ decide whether location is already a full address, a generic place name, or remote """
-    return _ask_json(
-        "You are given a job posting's company name and its raw location text.\n"
-        f"Company: {company}\n"
-        f"Location: {location}\n\n"
-        'Respond with only a JSON object with keys "status" and "address":\n'
-        '"status" must hold one of the following 3 options:\n'
-        '- "remote": the job is fully remote, no office attendance is required. Set "address" to null.\n'
-        '- "full_address": the location text already contains a specific street-level '
-        'address (street name and number), not just a city/region/country. Set '
-        '"address" to that address.\n'
-        '- "generic": the location text only names a city/region/country without a '
-        'specific street address. Set "address" to null.\n',
-        max_tokens=256,
-    )
-
-
-def search_office_address(company, location):
-    """ search the web for the company's office address, using location as a discriminator """
-    # LinkedIn appends "Metropolitan Area" to location text when it lacks a precise city;
-    # it's noise for search (not a real geographic term) and dilutes results toward
-    # unrelated same-named companies rather than helping narrow down the right one.
-    clean_location = re.sub(r"\s*Metropolitan Area\s*$", "", location, flags=re.IGNORECASE)
-
-    tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
-    results = tavily.search(f"{company} headquarters office address {clean_location}", max_results=5)
-    return "\n\n".join(f"{r['title']}\n{r['content']}" for r in results["results"])
-
-
-def resolve_office_address(company, location, search_context):
-    """ pick the office address matching location out of the search results """
-    result = _ask_json(
-        f"Company: {company}\n"
-        f"Known location (city/region) - use this to pick the right office if the "
-        f"company has multiple locations: {location}\n\n"
-        f"Search results:\n{search_context}\n\n"
-        "Find the company's full street-level office address that matches the given "
-        'location. Respond with only a JSON object: {"address": <full address string, '
-        "or null if it can't be determined from the search results>}.",
-        max_tokens=256,
-    )
-    return result["address"]
-
-
-def figure_address(company, location):
-    """ return a full street address for company/location, or FULLY_REMOTE if no office applies """
-    classification = classify_location(company, location)
-
-    if classification["status"] == "remote":
-        return FULLY_REMOTE
-    if classification["status"] == "full_address" and classification["address"]:
-        return classification["address"]
-
-    search_context = search_office_address(company, location)
-    return resolve_office_address(company, location, search_context)
 
 
 def draft_rubric(resume, preferences):
@@ -233,8 +121,9 @@ def draft_rubric(resume, preferences):
         'flags needed - matching is case-insensitive>, "type": "requirement_match" | '
         '"candidate_strength" | "dealbreaker", "weight": <integer 1-5 importance>, '
         '"rationale": <why this criterion matters, one sentence>}, ...]}',
+        tools=TOOLS,
         tool_names=["test_regex"],
-        max_tokens=4096,
+        max_tokens=EXTRACTION_MODEL_MAX_TOKENS,
         max_iterations=30,
     )
 
@@ -260,7 +149,7 @@ def reflect_on_rubric(resume, preferences, draft):
         "5. Incorrect weight/type assignments.\n\n"
         "Respond with only a JSON object in the exact same schema as the draft rubric, "
         'containing your revised, final criteria list: {"criteria": [...]}',
-        max_tokens=4096,
+        max_tokens=EXTRACTION_MODEL_MAX_TOKENS,
     )
 
 
@@ -296,11 +185,19 @@ def load_or_compile_rubric():
 
 
 def evaluate_rubric(rubric, description):
-    """ deterministically check which rubric criteria match a job description, via regex """
+    """ deterministically check which rubric criteria match a job description, via regex.
+        each criterion gets a "score": +weight if a requirement_match/candidate_strength
+        criterion matched, -weight if a dealbreaker matched, 0 otherwise (unmet requirement
+        or dealbreaker correctly absent).
+    """
     evaluated = []
     for criterion in rubric["criteria"]:
         matched = bool(re.search(criterion["pattern"], description, re.IGNORECASE))
-        evaluated.append({**criterion, "matched": matched})
+        if matched:
+            score = -criterion["weight"] if criterion["type"] == "dealbreaker" else criterion["weight"]
+        else:
+            score = 0
+        evaluated.append({**criterion, "matched": matched, "score": score})
     return evaluated
 
 
@@ -315,112 +212,20 @@ def compatibility_score(job_title, company, description):
         f"Job title: {job_title}\n"
         f"Company: {company}\n"
         f"Description:\n{description}\n\n"
-        "Rubric evaluation (regex-verified against the ad text above, do not contradict it):\n"
+        "Rubric evaluation (regex-verified against the ad text above, do not contradict it). "
+        "Each criterion carries a 'score': positive (its weight) if a matched "
+        "requirement_match/candidate_strength, negative (its weight) if a matched dealbreaker, "
+        "0 if unmatched:\n"
         f"{json.dumps(evaluated_criteria, indent=2)}\n\n"
         "Using the rubric evaluation as grounding for factual claims about what the ad does "
-        "or doesn't mention, produce a final compatibility judgment. Weigh matched "
-        "requirement_match/candidate_strength criteria positively (scaled by weight), "
-        "matched dealbreaker criteria very negatively, and note unmatched criteria only if "
-        "they were important (high weight) requirement_matches.\n\n"
+        "or doesn't mention, produce a final compatibility judgment. Weigh criteria by their "
+        "'score', and note unmatched criteria only if they were important (high weight) "
+        "requirement_matches.\n\n"
         'Respond with only a JSON object: {"compatibility_score": <integer 0-100>, '
         '"rationale": <explanation citing which matched/unmatched criteria drove the score>}.',
         max_tokens=1024,
     )
     return {**result, "criteria": evaluated_criteria}
-
-
-def figure_days_on_office(description):
-    """ return the required number of on-site office days per week (0-5) """
-    result = _ask_json(
-        "You are given a job posting's location text and full description. Determine "
-        "how many days per week on-site office attendance is required.\n"
-        f"Description:\n{description}\n\n"
-        'Respond with only text representing a single integer 0-5.\n'
-        "- 0 means fully remote, no office attendance required.\n"
-        "- 5 means fully in-office / on-site every day.\n"
-        "- For hybrid roles, use the number of required in-office days per week explicitly "
-        'stated (e.g. "3 days a week", "hybrid 2 days/week").\n'
-        "- if the job location is hybrid but no specific number of days is stated, use 4.\n"
-        "- If nothing about remote/hybrid/on-site policy is mentioned at all, use 5 as the "
-        "conservative default."
-        "double check that your reply is text representing a single integer with no other added comment",
-        max_tokens=256,
-    )
-    return result
-
-
-def geocode_address(address):
-    """ return (longitude, latitude) for a free-form address string """
-    response = requests.get(
-        f"{ORS_BASE_URL}/geocode/search",
-        params={"api_key": ORS_API_KEY, "text": address, "size": 1},
-        timeout=10,
-    )
-    response.raise_for_status()
-    features = response.json()["features"]
-    if not features:
-        raise ValueError(f"could not geocode address: {address}")
-    return features[0]["geometry"]["coordinates"]
-
-
-def commute_route(address, profile="driving-car"):
-    """ return (duration_minutes, distance_km) from HOME_ADDRESS to address """
-    origin = geocode_address(HOME_ADDRESS)
-    destination = geocode_address(address)
-
-    response = requests.get(
-        f"{ORS_BASE_URL}/v2/directions/{profile}",
-        params={
-            "api_key": ORS_API_KEY,
-            "start": f"{origin[0]},{origin[1]}",
-            "end": f"{destination[0]},{destination[1]}",
-        },
-        timeout=10,
-    )
-    response.raise_for_status()
-    segment = response.json()["features"][0]["properties"]["segments"][0]
-    return segment["duration"] / 60, segment["distance"] / 1000
-
-
-def commute_time(address, profile="driving-car"):
-    """ return commute time in minutes """
-    duration, _ = commute_route(address, profile)
-    return duration
-
-
-def commute_score(company, location, description):
-    """commute_score is the commute time for companies requiring 3 or 4 days from office.
-       for fully in office, multiply by 1.5
-       for <3 days on office, commute score is commute_time * days-on-office / 3.
-       fully remote jobs have no commute, so their score is 0.
-       returns {"score": float, "days_on_office": int, "address": str,
-                "raw_minutes": float|None, "distance_km": float|None}
-    """
-    days_on_office = int(figure_days_on_office(description))
-
-    if days_on_office <= 0:
-        return {"score": 0, "days_on_office": days_on_office, "address": FULLY_REMOTE,
-                "raw_minutes": None, "distance_km": None}
-
-    address = figure_address(company, location)
-    if address == FULLY_REMOTE:
-        return {"score": 0, "days_on_office": days_on_office, "address": FULLY_REMOTE,
-                "raw_minutes": None, "distance_km": None}
-    if not address:
-        return {"score": None, "days_on_office": days_on_office, "address": None,
-                "raw_minutes": None, "distance_km": None}
-
-    time, distance = commute_route(address)
-
-    if days_on_office >= 5:
-        score = time * 1.5
-    elif days_on_office in (3, 4):
-        score = time
-    else:
-        score = time * days_on_office / 3
-
-    return {"score": score, "days_on_office": days_on_office, "address": address,
-            "raw_minutes": time, "distance_km": distance}
 
 
 def summarize_evaluation(job, commute, compatibility):
