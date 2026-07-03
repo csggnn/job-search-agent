@@ -2,17 +2,18 @@
 Evaluate a job post for fitness to my criteria: compatibility with my experience and ambitions, commute time
 """
 
+import argparse
 import hashlib
 import json
 import os
 import re
-import sys
 
 from tavily import TavilyClient
 from dotenv import load_dotenv
 
 from llm import _ask_json, _ask_json_with_tools
 from commute import commute_score, FULLY_REMOTE
+import storage
 
 load_dotenv()
 
@@ -260,8 +261,30 @@ def summarize_evaluation(job, commute, compatibility):
     )
 
 
-def evaluate_job(url):
-    """ scrape a job posting and produce a full evaluation: commute, compatibility, overview """
+def evaluate_job(url, force=False):
+    """ scrape a job posting and produce a full evaluation: commute, compatibility, overview.
+        returns a saved evaluation instead of re-running the pipeline if one already exists
+        for this url and the compatibility rubric hasn't changed since, unless force=True.
+    """
+    rubric = load_or_compile_rubric()
+    rubric_hash = storage.rubric_content_hash(rubric)
+
+    if not force:
+        cached = storage.get_cached_evaluation(url, rubric_hash)
+        if cached is not None:
+            print(f"Evaluating Position: {cached['job_title']} at {cached['company']} "
+                  f"(cached from {cached['evaluated_at']})")
+            if cached["commute_score"] is None:
+                print(f"Commute score: unknown ({cached['days_on_office']} days/week, "
+                      f"address not found)")
+            else:
+                print(f"Commute score: {cached['commute_score']:.1f} min "
+                      f"({cached['days_on_office']} days/week, {cached['commute_address']})")
+            print(f"Compatibility score: {cached['compatibility_score']}/100")
+            print("Works well:", cached["works_well"])
+            print("Does not work:", cached["does_not_work"])
+            return cached
+
     job = scrape_post(url)
     print(f"Evaluating Position: {job['job_title']} at {job['company']}")
 
@@ -279,15 +302,24 @@ def evaluate_job(url):
     print("Works well:", overview["works_well"])
     print("Does not work:", overview["does_not_work"])
 
-    return {
+    result = {
         "job_title": job["job_title"],
         "company": job["company"],
         "commute_score": commute["score"],
+        "commute_address": commute["address"],
+        "days_on_office": commute["days_on_office"],
         "compatibility_score": compatibility["compatibility_score"],
         "works_well": overview["works_well"],
         "does_not_work": overview["does_not_work"],
     }
+    storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview)
+    return result
 
 
 if __name__ == "__main__":
-    evaluate_job(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument("url")
+    parser.add_argument("--force", action="store_true",
+                         help="ignore any saved evaluation and force a fresh run")
+    args = parser.parse_args()
+    evaluate_job(args.url, force=args.force)
