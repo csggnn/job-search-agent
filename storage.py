@@ -99,10 +99,14 @@ def normalize_url(url):
 
 
 def rubric_content_hash(rubric):
-    """ sha256 of the rubric's criteria list, used to detect any rubric change (including
-        hand-edits to compatibility_rubric.json that don't touch resume.md/job_preferences.md)
+    """ sha256 of every rubric field that feeds compatibility_score()'s prompt (criteria +
+        scoring_guidance), used to detect any change that would affect an already-evaluated
+        job's judgment - including hand-edits to compatibility_rubric.json that don't touch
+        resume.md/job_preferences.md, and scoring_guidance-only edits that don't add/remove/
+        reweight any criterion.
     """
-    return hashlib.sha256(json.dumps(rubric["criteria"], sort_keys=True).encode()).hexdigest()
+    payload = {"criteria": rubric["criteria"], "scoring_guidance": rubric.get("scoring_guidance")}
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 def list_evaluated_urls():

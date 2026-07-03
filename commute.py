@@ -123,12 +123,14 @@ def figure_days_on_office(description):
 def improve_for_geocode(address):
     """ improve a free-form address string for geocoding by adding city/state/country if missing """
     result = _ask_json(
-        """You are given a free-form address string which failed a geocoding attempt. " \
-        "Improve it so that it includes the city, state, and country if they are missing. " \ 
-        "or remove parts which are not relevant to geocoding.""",
-        max_tokens=256
+        f"This address failed a geocoding attempt: {address!r}\n\n"
+        "Improve it so that it includes the city, state, and country if they are missing, "
+        "and remove any parts that are not relevant to geocoding (e.g. building/company "
+        "names, floor or suite numbers).\n\n"
+        'Respond with only a JSON object: {"address": <improved address string>}.',
+        max_tokens=256,
     )
-    return result
+    return result["address"]
 
 
 def geocode_address(address):
