@@ -4,6 +4,9 @@ anthropic
 groq
 tavily-python>=0.7.12
 
+# === Job search ===
+python-jobspy
+
 # === Utilities ===
 python-dotenv
 requests
