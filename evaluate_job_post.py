@@ -42,6 +42,20 @@ def _file_hash(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
+def _extract_section(markdown_text, heading):
+    """ return the raw text under a "## <heading>" section of a markdown document, up to the
+        next "## " heading or end of document; None if the heading isn't present. Used to carry
+        free-text sections (e.g. candidate-authored scoring guidance) verbatim into the rubric,
+        without any domain-specific content living in code.
+    """
+    match = re.search(
+        rf"^##\s+{re.escape(heading)}\s*\n(.*?)(?=\n##\s+|\Z)",
+        markdown_text,
+        re.DOTALL | re.MULTILINE,
+    )
+    return match.group(1).strip() if match else None
+
+
 def test_regex(pattern, test_text):
     """ tool: test a regex pattern (case-insensitive) against a piece of sample text """
     try:
@@ -166,6 +180,7 @@ def compile_rubric():
         "resume_hash": _file_hash(RESUME_PATH),
         "preferences_hash": _file_hash(JOB_PREFERENCES_PATH),
         "criteria": reviewed["criteria"],
+        "scoring_guidance": _extract_section(preferences, "Scoring Notes"),
     }
     with open(RUBRIC_PATH, "w") as f:
         json.dump(rubric, f, indent=2)
@@ -208,6 +223,8 @@ def compatibility_score(job_title, company, description):
     """
     rubric = load_or_compile_rubric()
     evaluated_criteria = evaluate_rubric(rubric, description)
+    scoring_guidance = rubric.get("scoring_guidance")
+    guidance_block = f"\nAdditional scoring guidance from the candidate:\n{scoring_guidance}\n" if scoring_guidance else ""
 
     result = _ask_json(
         f"Job title: {job_title}\n"
@@ -217,11 +234,12 @@ def compatibility_score(job_title, company, description):
         "Each criterion carries a 'score': positive (its weight) if a matched "
         "requirement_match/candidate_strength, negative (its weight) if a matched dealbreaker, "
         "0 if unmatched:\n"
-        f"{json.dumps(evaluated_criteria, indent=2)}\n\n"
+        f"{json.dumps(evaluated_criteria, indent=2)}\n"
+        f"{guidance_block}\n"
         "Using the rubric evaluation as grounding for factual claims about what the ad does "
         "or doesn't mention, produce a final compatibility judgment. Weigh criteria by their "
-        "'score', and note unmatched criteria only if they were important (high weight) "
-        "requirement_matches.\n\n"
+        "'score', note unmatched criteria only if they were important (high weight) "
+        "requirement_matches, and apply the additional scoring guidance above if any was given.\n\n"
         'Respond with only a JSON object: {"compatibility_score": <integer 0-100>, '
         '"rationale": <explanation citing which matched/unmatched criteria drove the score>}.',
         max_tokens=1024,
@@ -261,6 +279,33 @@ def summarize_evaluation(job, commute, compatibility):
     )
 
 
+def _print_evaluation(evaluation, cached):
+    """ print an evaluation dict (as returned by storage.get_evaluation) in a consistent
+        format, whether it was just computed or served from the cache
+    """
+    suffix = f" (cached from {evaluation['evaluated_at']})" if cached else ""
+    print(f"Evaluating Position: {evaluation['job_title']} at {evaluation['company']}{suffix}")
+
+    if evaluation["commute_score"] is None:
+        print(f"Commute score: unknown ({evaluation['days_on_office']} days/week, "
+              f"address not found)")
+    else:
+        print(f"Commute score: {evaluation['commute_score']:.1f} min "
+              f"({evaluation['days_on_office']} days/week, {evaluation['commute_address']})")
+
+    print(f"Compatibility score: {evaluation['compatibility_score']}/100")
+    print("Works well:", evaluation["works_well"])
+    print("Does not work:", evaluation["does_not_work"])
+
+    print("Reviewed:", "yes" if evaluation["reviewed"] else "no")
+    status_line = f"Application status: {evaluation['application_status']}"
+    if evaluation["status_reason"]:
+        status_line += f" (reason: {evaluation['status_reason']})"
+    print(status_line)
+    if evaluation["notes"]:
+        print("Notes:", evaluation["notes"])
+
+
 def evaluate_job(url, force=False):
     """ scrape a job posting and produce a full evaluation: commute, compatibility, overview.
         returns a saved evaluation instead of re-running the pipeline if one already exists
@@ -270,49 +315,19 @@ def evaluate_job(url, force=False):
     rubric_hash = storage.rubric_content_hash(rubric)
 
     if not force:
-        cached = storage.get_cached_evaluation(url, rubric_hash)
-        if cached is not None:
-            print(f"Evaluating Position: {cached['job_title']} at {cached['company']} "
-                  f"(cached from {cached['evaluated_at']})")
-            if cached["commute_score"] is None:
-                print(f"Commute score: unknown ({cached['days_on_office']} days/week, "
-                      f"address not found)")
-            else:
-                print(f"Commute score: {cached['commute_score']:.1f} min "
-                      f"({cached['days_on_office']} days/week, {cached['commute_address']})")
-            print(f"Compatibility score: {cached['compatibility_score']}/100")
-            print("Works well:", cached["works_well"])
-            print("Does not work:", cached["does_not_work"])
-            return cached
+        existing = storage.get_evaluation(url)
+        if existing is not None and existing["rubric_hash"] == rubric_hash:
+            _print_evaluation(existing, cached=True)
+            return existing
 
     job = scrape_post(url)
-    print(f"Evaluating Position: {job['job_title']} at {job['company']}")
-
     commute = commute_score(job["company"], job["location"], job["description"])
-    if commute["score"] is None:
-        print(f"Commute score: unknown ({commute['days_on_office']} days/week, address not found)")
-    else:
-        print(f"Commute score: {commute['score']:.1f} min "
-              f"({commute['days_on_office']} days/week, {commute['address']})")
-
     compatibility = compatibility_score(job["job_title"], job["company"], job["description"])
-    print(f"Compatibility score: {compatibility['compatibility_score']}/100")
-
     overview = summarize_evaluation(job, commute, compatibility)
-    print("Works well:", overview["works_well"])
-    print("Does not work:", overview["does_not_work"])
 
-    result = {
-        "job_title": job["job_title"],
-        "company": job["company"],
-        "commute_score": commute["score"],
-        "commute_address": commute["address"],
-        "days_on_office": commute["days_on_office"],
-        "compatibility_score": compatibility["compatibility_score"],
-        "works_well": overview["works_well"],
-        "does_not_work": overview["does_not_work"],
-    }
     storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview)
+    result = storage.get_evaluation(url)
+    _print_evaluation(result, cached=False)
     return result
 
 
