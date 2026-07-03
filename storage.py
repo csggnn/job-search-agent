@@ -105,6 +105,19 @@ def rubric_content_hash(rubric):
     return hashlib.sha256(json.dumps(rubric["criteria"], sort_keys=True).encode()).hexdigest()
 
 
+def list_evaluated_urls():
+    """ return [(url, normalized_url), ...] for every saved evaluation - the original url last
+        passed to save_evaluation() plus its normalized form, for callers that need to diff
+        against another set of urls (e.g. cases.json) using the same normalization.
+    """
+    conn = _get_connection()
+    try:
+        rows = conn.execute("SELECT url, normalized_url FROM evaluations").fetchall()
+    finally:
+        conn.close()
+    return rows
+
+
 _EVALUATION_COLUMNS = (
     "job_title", "company", "commute_score", "commute_address", "days_on_office",
     "compatibility_score", "compatibility_rationale", "works_well", "does_not_work",
@@ -128,6 +141,26 @@ def get_evaluation(url):
     if row is None:
         return None
     return dict(zip(_EVALUATION_COLUMNS, row))
+
+
+_CRITERION_COLUMNS = ("name", "type", "weight", "matched", "score", "rationale")
+
+
+def get_evaluation_criteria(url):
+    """ return the list of evaluation_criteria rows (name, type, weight, matched, score,
+        rationale) for url's saved evaluation, or [] if never evaluated.
+    """
+    conn = _get_connection()
+    try:
+        rows = conn.execute(
+            f"SELECT {', '.join(_CRITERION_COLUMNS)} FROM evaluation_criteria "
+            "WHERE evaluation_id = (SELECT id FROM evaluations WHERE normalized_url = ?)",
+            (normalize_url(url),),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    return [dict(zip(_CRITERION_COLUMNS, row)) for row in rows]
 
 
 def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
