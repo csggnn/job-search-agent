@@ -59,6 +59,30 @@ data/job_preferences.md ─┘   (draft + reflect,        (cached, gitignored)  
 change (content-hash check) — every regular `evaluate_job()` call reuses the cached
 rubric and just regex-matches against it, which costs nothing.
 
+### Discovery: `discover_jobs.py`
+
+`discover_jobs.py` finds new candidate job URLs instead of requiring you to paste one
+in: it asks an LLM to derive search query phrases from `resume.md` + `job_preferences.md`
+(cached in `data/search_queries.json`, invalidated the same way the rubric is), runs
+each query against Indeed + LinkedIn via the [JobSpy](https://github.com/speedyapply/JobSpy)
+library, dedupes against URLs already in `evaluations.db`, and either lists the new
+candidates or (with `--evaluate`) runs them through `evaluate_job()`.
+
+**Fallback when a discovered URL can't be scraped.** Some job boards (LinkedIn, Ashby,
+and other JS-rendered/login-walled pages) reliably fail Tavily extraction —
+`scrape_post()` raises `ScrapeError` in that case. `discover_jobs.py` catches it and
+searches the web with the candidate's known company + title (still Tavily: 1 search +
+up to 3 extracts + 1 LLM call to disambiguate) for a page that contains that exact
+posting's own full description, published by that exact company — explicitly
+excluding third-party re-poster domains (Indeed, Glassdoor, jobleads, bebee, ...),
+since those tend to carry a thin/stale copy that scores worse than no evaluation at
+all. If a genuine match is found (typically the company's own careers page or their
+ATS, e.g. Greenhouse/Ashby-hosted-on-their-own-domain), `evaluate_job()` runs against
+that URL instead. If nothing on the company's own site matches — same-title postings
+at unrelated companies and generic "here are our open roles" listing pages are both
+deliberately rejected — the candidate is skipped rather than evaluated against
+low-quality content.
+
 ## Setup
 
 1. Clone the repo, then fill in `.env` (already present as an empty template — see
@@ -89,6 +113,8 @@ rubric and just regex-matches against it, which costs nothing.
 | I want to...                                          | Run this                                                          |
 |--------------------------------------------------------|---------------------------------------------------------------------|
 | Evaluate a job posting                                 | `python evaluate_job_post.py <url>`                                 |
+| Find new candidate jobs (lists URLs, doesn't score)     | `python discover_jobs.py`                                           |
+| Find and score new candidate jobs                       | `python discover_jobs.py --evaluate` (add `--limit N` to cap how many get scored) |
 | Force a fresh evaluation (ignore the saved cache)       | `python evaluate_job_post.py <url> --force`                         |
 | See the 5 highest-scoring saved jobs                    | `sqlite3 data/evaluations.db "SELECT job_title, company, compatibility_score FROM evaluations ORDER BY compatibility_score DESC LIMIT 5;"` |
 | See everything saved for one job                        | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
@@ -106,6 +132,8 @@ above — they're plain SQL / a Python call. See
 
 ```
 evaluate_job_post.py         entry point: scrape -> commute -> compatibility -> summary -> save
+discover_jobs.py             derive search queries from resume/preferences, search Indeed +
+                              LinkedIn (JobSpy), surface/evaluate new candidate job URLs
 commute.py                   office-address lookup + commute-time scoring (OpenRouteService)
 llm.py                       thin aisuite wrapper: one-shot JSON calls + an agentic tool-call loop
 storage.py                   SQLite persistence, URL normalization, cache-hash helpers
@@ -113,6 +141,7 @@ data/
   resume.md                  user-provided
   job_preferences.md         user-provided
   compatibility_rubric.json  generated, gitignored
+  search_queries.json        generated, gitignored (discover_jobs.py's cached query set)
   evaluations.db             generated, gitignored
 evals/
   cases.json                 generated (from real runs), gitignored, hand-edited afterward
@@ -184,6 +213,14 @@ does, it dwarfs the cost of evaluating any number of jobs against the cached res
 unconditionally — N jobs × 4-6 LLM calls, every time it's run, even if only one job's
 data actually needed refreshing. See the first item in
 [Future Improvements](#future-improvements).
+
+**`discover_jobs.py --evaluate` adds a per-candidate cost on top of the above.** Query
+derivation is 1 LLM call, cached until resume/preferences change. Each JobSpy search
+itself is free (no Tavily/LLM involved). Any candidate whose URL can't be scraped adds
+1 Tavily search + up to 3 Tavily extracts + 1 LLM call for the company-site fallback
+lookup — before the normal per-job evaluation cost above even starts (and that only
+happens if the fallback finds a genuine match; otherwise the candidate is skipped for
+free).
 
 ## Evals
 
