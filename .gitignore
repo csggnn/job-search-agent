@@ -16,3 +16,6 @@ __pycache__/
 
 # Local-only tool permission overrides (see .claude/settings.json for shared config)
 .claude/settings.local.json
+
+# Local git worktrees - each is a full checkout of another branch, not repo content
+.trees/
