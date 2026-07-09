@@ -91,12 +91,19 @@ TOOLS = {
 }
 
 
+class ScrapeError(ValueError):
+    """ raised when a job posting's content could not be extracted from a URL - callers with
+        other metadata about the posting (e.g. discover_jobs.py) can catch this specifically to
+        try an alternate source rather than a generic pipeline failure
+    """
+
+
 def scrape_post(url):
     """given a web address with a job post, extract job title, company, location relevant data and description"""
     tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
     result = tavily.extract(url, format="text")
     if not result["results"]:
-        raise ValueError(f"could not extract content from: {url}")
+        raise ScrapeError(f"could not extract content from: {url}")
     page_text = result["results"][0]["raw_content"]
 
     return _ask_json(

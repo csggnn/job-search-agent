@@ -13,17 +13,19 @@ import argparse
 import json
 import os
 import re
+from urllib.parse import urlsplit
 
 import pandas as pd
 from dotenv import load_dotenv
 from jobspy import scrape_jobs
 from jobspy.model import Country
+from tavily import TavilyClient
 
 from llm import _ask_json
 from commute import HOME_ADDRESS
 from evaluate_job_post import (
     read_resume, read_job_preferences, _file_hash, _extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR, evaluate_job,
+    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR, evaluate_job, ScrapeError,
 )
 import storage
 
@@ -35,6 +37,17 @@ DEFAULT_MAX_RESULTS = 10
 DEFAULT_SITES = ["indeed", "linkedin"]
 _COUNTRY_CODE_RE = re.compile(r"^[a-z]{2}$")
 _COUNTRY_NAMES = {c.value[1]: c.value[0] for c in Country}  # alpha-2 -> JobSpy country name
+
+# third-party re-posters/aggregators tend to carry a thin/stale copy of the posting (missing
+# the detail an LLM needs to score it well) - excluded from the fallback search alongside
+# whichever domain originally failed to scrape, so results are biased toward the company's
+# own careers page
+_AGGREGATOR_DOMAINS = {
+    "linkedin.com", "indeed.com", "glassdoor.com", "jobleads.com", "bebee.com",
+    "monster.com", "jobrapido.com", "jooble.org", "careerjet.com", "simplyhired.com",
+    "ziprecruiter.com", "talent.com", "adzuna.com", "neuvoo.com", "jobsora.com",
+    "trabajo.org", "whatjobs.com", "learn4good.com", "receptix.com",
+}
 
 
 def _resolve_target_locations(resume, preferences):
@@ -243,6 +256,59 @@ def _print_candidates(candidates):
         print(f"  matched: {', '.join(c['matched_queries'])}")
 
 
+def find_company_posting_url(company, title, excluded_domain, debug=False):
+    """ when a discovered posting's URL couldn't be scraped (e.g. a JS-heavy aggregator page
+        like LinkedIn/Ashby), search the web for the company's own careers page for the same
+        role and return its URL - None if no matching posting is found there. Deliberately
+        does not fall back to third-party re-poster sites (jobleads, bebee, ...): those tend to
+        carry a thin/stale copy of the posting that scores worse than having no posting at all.
+    """
+    query = f"{company} careers {title}"
+    tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+    results = tavily.search(query, max_results=5)
+    # skip the domain that already failed to extract (retrying there just reproduces the
+    # original failure) and known aggregators/re-posters, biasing toward the company's own site
+    candidate_urls = [
+        r["url"] for r in results["results"]
+        if urlsplit(r["url"]).netloc != excluded_domain
+        and not any(d in urlsplit(r["url"]).netloc for d in _AGGREGATOR_DOMAINS)
+    ][:3]
+    if debug:
+        print(f"[find_company_posting_url] query={query!r} candidates={candidate_urls}")
+    if not candidate_urls:
+        return None
+
+    extracted = tavily.extract(candidate_urls, format="text")
+    if not extracted["results"]:
+        return None
+
+    context = "\n\n---\n\n".join(
+        f"{r['url']}\n{r['raw_content'][:3000]}" for r in extracted["results"]
+    )
+    result = _ask_json(
+        f"Company being searched for: {company}\nJob title being searched for: {title}\n\n"
+        f"Search results (url + page content):\n{context}\n\n"
+        "Identify which URL, if any, is a page containing this specific job posting's own "
+        "full requirements/responsibilities text - not just its title - published by this "
+        f"exact company ({company}). A page qualifies only if ALL of the following are true:\n"
+        "1. It shows this role's own requirements/responsibilities, not just its title inside "
+        "a list of the company's other open positions or a company profile summary.\n"
+        "2. It's this exact role, not a different one.\n"
+        f"3. The page's own content identifies the employer as {company} - this is critical, "
+        "since job titles repeat across many unrelated employers, so a title/seniority match "
+        "alone is not enough.\n\n"
+        "It is common and expected for NONE of the candidates to qualify (e.g. the only "
+        "results are re-posters, unrelated companies, or listing pages) - in that case you "
+        "must respond with null rather than picking the closest/least-bad option. Respond "
+        'with only a JSON object: {"url": <the matching url, or null if none of these pages '
+        "satisfies all three conditions above>}.",
+        max_tokens=256,
+    )
+    if debug:
+        print(f"[find_company_posting_url] -> {result}")
+    return result.get("url")
+
+
 def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_RESULTS,
                    force_queries=False, debug=False):
     """ full discovery pipeline: compile/reuse search queries, search Google Jobs, dedupe
@@ -268,6 +334,18 @@ def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_
     for c in to_run:
         try:
             results.append(evaluate_job(c["url"]))
+        except ScrapeError as e:
+            print(f"  could not scrape {c['url']} ({e}) - searching {c['company']}'s site directly")
+            alt_url = find_company_posting_url(
+                c["company"], c["title"], urlsplit(c["url"]).netloc, debug=debug,
+            )
+            if not alt_url:
+                print(f"  skipping {c['url']}: no matching posting found on {c['company']}'s site")
+                continue
+            try:
+                results.append(evaluate_job(alt_url))
+            except Exception as e2:
+                print(f"  skipping {c['url']}: fallback {alt_url} also failed: {e2}")
         except Exception as e:
             print(f"  skipping {c['url']}: {e}")
     return results
