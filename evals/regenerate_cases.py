@@ -21,9 +21,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from evaluate_job_post import evaluate_job
+from jobsearch.evaluation import evaluate_job
 from add_case import build_case, _slugify
-import storage
+from jobsearch import storage
 
 CASES_PATH = os.path.join(os.path.dirname(__file__), "cases.json")
 BACKUP_PATH = os.path.join(os.path.dirname(__file__), "cases.json.bak")

@@ -10,10 +10,9 @@ import sqlite3
 from datetime import datetime, timezone
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
-from commute import FULLY_REMOTE
+from jobsearch import config
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-DB_PATH = os.path.join(DATA_DIR, "evaluations.db")
+DB_PATH = os.path.join(config.DATA_DIR, "evaluations.db")
 
 # query params that are tracking noise, not part of a job posting's identity
 _TRACKING_PARAMS = {"trk", "trackingid", "refid", "ref", "originalsubdomain", "position", "pagenum"}
@@ -77,7 +76,7 @@ def _migrate_schema(conn):
 
 def _get_connection():
     """ open a connection to the evaluations DB, creating/migrating the schema if needed """
-    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(config.DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(_SCHEMA)
@@ -175,7 +174,7 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
     """
     normalized = normalize_url(url)
     evaluated_at = datetime.now(timezone.utc).isoformat()
-    is_remote = 1 if commute["address"] == FULLY_REMOTE else 0
+    is_remote = 1 if commute["address"] == config.FULLY_REMOTE else 0
 
     conn = _get_connection()
     try:
