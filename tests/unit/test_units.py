@@ -5,7 +5,7 @@ These cover the deterministic helpers that the package refactor isolated into im
 modules (URL normalization, rubric hashing/application, markdown section extraction,
 query validation, JSON-reply parsing):
 
-    podman-compose exec notebook python3 -m unittest discover -s tests/unit -v
+    podman-compose exec job-search python3 -m unittest discover -s tests/unit -v
 """
 
 import unittest

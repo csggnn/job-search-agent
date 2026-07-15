@@ -22,9 +22,9 @@ compose container:
 
 ```
 podman-compose up -d
-podman-compose exec notebook python3 evaluate_job_post.py <job-url>          # evaluate one job
-podman-compose exec notebook python3 evaluate_job_post.py <job-url> --force  # bypass the cache
-podman-compose exec notebook python3 scripts/check_setup.py                  # verify API keys/provider wiring
+podman-compose exec job-search python3 evaluate_job_post.py <job-url>          # evaluate one job
+podman-compose exec job-search python3 evaluate_job_post.py <job-url> --force  # bypass the cache
+podman-compose exec job-search python3 scripts/check_setup.py                  # verify API keys/provider wiring
 ```
 
 Tests use stdlib `unittest` (no linter configured). Offline unit tests live in
@@ -33,17 +33,17 @@ Tests use stdlib `unittest` (no linter configured). Offline unit tests live in
 subdirectories so the offline suite can run without credentials:
 
 ```
-podman-compose exec notebook python3 -m unittest discover -s tests/unit   # offline unit tests
-podman-compose exec notebook python3 -m unittest discover -s tests/e2e    # live end-to-end smoke test
+podman-compose exec job-search python3 -m unittest discover -s tests/unit   # offline unit tests
+podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # live end-to-end smoke test
 ```
 
 Beyond those, the eval harness exercises the real pipeline against saved ground-truth cases:
 
 ```
-podman-compose exec notebook python3 evals/run_evals.py                  # run all cases
-podman-compose exec notebook python3 evals/run_evals.py --verified-only  # only hand-verified ground truth
-podman-compose exec notebook python3 evals/add_case.py <url>             # add/refresh one case from a live run
-podman-compose exec notebook python3 evals/regenerate_cases.py           # bulk-rebuild every case (expensive: full pipeline re-run per URL, no cache)
+podman-compose exec job-search python3 evals/run_evals.py                  # run all cases
+podman-compose exec job-search python3 evals/run_evals.py --verified-only  # only hand-verified ground truth
+podman-compose exec job-search python3 evals/add_case.py <url>             # add/refresh one case from a live run
+podman-compose exec job-search python3 evals/regenerate_cases.py           # bulk-rebuild every case (expensive: full pipeline re-run per URL, no cache)
 ```
 
 `run_evals.py` reports pass/fail per pipeline **stage** (`days_on_office`, `address`,

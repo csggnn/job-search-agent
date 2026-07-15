@@ -89,11 +89,11 @@ runs inside the provided container.
 3. Start the container and evaluate a posting:
    ```
    podman-compose up -d
-   podman-compose exec notebook python3 evaluate_job_post.py <job-url>
+   podman-compose exec job-search python3 evaluate_job_post.py <job-url>
    ```
 4. Sanity-check that the API keys are wired up:
    ```
-   podman-compose exec notebook python3 scripts/check_setup.py
+   podman-compose exec job-search python3 scripts/check_setup.py
    ```
 
 ## Commands
@@ -192,8 +192,8 @@ credentials, plus the eval harness:
   the top of `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
 
 ```
-podman-compose exec notebook python3 -m unittest discover -s tests/unit   # unit tests, offline
-podman-compose exec notebook python3 -m unittest discover -s tests/e2e    # end-to-end, needs keys
+podman-compose exec job-search python3 -m unittest discover -s tests/unit   # unit tests, offline
+podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # end-to-end, needs keys
 ```
 
 `evals/run_evals.py` runs the real pipeline against `evals/cases.json` and checks
