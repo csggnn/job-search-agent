@@ -21,8 +21,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from evaluate_job_post import evaluate_job
-import storage
+from jobsearch.evaluation import evaluate_job
+from jobsearch import storage
 
 CASES_PATH = os.path.join(os.path.dirname(__file__), "cases.json")
 SCORE_PADDING = 15

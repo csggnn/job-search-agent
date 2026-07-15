@@ -9,6 +9,7 @@ import re
 import aisuite as ai
 
 EXTRACTION_MODEL = "anthropic:claude-haiku-4-5-20251001"
+EXTRACTION_MODEL_MAX_TOKENS = 4096
 
 
 def _parse_json_reply(content):
@@ -23,7 +24,7 @@ def _parse_json_reply(content):
     return json.loads(content.strip())
 
 
-def _ask_json(prompt, max_tokens=1024):
+def ask_json(prompt, max_tokens=1024):
     """ send a prompt to the extraction model and parse its JSON reply """
     client = ai.Client()
     messages = [{"role": "user", "content": prompt}]
@@ -35,7 +36,7 @@ def _ask_json(prompt, max_tokens=1024):
     return _parse_json_reply(response.choices[0].message.content)
 
 
-def _ask_json_with_tools(prompt, tools, tool_names, max_tokens=1024, max_iterations=10):
+def ask_json_with_tools(prompt, tools, tool_names, max_tokens=1024, max_iterations=10):
     """ run an agentic tool-call loop, letting the model call the given tools before answering.
         `tools` is a {name: {"spec": <tool schema>, "impl": <callable>}} registry owned by the caller.
     """

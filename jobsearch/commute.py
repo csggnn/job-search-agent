@@ -3,26 +3,21 @@ Location and commute scoring: resolving an employer's office address for a job p
 and computing a commute score weighted by required in-office days per week.
 """
 
-import os
 import re
 
 import requests
 from tavily import TavilyClient
-from dotenv import load_dotenv
 
-from llm import _ask_json
+from jobsearch import config
+from jobsearch.config import FULLY_REMOTE
+from jobsearch.llm import ask_json
 
-load_dotenv()
-
-ORS_API_KEY = os.environ["ORS_API_KEY"]
-HOME_ADDRESS = os.environ["HOME_ADDRESS"]
 ORS_BASE_URL = "https://api.openrouteservice.org"
-FULLY_REMOTE = "Fully Remote"
 
 
 def classify_location(company, location, debug=False):
     """ decide whether location is already a full address, a generic place name, or remote """
-    result = _ask_json(
+    result = ask_json(
         "You are given a job posting's company name and its raw location text.\n"
         f"Company: {company}\n"
         f"Location: {location}\n\n"
@@ -52,7 +47,7 @@ def search_office_address(company, location, debug=False):
     # search-engine-y terms like "headquarters office address" instead biases results
     # toward directory/aggregator sites that rarely have a real street address.
     query = f"{company} {clean_location}"
-    tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+    tavily = TavilyClient(api_key=config.require_env("TAVILY_API_KEY"))
     results = tavily.search(query, max_results=5)
     urls = [r["url"] for r in results["results"]]
     if debug:
@@ -72,7 +67,7 @@ def search_office_address(company, location, debug=False):
 
 def resolve_office_address(company, location, search_context, debug=False):
     """ pick the office address matching location out of the search results """
-    result = _ask_json(
+    result = ask_json(
         f"Company: {company}\n"
         f"Known location (city/region) - use this to pick the right office if the "
         f"company has multiple locations: {location}\n\n"
@@ -102,7 +97,7 @@ def figure_address(company, location, debug=False):
 
 def figure_days_on_office(description):
     """ return the required number of on-site office days per week (0-5) """
-    result = _ask_json(
+    result = ask_json(
         "You are given a job posting's location text and full description. Determine "
         "how many days per week on-site office attendance is required.\n"
         f"Description:\n{description}\n\n"
@@ -122,7 +117,7 @@ def figure_days_on_office(description):
 
 def improve_for_geocode(address):
     """ improve a free-form address string for geocoding by adding city/state/country if missing """
-    result = _ask_json(
+    result = ask_json(
         f"This address failed a geocoding attempt: {address!r}\n\n"
         "Improve it so that it includes the city, state, and country if they are missing, "
         "and remove any parts that are not relevant to geocoding (e.g. building/company "
@@ -141,7 +136,7 @@ def geocode_address(address):
             address = improve_for_geocode(address)
         response = requests.get(
             f"{ORS_BASE_URL}/geocode/search",
-            params={"api_key": ORS_API_KEY, "text": address, "size": 1},
+            params={"api_key": config.require_env("ORS_API_KEY"), "text": address, "size": 1},
             timeout=10,
         )
         response.raise_for_status()
@@ -156,13 +151,13 @@ def geocode_address(address):
 
 def commute_route(address, profile="driving-car"):
     """ return (duration_minutes, distance_km) from HOME_ADDRESS to address """
-    origin = geocode_address(HOME_ADDRESS)
+    origin = geocode_address(config.home_address())
     destination = geocode_address(address)
 
     response = requests.get(
         f"{ORS_BASE_URL}/v2/directions/{profile}",
         params={
-            "api_key": ORS_API_KEY,
+            "api_key": config.require_env("ORS_API_KEY"),
             "start": f"{origin[0]},{origin[1]}",
             "end": f"{destination[0]},{destination[1]}",
         },

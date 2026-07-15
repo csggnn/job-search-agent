@@ -27,8 +27,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from evaluate_job_post import compatibility_score, scrape_post
-from commute import commute_score as commute_score_fn
+from jobsearch.evaluation import compatibility_score
+from jobsearch.scrape import scrape_post
+from jobsearch.commute import commute_score as commute_score_fn
 
 CASES_PATH = os.path.join(os.path.dirname(__file__), "cases.json")
 
