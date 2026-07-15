@@ -27,8 +27,17 @@ podman-compose exec notebook python3 evaluate_job_post.py <job-url> --force  # b
 podman-compose exec notebook python3 scripts/check_setup.py                  # verify API keys/provider wiring
 ```
 
-There is no unit test suite or linter configured. The closest thing to tests is the
-eval harness:
+Tests use stdlib `unittest` (no linter configured). Offline unit tests live in
+`tests/unit/` (no LLM/network/env); the live end-to-end smoke test lives in `tests/e2e/`
+(needs API keys; set `TARGET_URL` in `tests/e2e/test_e2e_pipeline.py`). Separate
+subdirectories so the offline suite can run without credentials:
+
+```
+podman-compose exec notebook python3 -m unittest discover -s tests/unit   # offline unit tests
+podman-compose exec notebook python3 -m unittest discover -s tests/e2e    # live end-to-end smoke test
+```
+
+Beyond those, the eval harness exercises the real pipeline against saved ground-truth cases:
 
 ```
 podman-compose exec notebook python3 evals/run_evals.py                  # run all cases
@@ -51,27 +60,43 @@ against `data/evaluations.db` (e.g. `ORDER BY compatibility_score DESC LIMIT 5`,
 
 ## Architecture
 
-### Pipeline (`evaluate_job_post.py:evaluate_job`)
+The code is a `jobsearch/` package with two thin root CLI entrypoints
+(`evaluate_job_post.py`, `discover_jobs.py`) that only parse arguments and delegate in.
+Modules, by concern:
+
+- `jobsearch/config.py` — filesystem paths, personalization-file access (`read_resume`,
+  `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel,
+  and **lazy** env access (`require_env`/`home_address`) so modules import without a
+  populated `.env`.
+- `jobsearch/llm.py` — aisuite wrapper. `jobsearch/storage.py` — SQLite persistence.
+- `jobsearch/scrape.py` — content acquisition (`scrape_post`, `ScrapeError`).
+- `jobsearch/rubric.py` — the compatibility rubric: draft/reflect/cache + regex application.
+- `jobsearch/commute.py` — commute scoring.
+- `jobsearch/evaluation.py` — score a job against the rubric + `evaluate_job` orchestrator.
+- `jobsearch/discovery.py` — candidate discovery.
+
+### Pipeline (`jobsearch/evaluation.py:evaluate_job`)
 
 ```
 evaluate_job(url) -> cache hit (same normalized URL + unchanged rubric)?
   yes -> return saved row from storage.get_evaluation()
   no  -> scrape_post(url)            Tavily extract + 1 LLM call -> {job_title, company, location, description}
-      -> commute_score(...)          commute.py; 1-3 LLM calls + ORS geocode/route, skipped once remote is detected
+      -> commute_score(...)          jobsearch/commute.py; 1-3 LLM calls + ORS geocode/route, skipped once remote is detected
       -> compatibility_score(...)    regex rubric match (free) + 1 LLM call for the final 0-100 judgment
       -> summarize_evaluation(...)   1 LLM call: works_well / does_not_work
       -> storage.save_evaluation()   SQLite upsert, keyed by normalized URL
 ```
 
-All LLM calls go through `llm.py`'s `_ask_json`/`_ask_json_with_tools` (aisuite,
-model = `EXTRACTION_MODEL` in `llm.py`, currently Anthropic Haiku). `_ask_json_with_tools`
+All LLM calls go through `jobsearch/llm.py`'s `ask_json`/`ask_json_with_tools` (aisuite,
+model = `EXTRACTION_MODEL` in `llm.py`, currently Anthropic Haiku). `ask_json_with_tools`
 runs a bounded agentic loop (`max_iterations`) for the one place that needs it: rubric
-drafting.
+drafting (`jobsearch/rubric.py`).
 
 ### The compatibility rubric: LLM-generated once, regex-applied many times
 
-`compatibility_score()` never asks an LLM to read the full rubric-drafting process for
-every job — it applies a **cached, pre-compiled rubric** via deterministic regex:
+`compatibility_score()` (in `jobsearch/evaluation.py`) never asks an LLM to read the
+full rubric-drafting process for every job — it applies a **cached, pre-compiled
+rubric** (built, cached, and regex-applied by `jobsearch/rubric.py`):
 
 ```
 data/resume.md + data/job_preferences.md
@@ -92,7 +117,7 @@ evaluate_rubric(rubric, description)  -- pure regex, no LLM: each criterion gets
 ```
 
 `scoring_guidance` is the verbatim text of job_preferences.md's `## Scoring Notes`
-section (extracted by `_extract_section()`), passed into the final LLM judgment
+section (extracted by `config.extract_section()`), passed into the final LLM judgment
 prompt unmodified — this is the mechanism that keeps domain-specific scoring logic
 (e.g. "this role only counts if the company is in domain X") out of `.py` files
 entirely and inside the user-owned preferences file instead.
@@ -108,7 +133,7 @@ entirely and inside the user-owned preferences file instead.
   this hash too, or saved evaluations will silently go stale without being
   invalidated.
 
-### Storage (`storage.py`)
+### Storage (`jobsearch/storage.py`)
 
 SQLite, two tables: `evaluations` (one row per normalized URL) and
 `evaluation_criteria` (one row per rubric criterion per evaluation, replaced wholesale
