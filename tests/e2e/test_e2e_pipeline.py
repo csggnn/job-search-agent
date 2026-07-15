@@ -15,9 +15,9 @@ baseline, then again AFTER to confirm nothing regressed.
 
 Run (inside the container):
 
-    podman-compose exec notebook python3 -m unittest discover -s tests/e2e -v
+    podman-compose exec job-search python3 -m unittest discover -s tests/e2e -v
     # or, directly:
-    podman-compose exec notebook python3 tests/e2e/test_e2e_pipeline.py
+    podman-compose exec job-search python3 tests/e2e/test_e2e_pipeline.py
 
 What it exercises, end to end:
     scrape_post -> commute_score -> compatibility_score (rubric compile+apply) ->

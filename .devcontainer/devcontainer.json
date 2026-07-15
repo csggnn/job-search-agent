@@ -1,7 +1,7 @@
 {
   "name": "job-search-agent",
   "dockerComposeFile": "../docker-compose.yml",
-  "service": "notebook",
+  "service": "job-search",
   "workspaceFolder": "/workspace",
   "customizations": {
     "vscode": {
