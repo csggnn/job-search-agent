@@ -1,269 +1,203 @@
 # job-search-agent
 
-A personal job-search pipeline: given a job posting URL, it scrapes the ad, scores the
-commute against your home address, scores how well the role matches your resume and
-stated preferences, and saves the result so you never pay to re-evaluate the same job
-twice. The code itself carries no personal data — everything specific to *you*
-(resume, preferences, scoring rules) lives in two editable Markdown files, so the same
-tool works for any candidate/role.
+A pipeline for finding and evaluating job postings against a candidate's CV and stated
+preferences. Given a job URL, it scrapes the ad, scores the commute relative to
+`HOME_ADDRESS`, scores how well the role fits the resume and preferences, and stores
+the result in SQLite so it is not recomputed on subsequent runs.
+
+The code holds no personal data. Everything candidate-specific — resume, preferences,
+and scoring rules — lives in two editable Markdown files (`data/resume.md`,
+`data/job_preferences.md`), so the same tool works for any candidate and role.
 
 ## How it works
 
-```
-                              evaluate_job(url)
-                                     │
-                     ┌───────────────┴───────────────┐
-                     │ already saved for this URL,    │
-                     │ and rubric unchanged since?     │
-                     └───────────────┬───────────────┘
-                     yes ◄───────────┴───────────► no
-                      │                             │
-                      │                             ▼
-                      │                     scrape_post(url)
-                      │                (Tavily fetch + 1 LLM call to
-                      │                 extract title/company/location/description)
-                      │                             │
-                      │                             ▼
-                      │                     commute_score(...)
-                      │                (1-3 LLM calls to locate the office +
-                      │                 ORS geocoding/routing, skipped if remote)
-                      │                             │
-                      │                             ▼
-                      │                     compatibility_score(...)
-                      │                (rubric regex match: free, deterministic +
-                      │                 1 LLM call for the final 0-100 judgment)
-                      │                             │
-                      │                             ▼
-                      │                     summarize_evaluation(...)
-                      │                       (1 LLM call: works well / doesn't)
-                      │                             │
-                      │                             ▼
-                      │                     storage.save_evaluation()
-                      │                        (SQLite upsert, instant)
-                      └───────────────┬─────────────┘
-                                      ▼
-                          printed evaluation + saved row
-```
-
-The **compatibility rubric** (the set of criteria a job is scored against) is itself
-LLM-generated, but only once per resume/preferences version — not per job:
+### Evaluating one posting — `evaluate_job(url)`
 
 ```
-data/resume.md  ──┐
-                   ├──► compile_rubric() ──► data/compatibility_rubric.json ──► regex-matched
-data/job_preferences.md ─┘   (draft + reflect,        (cached, gitignored)      against every
-                               ~agentic LLM loop)                                job description
+evaluate_job(url)
+  │
+  ├─ URL already evaluated and rubric unchanged?  ──►  return the saved evaluation
+  │
+  └─ otherwise run the pipeline, then save the result:
+       scrape_post              Tavily fetch, then extract title / company / location / description
+       commute_score            geocode + route the office via OpenRouteService; skipped when remote
+       compatibility_score      regex-match the cached rubric, then judge an overall 0-100 score
+       summarize_evaluation     one-line "works well / doesn't work" summary
+       storage.save_evaluation  upsert into SQLite, keyed by the normalized URL
 ```
 
-`compile_rubric()` only re-runs when `resume.md` or `job_preferences.md` actually
-change (content-hash check) — every regular `evaluate_job()` call reuses the cached
-rubric and just regex-matches against it, which costs nothing.
+`normalize_url()` strips tracking parameters and trailing slashes, so the same posting
+reached through different links dedupes to one row.
 
-### Discovery: `discover_jobs.py`
+### The compatibility rubric
 
-`discover_jobs.py` finds new candidate job URLs instead of requiring you to paste one
-in: it asks an LLM to derive search query phrases from `resume.md` + `job_preferences.md`
-(cached in `data/search_queries.json`, invalidated the same way the rubric is), runs
-each query against Indeed + LinkedIn via the [JobSpy](https://github.com/speedyapply/JobSpy)
-library, dedupes against URLs already in `evaluations.db`, and either lists the new
-candidates or (with `--evaluate`) runs them through `evaluate_job()`.
+Compatibility is scored against a rubric — a set of weighted criteria — that is itself
+generated by an LLM, but only once per resume/preferences version rather than per job:
 
-**Fallback when a discovered URL can't be scraped.** Some job boards (LinkedIn, Ashby,
-and other JS-rendered/login-walled pages) reliably fail Tavily extraction —
-`scrape_post()` raises `ScrapeError` in that case. `discover_jobs.py` catches it and
-searches the web with the candidate's known company + title (still Tavily: 1 search +
-up to 3 extracts + 1 LLM call to disambiguate) for a page that contains that exact
-posting's own full description, published by that exact company — explicitly
-excluding third-party re-poster domains (Indeed, Glassdoor, jobleads, bebee, ...),
-since those tend to carry a thin/stale copy that scores worse than no evaluation at
-all. If a genuine match is found (typically the company's own careers page or their
-ATS, e.g. Greenhouse/Ashby-hosted-on-their-own-domain), `evaluate_job()` runs against
-that URL instead. If nothing on the company's own site matches — same-title postings
-at unrelated companies and generic "here are our open roles" listing pages are both
-deliberately rejected — the candidate is skipped rather than evaluated against
-low-quality content.
+```
+data/resume.md + data/job_preferences.md
+        │  re-run only when the content hash of either file changes
+        ▼
+compile_rubric()   (LLM drafts criteria, then a reflection pass revises them)
+        │
+        ▼
+data/compatibility_rubric.json   (cached, gitignored)
+        │  regex-matched against every job description — deterministic, no LLM
+        ▼
+per-criterion match + weight  ──►  overall compatibility score
+```
+
+The `## Scoring Notes` section of `job_preferences.md` is passed verbatim into the
+final scoring prompt. This keeps domain-specific scoring logic in the user-owned
+preferences file rather than in code.
+
+### Discovering postings — `discover_jobs.py`
+
+`discover_jobs.py` finds new candidate URLs instead of requiring one to be pasted in:
+
+- derives search phrases from `resume.md` + `job_preferences.md` (cached in
+  `data/search_queries.json`, invalidated the same way the rubric is);
+- runs each phrase against Indeed and LinkedIn via
+  [JobSpy](https://github.com/speedyapply/JobSpy);
+- dedupes results against URLs already in `evaluations.db`;
+- lists the new candidates, or with `--evaluate` runs them through `evaluate_job()`.
+
+**Fallback when a URL can't be scraped.** Some boards (LinkedIn, Ashby, and other
+JS-rendered or login-walled pages) reliably fail Tavily extraction, and `scrape_post()`
+raises `ScrapeError`. `discover_jobs.py` then searches the web for the same posting's
+full description published by the same company, explicitly excluding third-party
+re-poster domains (Indeed, Glassdoor, jobleads, ...) whose copies tend to be thin or
+stale. If a genuine match is found — typically the company's own careers page or ATS —
+`evaluate_job()` runs against that URL instead; otherwise the candidate is skipped.
 
 ## Setup
 
-1. Clone the repo, then fill in `.env` (already present as an empty template — see
-   [Personalization files](#personalization-files-env-resumemd-job_preferencesmd)
-   below for why editing it won't show up in `git status`):
+The host machine is not expected to have the Python dependencies installed; everything
+runs inside the provided container.
+
+1. Clone the repo and fill in `.env` (present as an empty template — see
+   [Personalization files](#personalization-files) for why edits to it don't show up in
+   `git status`):
    ```
    ANTHROPIC_API_KEY=   # LLM calls (aisuite -> Anthropic)
-   TAVILY_API_KEY=      # web search/extraction (scraping job ads + office addresses)
+   TAVILY_API_KEY=      # web search/extraction (job ads + office addresses)
    GROQ_API_KEY=        # only used by scripts/check_setup.py, not the main pipeline
-   HOME_ADDRESS=        # your address, commute times are computed from here
+   HOME_ADDRESS=        # address that commute times are computed from
    ORS_API_KEY=         # OpenRouteService, for geocoding + driving-time routing
    ```
-2. Edit `data/resume.md` and `data/job_preferences.md` with your own resume and
-   preferences (see format below).
-3. Run everything inside the provided container (the host machine isn't expected to
-   have the Python dependencies installed):
+2. Edit `data/resume.md` and `data/job_preferences.md` (see format in each file).
+3. Start the container and evaluate a posting:
    ```
-   docker compose up -d
-   docker compose exec notebook python3 evaluate_job_post.py <job-url>
+   podman-compose up -d
+   podman-compose exec notebook python3 evaluate_job_post.py <job-url>
    ```
-4. Sanity-check your API keys are wired up correctly:
+4. Sanity-check that the API keys are wired up:
    ```
-   docker compose exec notebook python3 scripts/check_setup.py
+   podman-compose exec notebook python3 scripts/check_setup.py
    ```
 
-## Use cases & common interactions
+## Commands
 
-| I want to...                                          | Run this                                                          |
-|--------------------------------------------------------|---------------------------------------------------------------------|
-| Evaluate a job posting                                 | `python evaluate_job_post.py <url>`                                 |
-| Find new candidate jobs (lists URLs, doesn't score)     | `python discover_jobs.py`                                           |
-| Find and score new candidate jobs                       | `python discover_jobs.py --evaluate` (add `--limit N` to cap how many get scored) |
-| Force a fresh evaluation (ignore the saved cache)       | `python evaluate_job_post.py <url> --force`                         |
-| See the 5 highest-scoring saved jobs                    | `sqlite3 data/evaluations.db "SELECT job_title, company, compatibility_score FROM evaluations ORDER BY compatibility_score DESC LIMIT 5;"` |
-| See everything saved for one job                        | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
-| Filter saved jobs (e.g. remote, score > 75)             | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
-| Mark a job reviewed / applied / discarded, add a note   | Python: `import storage; storage.update_review(url, reviewed=True, application_status="applied", notes="phone screen scheduled")` |
-| Add/refresh one eval ground-truth case from a real job  | `python evals/add_case.py <url>`                                    |
-| Rebuild the *entire* eval suite from live pipeline runs | `python evals/regenerate_cases.py` — see [cost warning](#what-eats-tokens-and-what-doesnt) below, this is expensive |
-| Check pipeline accuracy against hand-verified ground truth | `python evals/run_evals.py --verified-only`                      |
+| Task | Command |
+|------|---------|
+| Evaluate a posting | `python evaluate_job_post.py <url>` |
+| Force a fresh evaluation (ignore the cache) | `python evaluate_job_post.py <url> --force` |
+| List new candidate jobs (no scoring) | `python discover_jobs.py` |
+| Find and score new candidate jobs | `python discover_jobs.py --evaluate` (`--limit N` caps how many are scored) |
+| List the top-scoring saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company, compatibility_score FROM evaluations ORDER BY compatibility_score DESC LIMIT 5;"` |
+| Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
+| Filter saved jobs (e.g. remote, score > 75) | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
+| Mark a job reviewed / applied / discarded | `import storage; storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
+| Add/refresh one eval case from a real run | `python evals/add_case.py <url>` |
+| Rebuild the entire eval suite | `python evals/regenerate_cases.py` (expensive — full pipeline re-run per URL) |
+| Check accuracy against verified ground truth | `python evals/run_evals.py --verified-only` |
 
-There is currently no CLI for the "browse saved jobs" and "mark reviewed/applied" rows
-above — they're plain SQL / a Python call. See
-[Future Improvements](#future-improvements).
+Browsing saved jobs and marking them reviewed/applied currently have no CLI wrapper —
+they are raw SQL or a Python call. See [Future Improvements](#future-improvements).
 
-## Project layout
+## Files
 
 ```
-evaluate_job_post.py         entry point: scrape -> commute -> compatibility -> summary -> save
-discover_jobs.py             derive search queries from resume/preferences, search Indeed +
-                              LinkedIn (JobSpy), surface/evaluate new candidate job URLs
-commute.py                   office-address lookup + commute-time scoring (OpenRouteService)
-llm.py                       thin aisuite wrapper: one-shot JSON calls + an agentic tool-call loop
-storage.py                   SQLite persistence, URL normalization, cache-hash helpers
-data/
-  resume.md                  user-provided
-  job_preferences.md         user-provided
-  compatibility_rubric.json  generated, gitignored
-  search_queries.json        generated, gitignored (discover_jobs.py's cached query set)
-  evaluations.db             generated, gitignored
-evals/
-  cases.json                 generated (from real runs), gitignored, hand-edited afterward
-  add_case.py                add/update one eval case from a saved evaluation
-  regenerate_cases.py        bulk-rebuild every case from live pipeline runs
-  run_evals.py               pipeline-health checker: which step regressed, not just pass/fail
-scripts/
-  check_setup.py             smoke-test API keys / provider wiring
-docs/plan.md                 original course-assignment scope note (historical, not living docs)
+evaluate_job_post.py    entry point: scrape -> commute -> compatibility -> summary -> save
+discover_jobs.py        derive queries, search Indeed + LinkedIn, surface/evaluate new URLs
+commute.py              office-address lookup + commute-time scoring (OpenRouteService)
+llm.py                  aisuite wrapper: one-shot JSON calls + an agentic tool-call loop
+storage.py              SQLite persistence, URL normalization, cache-hash helpers
+evals/                  add_case.py, regenerate_cases.py, run_evals.py, cases.json
+scripts/check_setup.py  smoke-test API keys / provider wiring
+docs/plan.md            original course-assignment scope note (historical)
 ```
 
-## Artifacts: what you provide vs. what gets generated
+Data and generated files:
 
-| File                              | Who writes it              | Tracked in git? | Notes |
-|------------------------------------|-----------------------------|------------------|-------|
-| `.env`                             | you                          | yes, as an empty template | real values are local-only, see below |
-| `data/resume.md`                   | you                          | yes, as a generic template | your real content is local-only, see below |
-| `data/job_preferences.md`          | you                          | yes, as a generic template | free-text `## Scoring Notes` section is passed to the LLM verbatim |
-| `data/compatibility_rubric.json`   | `compile_rubric()`           | no (gitignored) | regenerated automatically when resume/preferences change |
-| `data/evaluations.db`              | `storage.save_evaluation()`  | no (gitignored) | one row per job URL + per-criterion breakdown |
-| `evals/cases.json`                 | `evals/add_case.py` / `regenerate_cases.py`, then you by hand | no (gitignored) | `"verified": false` until a human reviews the expected values |
-| `evals/cases.json.bak`             | `evals/regenerate_cases.py`  | no | last pre-regeneration snapshot, single backup, not a history |
+| File | Written by | In git | Notes |
+|------|-----------|--------|-------|
+| `.env` | user | template only | real values are local-only |
+| `data/resume.md` | user | template only | real content is local-only |
+| `data/job_preferences.md` | user | template only | `## Scoring Notes` is passed to the LLM verbatim |
+| `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume/preferences change |
+| `data/search_queries.json` | `discover_jobs.py` | no | cached search phrases |
+| `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL + per-criterion breakdown |
+| `evals/cases.json` | `add_case.py` / `regenerate_cases.py`, then hand-edited | no | `"verified": false` until reviewed |
 
-### Personalization files: `.env`, `resume.md`, `job_preferences.md`
+### Personalization files
 
-These three files are tracked in git (so `git clone` gives you a ready-to-fill
-template) but have the **skip-worktree** bit set. That means once you edit them with
-your real keys/resume/preferences, `git status` and `git diff` will not show those
-edits, and a `git add -A`/`git commit -a` won't pick them up — your personal data and
-API keys can't accidentally get committed. If you ever need to change the *template*
-itself (e.g. add a new required env var for everyone), you have to explicitly
-re-enable tracking first:
+`.env`, `data/resume.md`, and `data/job_preferences.md` are committed as generic
+templates but have the **skip-worktree** bit set. Once edited with real
+keys/resume/preferences, those edits do not appear in `git status`/`git diff` and are
+not picked up by `git add -A`, so personal data and API keys cannot be committed by
+accident. Changing the *template* itself requires re-enabling tracking first:
+
 ```
 git update-index --no-skip-worktree .env
 # edit, commit the template change
 git update-index --skip-worktree .env
 ```
 
-## What eats tokens, and what doesn't
+## Cost & caching
 
-**Free (no LLM/API cost):**
-- Reusing a saved evaluation — `evaluate_job(url)` without `--force`, when the URL was
-  already evaluated and the rubric hasn't changed, is a pure SQLite read.
-- `evaluate_rubric()` — matching a job description against the rubric is plain regex,
-  no LLM involved. Only the final 0-100 synthesis step is an LLM call.
-- Geocoding/routing (OpenRouteService) — a paid-tier-free external API, not an LLM.
+Two independent caches keep repeated runs cheap:
 
-**One job's worth of API calls (rubric already cached, cache miss on the job itself):**
+- **Rubric cache.** `compile_rubric()` runs an agentic drafting loop plus a reflection
+  pass, and is the most expensive operation. It re-runs only when `resume.md` or
+  `job_preferences.md` changes; every evaluation otherwise reuses the cached rubric and
+  matches it with plain regex (no LLM).
+- **Evaluation cache.** A saved evaluation is reused when the same normalized URL is
+  requested and the rubric is unchanged — a pure SQLite read, no API cost. `--force`
+  bypasses it.
 
-| Step | Calls |
-|---|---|
-| `scrape_post` | 1 Tavily extract + 1 LLM call |
-| `commute_score` | 1 LLM call to get on-site days/week. If that's 0 (remote), stop here. Otherwise, 1 more LLM call to classify the location. If it's not already a full street address, 1 Tavily search + up to 3 Tavily extracts + 1 more LLM call to resolve it. |
-| `compatibility_score` | 1 LLM call (rubric matching itself is free regex) |
-| `summarize_evaluation` | 1 LLM call |
-
-So a single fresh evaluation costs **4 LLM calls for a remote job, up to 6 for an
-on-site/hybrid one whose office address needs a web search**, plus 0-2 Tavily search
-operations. Job description length affects input token count, not call count.
-
-**The expensive one: `compile_rubric()`.** This runs `draft_rubric()`, an *agentic*
-loop where the LLM proposes criteria and calls a `test_regex` tool to validate each
-pattern — up to 30 round trips — followed by a `reflect_on_rubric()` critique pass.
-It only runs when `resume.md` or `job_preferences.md` content changes, but when it
-does, it dwarfs the cost of evaluating any number of jobs against the cached result.
-
-**Bulk operations multiply this per-job cost.** `evals/regenerate_cases.py` calls
-`evaluate_job(url, force=True)` for every case URL, which skips the cache
-unconditionally — N jobs × 4-6 LLM calls, every time it's run, even if only one job's
-data actually needed refreshing. See the first item in
-[Future Improvements](#future-improvements).
-
-**`discover_jobs.py --evaluate` adds a per-candidate cost on top of the above.** Query
-derivation is 1 LLM call, cached until resume/preferences change. Each JobSpy search
-itself is free (no Tavily/LLM involved). Any candidate whose URL can't be scraped adds
-1 Tavily search + up to 3 Tavily extracts + 1 LLM call for the company-site fallback
-lookup — before the normal per-job evaluation cost above even starts (and that only
-happens if the fallback finds a genuine match; otherwise the candidate is skipped for
-free).
+Geocoding and routing use OpenRouteService (a free external API, not an LLM). Bulk
+operations such as `evals/regenerate_cases.py` re-run the full pipeline per URL and so
+multiply per-job cost.
 
 ## Evals
 
 `evals/run_evals.py` runs the real pipeline against `evals/cases.json` and checks
 results against hand-set ranges/substrings per pipeline stage (`days_on_office`,
 `address`, `commute_score`, `compatibility_score`, `criteria_matched`,
-`criteria_unmatched`), then ranks stages worst-first so you know what to fix next —
-not just which cases pass. Only cases with `"verified": true` are trustworthy ground
-truth; anything auto-drafted by `add_case.py`/`regenerate_cases.py` should be reviewed
-by hand before you rely on it (`--verified-only` filters to just those).
-
----
+`criteria_unmatched`), then ranks the stages worst-first so the next thing to fix is
+visible — not just which cases pass. Only cases with `"verified": true` are trustworthy
+ground truth; anything auto-drafted by `add_case.py`/`regenerate_cases.py` should be
+reviewed by hand first (`--verified-only` filters to the verified set).
 
 ## Future Improvements
 
-Items below require touching code, not just documentation or configuration.
+Items below require code changes, not just documentation or configuration.
 
-1. **The evaluation cache still can't be refreshed at a finer grain than "one whole
-   job."** `evaluate_job(url, force=True)` always re-scrapes, re-computes commute,
-   *and* re-judges compatibility together — there's no way to refresh just the
-   commute score (e.g. after a `HOME_ADDRESS` change) or just the compatibility
-   judgment (e.g. after a rubric tweak) using the job description already sitting in
-   `evaluations.db`. This is the general form of the "re-run everything when
-   something small changes" problem: fixing it well means splitting the cache into
-   independent layers — a scrape-freshness check (re-scrape only if never
-   scraped/stale), the rubric-freshness check that already exists via
-   `rubric_content_hash` (re-run just `compatibility_score` +
-   `summarize_evaluation` off the stored description), and a new home-address/
-   commute-config check (re-run just `commute_score`) — so a single-dimension
-   change only pays for what it actually invalidates, instead of every saved job
-   paying for a full re-scrape + re-judgment.
+1. **Finer-grained evaluation cache.** `evaluate_job(url, force=True)` always
+   re-scrapes, re-computes commute, and re-judges compatibility together. Splitting the
+   cache into independent layers — scrape freshness, rubric freshness (already tracked
+   via `rubric_content_hash`), and home-address/commute freshness — would let a
+   single-dimension change (e.g. a new `HOME_ADDRESS`) refresh only what it invalidates,
+   reusing the job description already in `evaluations.db`.
 
-2. **No CLI for the two most natural "browse my results" use cases.** Filtering saved
-   evaluations (by score, remote status, matched criteria) and updating
-   `reviewed`/`application_status`/`notes` (`storage.update_review`,
-   `storage.py:233`) are both only reachable via raw `sqlite3` or a Python REPL today
-   — despite being, per the project's own original goal, the main reason to have a
-   database at all ("select all remote jobs, all jobs > 75, all C++..."). A small
-   `query.py`/`review.py` script wrapping common filters and `update_review` would
-   remove the need to hand-write SQL for routine use.
+2. **No CLI for browsing and updating results.** Filtering saved evaluations and
+   updating `reviewed`/`application_status`/`notes` (`storage.update_review`,
+   `storage.py:237`) are reachable only via raw `sqlite3` or a Python REPL. A small
+   `query.py`/`review.py` wrapper would remove the need to hand-write SQL for routine
+   use.
 
-3. **`evals/regenerate_cases.py` has no partial/incremental mode.** It always
-   force-reruns every known URL (`evals/regenerate_cases.py:60-82`). A `--only-stale`
-   mode (only re-run cases whose saved `rubric_hash` no longer matches the current
-   rubric) would make routine rubric tweaks cheap to validate instead of an
-   all-or-nothing, full-token-cost operation every time.
+3. **No incremental mode for `evals/regenerate_cases.py`.** It always force-reruns every
+   known URL. An `--only-stale` mode (re-run only cases whose saved `rubric_hash` no
+   longer matches the current rubric) would make routine rubric tweaks cheap to
+   validate.
