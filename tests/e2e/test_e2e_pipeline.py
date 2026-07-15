@@ -15,9 +15,9 @@ baseline, then again AFTER to confirm nothing regressed.
 
 Run (inside the container):
 
-    podman-compose exec notebook python3 -m unittest tests.test_e2e_pipeline -v
-    # or, equivalently:
-    podman-compose exec notebook python3 tests/test_e2e_pipeline.py
+    podman-compose exec notebook python3 -m unittest discover -s tests/e2e -v
+    # or, directly:
+    podman-compose exec notebook python3 tests/e2e/test_e2e_pipeline.py
 
 What it exercises, end to end:
     scrape_post -> commute_score -> compatibility_score (rubric compile+apply) ->
@@ -37,7 +37,7 @@ import time
 import unittest
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]  # tests/e2e/<file> -> repo root
 DB_PATH = REPO_ROOT / "data" / "evaluations.db"
 ENV_PATH = REPO_ROOT / ".env"
 

@@ -118,12 +118,21 @@ they are raw SQL or a Python call. See [Future Improvements](#future-improvement
 ## Files
 
 ```
-evaluate_job_post.py    entry point: scrape -> commute -> compatibility -> summary -> save
-discover_jobs.py        derive queries, search Indeed + LinkedIn, surface/evaluate new URLs
-commute.py              office-address lookup + commute-time scoring (OpenRouteService)
-llm.py                  aisuite wrapper: one-shot JSON calls + an agentic tool-call loop
-storage.py              SQLite persistence, URL normalization, cache-hash helpers
+evaluate_job_post.py    CLI entrypoint (argument parsing) -> jobsearch.evaluation
+discover_jobs.py        CLI entrypoint (argument parsing) -> jobsearch.discovery
+jobsearch/              the package
+  config.py             paths, personalization-file access, lazy env, shared constants
+  llm.py                aisuite wrapper: one-shot JSON calls + an agentic tool-call loop
+  storage.py            SQLite persistence, URL normalization, cache-hash helpers
+  scrape.py             fetch a posting URL -> {job_title, company, location, description}
+  commute.py            office-address lookup + commute-time scoring (OpenRouteService)
+  rubric.py             the compatibility rubric: draft/reflect/cache + regex application
+  evaluation.py         score a job against the rubric + commute; evaluate_job orchestrator
+  discovery.py          derive queries, search Indeed + LinkedIn, surface/evaluate new URLs
 evals/                  add_case.py, regenerate_cases.py, run_evals.py, cases.json
+tests/
+  unit/                 offline unit tests (test_units.py)
+  e2e/                  live end-to-end smoke test (test_e2e_pipeline.py, needs keys)
 scripts/check_setup.py  smoke-test API keys / provider wiring
 docs/plan.md            original course-assignment scope note (historical)
 ```
@@ -136,7 +145,7 @@ Data and generated files:
 | `data/resume.md` | user | template only | real content is local-only |
 | `data/job_preferences.md` | user | template only | `## Scoring Notes` is passed to the LLM verbatim |
 | `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume/preferences change |
-| `data/search_queries.json` | `discover_jobs.py` | no | cached search phrases |
+| `data/search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
 | `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL + per-criterion breakdown |
 | `evals/cases.json` | `add_case.py` / `regenerate_cases.py`, then hand-edited | no | `"verified": false` until reviewed |
 
@@ -170,7 +179,22 @@ Geocoding and routing use OpenRouteService (a free external API, not an LLM). Bu
 operations such as `evals/regenerate_cases.py` re-run the full pipeline per URL and so
 multiply per-job cost.
 
-## Evals
+## Tests & evals
+
+Two tiers under `tests/`, in separate subdirectories so the offline suite runs without
+credentials, plus the eval harness:
+
+- `tests/unit/` — offline unit tests for the deterministic helpers (URL normalization,
+  rubric hashing/application, section extraction, query validation, JSON parsing). No
+  LLM, network, or `.env` required.
+- `tests/e2e/` — a live end-to-end smoke test that drives the pipeline through the CLI
+  entrypoint and inspects the saved SQLite row. Requires API keys; set `TARGET_URL` near
+  the top of `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
+
+```
+podman-compose exec notebook python3 -m unittest discover -s tests/unit   # unit tests, offline
+podman-compose exec notebook python3 -m unittest discover -s tests/e2e    # end-to-end, needs keys
+```
 
 `evals/run_evals.py` runs the real pipeline against `evals/cases.json` and checks
 results against hand-set ranges/substrings per pipeline stage (`days_on_office`,
@@ -193,7 +217,7 @@ Items below require code changes, not just documentation or configuration.
 
 2. **No CLI for browsing and updating results.** Filtering saved evaluations and
    updating `reviewed`/`application_status`/`notes` (`storage.update_review`,
-   `storage.py:237`) are reachable only via raw `sqlite3` or a Python REPL. A small
+   `jobsearch/storage.py:236`) are reachable only via raw `sqlite3` or a Python REPL. A small
    `query.py`/`review.py` wrapper would remove the need to hand-write SQL for routine
    use.
 
