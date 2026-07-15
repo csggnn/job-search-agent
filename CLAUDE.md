@@ -17,24 +17,24 @@ cost tables, and Future Improvements list are meant to stay accurate, not aspira
 
 ## Commands
 
-Host machine has no Python deps installed — everything runs inside the docker
+Host machine has no Python deps installed — everything runs inside the podman
 compose container:
 
 ```
-docker compose up -d
-docker compose exec notebook python3 evaluate_job_post.py <job-url>          # evaluate one job
-docker compose exec notebook python3 evaluate_job_post.py <job-url> --force  # bypass the cache
-docker compose exec notebook python3 scripts/check_setup.py                  # verify API keys/provider wiring
+podman-compose up -d
+podman-compose exec notebook python3 evaluate_job_post.py <job-url>          # evaluate one job
+podman-compose exec notebook python3 evaluate_job_post.py <job-url> --force  # bypass the cache
+podman-compose exec notebook python3 scripts/check_setup.py                  # verify API keys/provider wiring
 ```
 
 There is no unit test suite or linter configured. The closest thing to tests is the
 eval harness:
 
 ```
-docker compose exec notebook python3 evals/run_evals.py                  # run all cases
-docker compose exec notebook python3 evals/run_evals.py --verified-only  # only hand-verified ground truth
-docker compose exec notebook python3 evals/add_case.py <url>             # add/refresh one case from a live run
-docker compose exec notebook python3 evals/regenerate_cases.py           # bulk-rebuild every case (expensive: full pipeline re-run per URL, no cache)
+podman-compose exec notebook python3 evals/run_evals.py                  # run all cases
+podman-compose exec notebook python3 evals/run_evals.py --verified-only  # only hand-verified ground truth
+podman-compose exec notebook python3 evals/add_case.py <url>             # add/refresh one case from a live run
+podman-compose exec notebook python3 evals/regenerate_cases.py           # bulk-rebuild every case (expensive: full pipeline re-run per URL, no cache)
 ```
 
 `run_evals.py` reports pass/fail per pipeline **stage** (`days_on_office`, `address`,
