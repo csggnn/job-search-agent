@@ -18,7 +18,7 @@ from jobsearch.config import (
     read_resume, read_job_preferences, file_hash, extract_section,
     RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
 )
-from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS
+from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL
 
 RUBRIC_PATH = os.path.join(DATA_DIR, "compatibility_rubric.json")
 
@@ -88,6 +88,7 @@ def draft_rubric(resume, preferences):
         tool_names=["test_regex"],
         max_tokens=EXTRACTION_MODEL_MAX_TOKENS,
         max_iterations=30,
+        model=RUBRIC_MODEL,
     )
 
 
@@ -113,6 +114,7 @@ def reflect_on_rubric(resume, preferences, draft):
         "Respond with only a JSON object in the exact same schema as the draft rubric, "
         'containing your revised, final criteria list: {"criteria": [...]}',
         max_tokens=EXTRACTION_MODEL_MAX_TOKENS,
+        model=RUBRIC_MODEL,
     )
 
 

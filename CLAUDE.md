@@ -87,10 +87,15 @@ evaluate_job(url) -> cache hit (same normalized URL + unchanged rubric)?
       -> storage.save_evaluation()   SQLite upsert, keyed by normalized URL
 ```
 
-All LLM calls go through `jobsearch/llm.py`'s `ask_json`/`ask_json_with_tools` (aisuite,
-model = `EXTRACTION_MODEL` in `llm.py`, currently Anthropic Haiku). `ask_json_with_tools`
-runs a bounded agentic loop (`max_iterations`) for the one place that needs it: rubric
-drafting (`jobsearch/rubric.py`).
+All LLM calls go through `jobsearch/llm.py`'s `ask_json`/`ask_json_with_tools` (aisuite).
+Both take a `model=` argument defaulting to `EXTRACTION_MODEL` (currently Anthropic Haiku),
+which every pipeline stage uses **except** rubric compilation: `jobsearch/rubric.py`'s
+draft + reflect calls pass `RUBRIC_MODEL` (currently Anthropic Sonnet), since regex/criteria
+quality there justifies a stronger, pricier model while the per-job hot path stays cheap.
+`ask_json_with_tools` runs a bounded agentic loop (`max_iterations`) for the one place that
+needs it: rubric drafting. Both functions disable Anthropic extended-thinking
+(`_provider_kwargs`) because aisuite's response converter can't parse a leading
+`ThinkingBlock` (it reads `content[0].text`).
 
 ### The compatibility rubric: LLM-generated once, regex-applied many times
 
