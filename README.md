@@ -108,9 +108,12 @@ runs inside the provided container.
 | Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs (e.g. remote, score > 75) | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
 | Mark a job reviewed / applied / discarded | `import storage; storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
-| Add/refresh one eval case from a real run | `python evals/add_case.py <url>` |
-| Rebuild the entire eval suite | `python evals/regenerate_cases.py` (expensive — full pipeline re-run per URL) |
+| Save a posting as a replayable eval ad | `python evals/capture.py <url>` |
+| Review the eval set before picking cases | `python evals/capture.py --list-candidates` |
+| Pre-fill a case's ground truth | `python evals/draft.py <url\|NAME>` (`--all` for every incomplete case) |
+| Check the rubric's regexes (free, no network) | `python evals/run_evals.py --criteria-only` |
 | Check accuracy against verified ground truth | `python evals/run_evals.py --verified-only` |
+| See whether a change helped | `python evals/run_evals.py --compare` |
 
 Browsing saved jobs and marking them reviewed/applied currently have no CLI wrapper —
 they are raw SQL or a Python call. See [Future Improvements](#future-improvements).
@@ -124,14 +127,23 @@ jobsearch/              the package
   config.py             paths, personalization-file access, lazy env, shared constants
   llm.py                aisuite wrapper: one-shot JSON calls + an agentic tool-call loop
   storage.py            SQLite persistence, URL normalization, cache-hash helpers
-  scrape.py             fetch a posting URL -> {job_title, company, location, description}
+  scrape.py             fetch a posting URL -> {job_title, company, location, description};
+                        fetch and extract are separate so page text can be saved and replayed
   commute.py            office-address lookup + commute-time scoring (OpenRouteService)
   rubric.py             the compatibility rubric: draft/reflect/cache + regex application
   evaluation.py         score a job against the rubric + commute; evaluate_job orchestrator
   discovery.py          derive queries, search Indeed + LinkedIn, surface/evaluate new URLs
-evals/                  add_case.py, regenerate_cases.py, run_evals.py, cases.json
+evals/                  the eval harness
+  dataset.py            cases.json + stored-ad I/O; ground-truth shape checks
+  scoring.py            pure scoring: criteria labels, scalars, aggregation, run diffs
+  capture.py            posting URL -> replayable ad (raw page text + extracted post)
+  draft.py              stored ad -> pre-filled ground truth for a human to correct
+  run_evals.py          replay the eval set, score it, snapshot the run, compare runs
+  cases.json            the eval set: human-owned ground truth
+  ads/                  saved posting inputs, one JSON per case
+  runs/                 per-run result snapshots
 tests/
-  unit/                 offline unit tests (test_units.py)
+  unit/                 offline unit tests (test_units.py, test_evals.py)
   e2e/                  live end-to-end smoke test (test_e2e_pipeline.py, needs keys)
 scripts/check_setup.py  smoke-test API keys / provider wiring
 docs/plan.md            original course-assignment scope note (historical)
@@ -146,8 +158,10 @@ Data and generated files:
 | `data/job_preferences.md` | user | template only | `## Scoring Notes` is passed to the LLM verbatim |
 | `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume/preferences change |
 | `data/search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
-| `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL + per-criterion breakdown |
-| `evals/cases.json` | `add_case.py` / `regenerate_cases.py`, then hand-edited | no | `"verified": false` until reviewed |
+| `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL + per-criterion breakdown; real usage only, never eval runs |
+| `evals/cases.json` | `capture.py` / `draft.py`, then hand-edited | no | ground truth; `"verified": false` until reviewed |
+| `evals/ads/*.json` | `capture.py` | no | a posting's raw page text + extracted fields, so a case outlives the posting |
+| `evals/runs/*.json` | `run_evals.py` | no | one snapshot per run: metrics, rubric hash, model ids |
 
 ### Personalization files
 
@@ -175,9 +189,21 @@ Two independent caches keep repeated runs cheap:
   requested and the rubric is unchanged — a pure SQLite read, no API cost. `--force`
   bypasses it.
 
-Geocoding and routing use OpenRouteService (a free external API, not an LLM). Bulk
-operations such as `evals/regenerate_cases.py` re-run the full pipeline per URL and so
-multiply per-job cost.
+Geocoding and routing use OpenRouteService (a free external API, not an LLM).
+
+Eval runs add a third cache: **stored ads**. A case replays against its saved posting text
+rather than re-scraping, so `evals/run_evals.py` picks a tier by what it needs to check:
+
+| Tier | Cost per case | What it checks |
+|------|---------------|----------------|
+| `--criteria-only` | free, no network | the rubric's regexes against saved text |
+| `--no-commute` | 2 LLM calls | + `days_on_office` and the compatibility judgment |
+| (default) | 2 LLM calls + live address search + routing | + the office address and commute score |
+
+`--criteria-only` runs the whole eval set in well under a second, which makes it usable as
+a regression check on every rubric edit. `evals/capture.py --re-extract` rebuilds a
+stored ad's extracted fields from its saved page text for one LLM call and no Tavily call —
+that is what makes the extraction prompt iterable after a posting is taken down.
 
 ## Tests & evals
 
@@ -196,13 +222,36 @@ podman-compose exec job-search python3 -m unittest discover -s tests/unit   # un
 podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # end-to-end, needs keys
 ```
 
-`evals/run_evals.py` runs the real pipeline against `evals/cases.json` and checks
-results against hand-set ranges/substrings per pipeline stage (`days_on_office`,
-`address`, `commute_score`, `compatibility_score`, `criteria_matched`,
-`criteria_unmatched`), then ranks the stages worst-first so the next thing to fix is
-visible — not just which cases pass. Only cases with `"verified": true` are trustworthy
-ground truth; anything auto-drafted by `add_case.py`/`regenerate_cases.py` should be
-reviewed by hand first (`--verified-only` filters to the verified set).
+The eval harness answers a different question from the tests: not "does it run?" but "did
+this change make the judgments better?". It is a small hand-curated set (5-10 cases),
+deliberately not the whole database — the database records real usage and grows on its own,
+while an eval set only means anything if it is small enough to hold ground truth a human has
+actually checked.
+
+The workflow is capture → draft → verify → run:
+
+```
+python evals/capture.py <url>      # save the posting as an ad (do this early - postings expire)
+python evals/draft.py --all        # pre-fill ground truth from what the pipeline says today
+                                   # then hand-edit cases.json and set "verified": true
+python evals/run_evals.py --verified-only --compare
+```
+
+Drafting is a starting point, never an answer: it records what the current pipeline
+produced, which is the very thing under test. Every drafted case is written
+`"verified": false`, and only a human review makes it ground truth. `--verified-only`
+filters to the reviewed set.
+
+Results are reported two ways, because pass-rates alone can't show progress — two runs can
+both sit inside a tolerance band while one is much closer. So each scalar step reports mean
+absolute error alongside its pass-rate, and criteria report accuracy/precision/recall. Each
+run is snapshotted to `evals/runs/` with the rubric hash and both model ids, so `--compare`
+can attribute a change afterwards.
+
+Criterion ground truth is stored as exact rubric criterion names. When a recompile renames
+one, the harness reports the old label as *stale* and the new criterion as *unlabeled*, and
+excludes both from accuracy rather than scoring them — a label that no longer describes the
+rubric can neither pass nor fail a case, it just shows up as work to do.
 
 ## Future Improvements
 
@@ -212,8 +261,12 @@ Items below require code changes, not just documentation or configuration.
    re-scrapes, re-computes commute, and re-judges compatibility together. Splitting the
    cache into independent layers — scrape freshness, rubric freshness (already tracked
    via `rubric_content_hash`), and home-address/commute freshness — would let a
-   single-dimension change (e.g. a new `HOME_ADDRESS`) refresh only what it invalidates,
-   reusing the job description already in `evaluations.db`.
+   single-dimension change (e.g. a new `HOME_ADDRESS`) refresh only what it invalidates.
+   This needs a place to keep the description first: `save_evaluation()` currently drops
+   `job["description"]` and no column stores it, which is why a re-evaluation must always
+   re-scrape. `evals/ads/` solves this for the eval set only, and its capture path
+   (`scrape.fetch_page_text` + `extract_post`) is the seam a storage-side version would
+   reuse.
 
 2. **No CLI for browsing and updating results.** Filtering saved evaluations and
    updating `reviewed`/`application_status`/`notes` (`storage.update_review`,
@@ -221,7 +274,8 @@ Items below require code changes, not just documentation or configuration.
    `query.py`/`review.py` wrapper would remove the need to hand-write SQL for routine
    use.
 
-3. **No incremental mode for `evals/regenerate_cases.py`.** It always force-reruns every
-   known URL. An `--only-stale` mode (re-run only cases whose saved `rubric_hash` no
-   longer matches the current rubric) would make routine rubric tweaks cheap to
-   validate.
+3. **Ground truth is reviewed by hand-editing JSON.** `draft.py` pre-fills a case and the
+   human corrects it in `cases.json`. At this size (5-10 cases) this is fine; a guided
+   review loop that walks unverified cases one at a time — showing the posting alongside
+   what the pipeline claimed, and prompting accept/flip/skip — would make it faster and
+   harder to typo if the eval set ever grows.

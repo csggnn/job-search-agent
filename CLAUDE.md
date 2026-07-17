@@ -13,7 +13,15 @@ personalization flows through `data/resume.md` and `data/job_preferences.md`.
 
 **Whenever you change a file's behavior or logic, check whether `README.md` documents
 that behavior and update it in the same change** — the README's pipeline diagrams,
-cost tables, and Future Improvements list are meant to stay accurate, not aspirational.
+`Cost & caching` tiers, and Future Improvements list are meant to stay accurate, not
+aspirational.
+
+**The database is for usage; `evals/` is for eval.** `data/evaluations.db` records real
+evaluations and grows on its own; the eval set is curated by hand and stays small
+enough to hold verified ground truth. Eval code may import only the pure helpers from
+`jobsearch.storage` (`normalize_url`, `rubric_content_hash`) — never `get_*`/`save_*`/
+`list_*`, which open the database. Nothing under `evals/` may read or write
+`data/evaluations.db`, and the eval set must never be populated by sweeping it.
 
 ## Commands
 
@@ -37,21 +45,33 @@ podman-compose exec job-search python3 -m unittest discover -s tests/unit   # of
 podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # live end-to-end smoke test
 ```
 
-Beyond those, the eval harness exercises the real pipeline against saved ground-truth cases:
+Beyond those, the eval harness replays a hand-curated set of saved postings:
 
 ```
-podman-compose exec job-search python3 evals/run_evals.py                  # run all cases
-podman-compose exec job-search python3 evals/run_evals.py --verified-only  # only hand-verified ground truth
-podman-compose exec job-search python3 evals/add_case.py <url>             # add/refresh one case from a live run
-podman-compose exec job-search python3 evals/regenerate_cases.py           # bulk-rebuild every case (expensive: full pipeline re-run per URL, no cache)
+podman-compose exec job-search python3 evals/capture.py <url>              # save a posting as a replayable ad
+podman-compose exec job-search python3 evals/capture.py --list-candidates  # review the eval set before picking cases
+podman-compose exec job-search python3 evals/capture.py --re-extract --all # rebuild extracted fields from saved text
+podman-compose exec job-search python3 evals/draft.py --all                # pre-fill ground truth for a human to correct
+podman-compose exec job-search python3 evals/run_evals.py --criteria-only  # rubric regexes only: free, no network, ~1s
+podman-compose exec job-search python3 evals/run_evals.py --no-commute     # + days_on_office + compatibility (2 LLM calls/case)
+podman-compose exec job-search python3 evals/run_evals.py --verified-only  # full pipeline, hand-verified cases only
+podman-compose exec job-search python3 evals/run_evals.py --compare        # diff against the previous run snapshot
 ```
 
-`run_evals.py` reports pass/fail per pipeline **stage** (`days_on_office`, `address`,
-`commute_score`, `compatibility_score`, `criteria_matched`, `criteria_unmatched`),
-ranked worst-first, not just per case — that ranking is the signal for what to fix
-next. Only cases with `"verified": true` in `evals/cases.json` are trustworthy ground
-truth; anything from `add_case.py`/`regenerate_cases.py` is a draft
-(`"verified": false`) meant to be hand-reviewed before being trusted.
+`run_evals.py` reports pass-rate **and** a continuous metric per step: mean absolute error
+for `compatibility_score`/`commute_score`, exact-match for `days_on_office`, and
+accuracy/precision/recall for criteria. The continuous metrics are the point — a tolerance
+band is passed by two runs that are nowhere near each other, so pass/fail alone can't show
+whether a change helped. Each run is snapshotted to `evals/runs/` with the rubric hash and
+both model ids so `--compare` can attribute a change afterwards.
+
+Only cases with `"verified": true` in `evals/cases.json` are ground truth; anything
+`draft.py` pre-filled is `"verified": false` — it records what the pipeline currently says,
+which is the thing under test, so trusting it would be circular.
+
+Tolerances are harness policy, not per-case data: `--tolerance-score` (default 10, on a
+0-100 judgment) and `--tolerance-commute` (default 5 weighted minutes, deliberately tight
+because the commute accept/reject boundary is only a few minutes wide).
 
 Ad-hoc querying of saved evaluations has no dedicated script — use `sqlite3` directly
 against `data/evaluations.db` (e.g. `ORDER BY compatibility_score DESC LIMIT 5`,
@@ -69,7 +89,10 @@ Modules, by concern:
   and **lazy** env access (`require_env`/`home_address`) so modules import without a
   populated `.env`.
 - `jobsearch/llm.py` — aisuite wrapper. `jobsearch/storage.py` — SQLite persistence.
-- `jobsearch/scrape.py` — content acquisition (`scrape_post`, `ScrapeError`).
+- `jobsearch/scrape.py` — content acquisition (`fetch_page_text`, `extract_post`,
+  `validate_post`, `scrape_post`, `ScrapeError`). Fetch and extract are separate so a
+  posting's raw page text can be saved once and re-extracted later without re-fetching;
+  `scrape_post` composes them for the live path.
 - `jobsearch/rubric.py` — the compatibility rubric: draft/reflect/cache + regex application.
 - `jobsearch/commute.py` — commute scoring.
 - `jobsearch/evaluation.py` — score a job against the rubric + `evaluate_job` orchestrator.
@@ -127,6 +150,13 @@ prompt unmodified — this is the mechanism that keeps domain-specific scoring l
 (e.g. "this role only counts if the company is in domain X") out of `.py` files
 entirely and inside the user-owned preferences file instead.
 
+`load_or_compile_rubric()` is composed from `load_rubric()` (returns the cached rubric or
+`None`, never compiles) and `rubric_is_stale(rubric)`. Callers that must not trigger a live
+agentic recompile use those two directly — `evals/run_evals.py` resolves one rubric per run
+and warns when it's stale, because a mid-run recompile would score different cases against
+different rubrics. `compatibility_score(..., rubric=)` takes that pinned rubric; it defaults
+to the cached one when omitted.
+
 **Two independent cache layers, don't conflate them:**
 - `load_or_compile_rubric()` invalidates the *rubric* against `resume.md`/
   `job_preferences.md` file hashes (whole-file, so any edit — including
@@ -159,17 +189,38 @@ picked up by `git add -A`. To change the template itself (not your personal cont
 you must first run `git update-index --no-skip-worktree <file>`, commit, then
 re-apply `git update-index --skip-worktree <file>`.
 
-`data/compatibility_rubric.json`, `data/evaluations.db`, and `evals/cases.json` are
-gitignored entirely (generated/personal, never tracked).
+`data/compatibility_rubric.json`, `data/evaluations.db`, `evals/cases.json`,
+`evals/ads/`, and `evals/runs/` are gitignored entirely (generated/personal, never
+tracked). Stored ads hold verbatim scraped job-ad text — that content is data under `evals/`
+and must never be inlined into a `.py` file, per the candidate-agnostic rule above.
 
 ### Eval case shape (`evals/cases.json`)
 
-Each case: `{name, url, verified, notes, expected: {...}}`. `expected` keys are
-independent and optional — only the ones present are checked:
-`days_on_office` / `commute_score` (ranges, tolerate LLM/routing variance — never
-assert exact equality), `address_contains` (substring), `compatibility_score`
-(range), `criteria_matched_contains` / `criteria_unmatched_contains` (lists of
-substrings matched case-insensitively against rubric criterion *names*, so a rubric
-rename doesn't silently break the case). `run_evals.py` batches its LLM/API calls per
-case (one `commute_score()` call, one `compatibility_score()` call) rather than
-calling pipeline functions multiple times per case.
+Each case: `{name, url, ad, verified, notes, expected: {...}}`.
+
+`ad` names a file in `evals/ads/` and is what the case replays against — the `url`
+is provenance, not an input, so a posting being taken down can't break a case. `ad:
+null` means capture failed; the case is kept, reported, and skipped. The ad is recorded
+explicitly rather than derived from `name` so renaming a case can't orphan its inputs.
+
+`expected` keys are independent and optional — only the ones present are checked:
+`compatibility_score` (int 0-100), `days_on_office` (int, exact), `commute_score` (weighted
+minutes), `address_contains` (a short distinctive substring, or the `FULLY_REMOTE` sentinel,
+which is compared by equality), and `criteria` (exact criterion name → bool).
+
+**Ground truth is one value per step, never a `[lo, hi]` range.** A range is passed by two
+runs that are nowhere near each other, which hides the change an eval exists to detect; the
+accepted margin belongs to the harness (`--tolerance-*`), not the case. `dataset.py`'s
+`EXPECTED_TYPES`/`validate_expected` enforce this — a leftover range is rejected with the
+command to re-draft rather than silently scored.
+
+**`criteria` uses exact names, and unknown names are never scored.** Each label sorts into
+correct / wrong / `stale_label` (a name the rubric no longer has) / `unlabeled` (a rubric
+name with no label); only correct and wrong reach accuracy. A rubric rename therefore
+surfaces as reported work rather than a silent pass or fail. (The previous
+`criteria_matched_contains`/`criteria_unmatched_contains` lists asserted the *absence* of a
+substring, so a renamed criterion passed vacuously — this shape exists specifically to make
+that impossible.)
+
+`run_evals.py` batches per case: at most one `commute_score()` call and one
+`compatibility_score()` call, with the criteria pass being free regex over the stored ad.
