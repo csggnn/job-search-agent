@@ -9,8 +9,10 @@ test_units.py: test code holds no candidate- or domain-specific content.
 """
 
 import unittest
+from unittest import mock
 
-from evals.capture import looks_truncated
+from evals import capture
+from evals.capture import looks_truncated, upsert_case
 from evals.dataset import usable_expected, validate_expected
 from evals.scoring import (
     aggregate, compare_runs, score_address, score_criteria, score_scalar,
@@ -84,6 +86,38 @@ class LooksTruncatedTest(unittest.TestCase):
 
     def test_accepts_a_real_ad(self):
         self.assertFalse(looks_truncated({"description": "x" * 2000}))
+
+
+class UpsertCaseTest(unittest.TestCase):
+    """ the ad filename derives from the case name, so a blank name writes ".json" """
+
+    def _upsert(self, cases, name, url):
+        with mock.patch.object(capture.dataset, "save_ad", lambda n, ad: f"{n}.json"):
+            return upsert_case(cases, name, url, {"post": {}})
+
+    def test_blank_name_falls_back_to_the_captured_name(self):
+        cases = [{"name": "", "url": "https://example.com/job/1", "ad": "", "expected": {}}]
+        name, added = self._upsert(cases, "acme-widget-inspector", "https://example.com/job/1")
+        self.assertFalse(added)
+        self.assertEqual(name, "acme-widget-inspector")
+        self.assertEqual(cases[0]["name"], "acme-widget-inspector")
+        self.assertEqual(cases[0]["ad"], "acme-widget-inspector.json")
+
+    def test_recorded_name_and_ground_truth_survive_recapture(self):
+        cases = [{"name": "old-name", "url": "https://example.com/job/1",
+                  "ad": "old-name.json", "expected": {"days_on_office": 3}}]
+        name, added = self._upsert(cases, "new-slug", "https://example.com/job/1?trk=share")
+        self.assertFalse(added)
+        self.assertEqual(name, "old-name")
+        self.assertEqual(cases[0]["expected"], {"days_on_office": 3})
+
+    def test_unmatched_url_appends_a_case(self):
+        cases = []
+        name, added = self._upsert(cases, "acme-widget-inspector", "https://example.com/job/9")
+        self.assertTrue(added)
+        self.assertEqual(cases[0]["name"], "acme-widget-inspector")
+        self.assertFalse(cases[0]["verified"])
+        self.assertEqual(cases[0]["expected"], {})
 
 
 class UsableExpectedTest(unittest.TestCase):

@@ -12,7 +12,7 @@ import unittest
 
 from jobsearch import storage
 from jobsearch.config import extract_section
-from jobsearch.rubric import evaluate_rubric, test_regex
+from jobsearch.rubric import evaluate_rubric, match_text, test_regex
 from jobsearch.discovery import _validate_queries
 from jobsearch.llm import _parse_json_reply
 from jobsearch.scrape import ScrapeError, validate_post
@@ -81,6 +81,38 @@ class EvaluateRubricTest(unittest.TestCase):
     def test_matching_is_case_insensitive(self):
         [want, _] = evaluate_rubric(self.RUBRIC, "We ship WIDGETS daily")
         self.assertTrue(want["matched"])
+
+
+class MatchTextTest(unittest.TestCase):
+    def test_joins_title_location_and_description(self):
+        self.assertEqual(
+            match_text("Widget Inspector", "Springfield, Utopia", "We build widgets."),
+            "Widget Inspector\nSpringfield, Utopia\nWe build widgets.",
+        )
+
+    def test_omitted_parts_are_skipped(self):
+        self.assertEqual(match_text("Widget Inspector", None, "We build widgets."),
+                         "Widget Inspector\nWe build widgets.")
+        self.assertEqual(match_text(None, "", "We build widgets."), "We build widgets.")
+
+    def test_a_criterion_matches_evidence_in_the_title(self):
+        rubric = {"criteria": [
+            {"name": "role", "pattern": r"widget\s+inspector", "type": "requirement_match",
+             "weight": 3},
+        ]}
+        # the role is named only in the title; the description never restates it
+        text = match_text("Widget Inspector", "Springfield", "You will check things daily.")
+        [role] = evaluate_rubric(rubric, text)
+        self.assertTrue(role["matched"])
+
+    def test_a_criterion_matches_evidence_in_the_location(self):
+        rubric = {"criteria": [
+            {"name": "where", "pattern": r"springfield", "type": "requirement_match",
+             "weight": 3},
+        ]}
+        text = match_text("Widget Inspector", "Springfield, Utopia", "You will check things.")
+        [where] = evaluate_rubric(rubric, text)
+        self.assertTrue(where["matched"])
 
 
 class TestRegexToolTest(unittest.TestCase):

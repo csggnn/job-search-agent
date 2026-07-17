@@ -33,7 +33,7 @@ from jobsearch import storage
 from jobsearch.commute import commute_score as commute_score_fn, figure_days_on_office
 from jobsearch.evaluation import compatibility_score
 from jobsearch.llm import EXTRACTION_MODEL, RUBRIC_MODEL
-from jobsearch.rubric import evaluate_rubric, load_rubric, rubric_is_stale
+from jobsearch.rubric import evaluate_rubric, load_rubric, match_text, rubric_is_stale
 
 DEFAULT_TOLERANCE_SCORE = 10
 # in weighted minutes. The commute accept/reject boundary spans roughly 10 minutes, so this
@@ -73,7 +73,9 @@ def run_case(case, rubric, tolerances, tier):
 
     if "criteria" in expected:
         result["criteria"] = scoring.score_criteria(
-            expected["criteria"], evaluate_rubric(rubric, post["description"])
+            expected["criteria"],
+            evaluate_rubric(rubric, match_text(post["job_title"], post["location"],
+                                               post["description"])),
         )
 
     if tier == "criteria-only":
@@ -81,8 +83,8 @@ def run_case(case, rubric, tolerances, tier):
         return result
 
     if "compatibility_score" in expected:
-        actual = compatibility_score(post["job_title"], post["company"], post["description"],
-                                     rubric=rubric)
+        actual = compatibility_score(post["job_title"], post["company"], post["location"],
+                                     post["description"], rubric=rubric)
         result["compatibility_score"] = scoring.score_scalar(
             expected["compatibility_score"], actual["compatibility_score"], tolerances["score"]
         )

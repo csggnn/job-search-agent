@@ -42,10 +42,16 @@ compile_rubric()   (LLM drafts criteria, then a reflection pass revises them)
         │
         ▼
 data/compatibility_rubric.json   (cached, gitignored)
-        │  regex-matched against every job description — deterministic, no LLM
+        │  regex-matched against every posting's title + location + description
+        │  joined — deterministic, no LLM
         ▼
 per-criterion match + weight  ──►  overall compatibility score
 ```
+
+The patterns match the title and location as well as the description, because that is
+where a criterion's evidence often is: a role is stated in a posting's title, a city in
+its location field. Matching the description alone reported those criteria as unmatched
+regardless of pattern quality.
 
 The `## Scoring Notes` section of `job_preferences.md` is passed verbatim into the
 final scoring prompt. This keeps domain-specific scoring logic in the user-owned

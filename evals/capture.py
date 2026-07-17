@@ -79,9 +79,9 @@ def upsert_case(cases, name, url, ad):
         returns (name, added). The returned name may differ from the one passed in.
     """
     index = dataset.find_case(cases, name=name, url=url)
-    if index is not None:
+    if index is not None and cases[index].get("name"):
         # an existing case keeps its recorded name, which the extracted company/title may no
-        # longer produce
+        # longer produce. A case with no name falls back to the captured slug.
         name = cases[index]["name"]
     filename = dataset.save_ad(name, ad)
     if index is None:
@@ -94,6 +94,7 @@ def upsert_case(cases, name, url, ad):
             "expected": {},
         })
     else:
+        cases[index]["name"] = name
         cases[index]["ad"] = filename
         cases[index].setdefault("expected", {})
     return name, index is None
