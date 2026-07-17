@@ -49,10 +49,10 @@ _AGGREGATOR_DOMAINS = {
 
 def _resolve_target_locations(resume, preferences):
     """ return the location strings usable for non-remote search queries: job_preferences.md's
-        Target Locations section if present and filled in, else resume.md's Contact location
+        Location section if present and filled in, else resume.md's Contact location
         (skipped if still template placeholder text), else HOME_ADDRESS
     """
-    section = extract_section(preferences, "Target Locations")
+    section = extract_section(preferences, "Location")
     if section:
         # only lines starting with "-" are distinct entries; wrapped continuation lines of a
         # multi-line placeholder bullet (e.g. "(fill in: ...\n  one per line, e.g. ...)") don't

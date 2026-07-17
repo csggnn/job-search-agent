@@ -11,6 +11,10 @@ Run with: python scripts/recompile_rubric.py [--if-changed]
 """
 
 import argparse
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from jobsearch.rubric import compile_rubric, load_or_compile_rubric
 

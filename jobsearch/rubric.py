@@ -1,13 +1,15 @@
 """
 The compatibility rubric: a set of weighted, regex-checkable criteria derived once from
 the candidate's resume + job preferences, then applied deterministically to many job
-descriptions.
+postings.
 
 This module owns the rubric as an artifact end to end: drafting it (an agentic LLM loop
 that validates each regex via the test_regex tool), a one-shot reflection/revision pass,
 caching it to disk keyed by the resume/preferences content hashes, and applying it to a
-job description with pure regex (no LLM). The LLM judgment that turns an applied rubric
-into a 0-100 score lives in jobsearch.evaluation, not here.
+posting with pure regex (no LLM). Patterns match against match_text(): the posting's
+title, location and description joined, since criteria evidence is spread across all
+three. The LLM judgment that turns an applied rubric into a 0-100 score lives in
+jobsearch.evaluation, not here.
 """
 
 import json
@@ -58,31 +60,53 @@ TOOLS = {
 }
 
 
+# Both rubric prompts receive the whole preferences file, and compile_rubric() also stores
+# its "## Scoring Notes" section as scoring_guidance for the per-job LLM judgment. Without
+# this, a rule meant for that judgment is drafted into a regex criterion instead: drafting
+# turns the rule's examples into the pattern, and reflection's "missing criteria" check adds
+# it back if drafting omits it.
+SCORING_NOTES_GUARD = (
+    "The preferences' '## Scoring Notes' section is NOT part of this rubric. It is passed "
+    "verbatim to a separate LLM that judges each posting after this rubric's patterns have "
+    "run, and its rules are applied there by reading the posting. Do not create criteria "
+    "from that section and do not report it as uncovered. A rule that states a judgment "
+    "about a posting as a whole has no regex that expresses it, and any examples it gives "
+    "are illustrations, not a list to match against.\n\n"
+)
+
+
 def draft_rubric(resume, preferences):
     """ agentically propose + regex-test criteria that detect resume/preference matches in a job ad """
     return ask_json_with_tools(
         "You are building a reusable scoring rubric to evaluate future job postings against "
         "a specific candidate's resume and job preferences. This rubric will be applied to "
-        "many job descriptions later using only regex matching, with no further LLM "
+        "many job postings later using only regex matching, with no further LLM "
         "involvement, so patterns must be well-tested and precise.\n\n"
+        "Each pattern is matched against the posting's job title, location and description "
+        "joined together as one text, so a pattern must handle the phrasings each of those "
+        "fields uses. A role is stated in the title as a heading ('Technical Lead - Widget "
+        "Systems') and rarely as a sentence; a location is stated as a city or region "
+        "('Springfield, Utopia'), often naming a suburb or metro area rather than the city "
+        "a preference names.\n\n"
         f"Candidate resume:\n{resume}\n\n"
         f"Candidate job preferences:\n{preferences}\n\n"
+        + SCORING_NOTES_GUARD +
         "Identify the 6-10 most impactful, concrete, checkable criteria (skills, "
-        "technologies, role types, dealbreakers, must-haves) that indicate whether a job "
+        "technologies, role types, work felds) that indicate whether a job "
         "posting matches this candidate - prioritize the ones explicitly called out in the "
-        "preferences over minor resume details. Every criterion must be directly traceable "
-        "to specific text in the resume or preferences above - do not invent domains, "
-        "technologies, or preferences that are not explicitly present in that text, even if "
-        "they seem like a plausible fit. For each criterion, write a regex pattern "
-        "that will reliably detect mentions of it in a job posting's free-text description. "
+        "preferences."
+        "Every criterion must be directly traceable to specific text in the resume or job preferences."
+        "Allow for words appearing between the ones you anchor on: a "
+        "pattern for a senior engineer role must still match 'Senior Widget Engineer', and a "
+        "pattern anchored on a noun must still match the synonyms a title uses for it. "
         "Use the test_regex tool to validate each pattern with a single test call per "
         "pattern, passing one short piece of sample text that contains both a phrasing that "
         "SHOULD match and a superficially similar phrasing that should NOT match, so you can "
         "confirm precision in one call instead of two.\n\n"
         "When you are done testing, respond with only a JSON object:\n"
         '{"criteria": [{"name": <short label>, "pattern": <regex pattern string, no inline '
-        'flags needed - matching is case-insensitive>, "type": "requirement_match" | '
-        '"candidate_strength" | "dealbreaker", "weight": <integer 1-5 importance>, '
+        'flags needed - matching is case-insensitive>, "type": "role" | '
+        '"skill" | "field", "weight": <integer [-5, 5] importance: negative when there is negative preference for a topic, '
         '"rationale": <why this criterion matters, one sentence>}, ...]}',
         tools=TOOLS,
         tool_names=["test_regex"],
@@ -100,6 +124,7 @@ def reflect_on_rubric(resume, preferences, draft):
         f"Candidate resume:\n{resume}\n\n"
         f"Candidate job preferences:\n{preferences}\n\n"
         f"Draft rubric:\n{json.dumps(draft, indent=2)}\n\n"
+        + SCORING_NOTES_GUARD +
         "Check for, in this order of priority:\n"
         "1. Hallucinated criteria: for each criterion, find the specific phrase in the "
         "resume or preferences text above that justifies it. If you cannot point to such a "
@@ -165,17 +190,28 @@ def load_or_compile_rubric():
     return compile_rubric()
 
 
-def evaluate_rubric(rubric, description):
-    """ deterministically check which rubric criteria match a job description, via regex.
-        each criterion gets a "score": +weight if a requirement_match/candidate_strength
-        criterion matched, -weight if a dealbreaker matched, 0 otherwise (unmet requirement
-        or dealbreaker correctly absent).
+def match_text(job_title, location, description):
+    """ the text rubric patterns are matched against: a posting's title, location and
+        description joined by newlines, skipping the parts a posting omits.
+
+        A criterion's evidence is not confined to the description: a role is stated in the
+        title, a city in the location. Matching the description alone reports those
+        criteria as unmatched.
+    """
+    return "\n".join(part for part in (job_title, location, description) if part)
+
+
+def evaluate_rubric(rubric, text):
+    """ deterministically check which rubric criteria match a posting, via regex. text is
+        match_text() output.
+        each criterion gets a "score": its signed weight if matched (positive for a wanted
+        role/skill/field, negative for one to avoid), 0 if unmatched.
     """
     evaluated = []
     for criterion in rubric["criteria"]:
-        matched = bool(re.search(criterion["pattern"], description, re.IGNORECASE))
+        matched = bool(re.search(criterion["pattern"], text, re.IGNORECASE))
         if matched:
-            score = -criterion["weight"] if criterion["type"] == "dealbreaker" else criterion["weight"]
+            score = criterion["weight"] 
         else:
             score = 0
         evaluated.append({**criterion, "matched": matched, "score": score})

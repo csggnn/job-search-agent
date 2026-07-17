@@ -140,9 +140,18 @@ compile_rubric() -> draft_rubric() (agentic: proposes criteria, calls test_regex
 data/compatibility_rubric.json  {resume_hash, preferences_hash, criteria[], scoring_guidance}
         │
         ▼
-evaluate_rubric(rubric, description)  -- pure regex, no LLM: each criterion gets
-        matched (bool) and score (+weight / -weight if dealbreaker / 0)
+evaluate_rubric(rubric, match_text(job_title, location, description))
+        -- pure regex, no LLM: each criterion gets matched (bool) and score
+           (+weight / -weight if dealbreaker / 0)
 ```
+
+Patterns match against `match_text()` — title, location and description joined — not the
+description alone. A criterion's evidence is spread across all three: a role is stated in
+the title, a city in the location. Matching the description alone reported those criteria
+as unmatched (measured: recall 0.68 -> 0.86 on the eval set). Every caller composes the
+same text; `draft.py` must match `run_evals.py` here or drafted labels disagree with the
+scored ones. The drafting prompt in `rubric.py` describes these three fields to the agent,
+so patterns are written for the phrasings each field uses.
 
 `scoring_guidance` is the verbatim text of job_preferences.md's `## Scoring Notes`
 section (extracted by `config.extract_section()`), passed into the final LLM judgment

@@ -29,18 +29,19 @@ from evals import capture, dataset
 from jobsearch.commute import commute_score
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.evaluation import compatibility_score
-from jobsearch.rubric import evaluate_rubric, load_rubric, rubric_is_stale
+from jobsearch.rubric import evaluate_rubric, load_rubric, match_text, rubric_is_stale
 
 
-def draft_criteria(rubric, description, previous=None):
-    """ pre-fill name -> bool criteria labels by applying the rubric to a description.
+def draft_criteria(rubric, post, previous=None):
+    """ pre-fill name -> bool criteria labels by applying the rubric to a posting.
 
         a name present in `previous` keeps its value; the remaining names are filled from
         evaluate_rubric(). returns (criteria_map, filled_names). Pure: regex only.
     """
     previous = previous or {}
     criteria, filled = {}, []
-    for evaluated in evaluate_rubric(rubric, description):
+    text = match_text(post["job_title"], post["location"], post["description"])
+    for evaluated in evaluate_rubric(rubric, text):
         name = evaluated["name"]
         if name in previous:
             criteria[name] = previous[name]
@@ -61,7 +62,7 @@ def draft_expected(post, rubric, previous=None):
     expected = {}
     filled = []
 
-    criteria, criteria_filled = draft_criteria(rubric, post["description"],
+    criteria, criteria_filled = draft_criteria(rubric, post,
                                                previous=previous.get("criteria"))
     expected["criteria"] = criteria
     filled.extend(criteria_filled)
@@ -99,7 +100,7 @@ def draft_expected(post, rubric, previous=None):
         expected["compatibility_score"] = previous["compatibility_score"]
     else:
         compatibility = compatibility_score(post["job_title"], post["company"],
-                                            post["description"], rubric=rubric)
+                                            post["location"], post["description"], rubric=rubric)
         expected["compatibility_score"] = compatibility["compatibility_score"]
         filled.append("compatibility_score")
 

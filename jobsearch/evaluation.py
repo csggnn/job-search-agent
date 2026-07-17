@@ -14,18 +14,18 @@ from jobsearch import storage
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.commute import commute_score
 from jobsearch.llm import ask_json
-from jobsearch.rubric import load_or_compile_rubric, evaluate_rubric
+from jobsearch.rubric import load_or_compile_rubric, evaluate_rubric, match_text
 from jobsearch.scrape import scrape_post
 
 
-def compatibility_score(job_title, company, description, rubric=None):
+def compatibility_score(job_title, company, location, description, rubric=None):
     """ score 0-100 how well a job posting matches the candidate, using the cached rubric.
         returns {"compatibility_score": int, "rationale": str, "criteria": [...evaluated rubric criteria]}
-        
+
         If no rubric is provided, the cached rubric will be checked for staleness and recompiled if needed.
     """
     rubric = load_or_compile_rubric() if rubric is None else rubric
-    evaluated_criteria = evaluate_rubric(rubric, description)
+    evaluated_criteria = evaluate_rubric(rubric, match_text(job_title, location, description))
     scoring_guidance = rubric.get("scoring_guidance")
     guidance_block = f"\nAdditional scoring guidance from the candidate:\n{scoring_guidance}\n" if scoring_guidance else ""
 
@@ -34,15 +34,18 @@ def compatibility_score(job_title, company, description, rubric=None):
         f"Company: {company}\n"
         f"Description:\n{description}\n\n"
         "Rubric evaluation (regex-verified against the ad text above, do not contradict it). "
-        "Each criterion carries a 'score': positive (its weight) if a matched "
-        "requirement_match/candidate_strength, negative (its weight) if a matched dealbreaker, "
-        "0 if unmatched:\n"
+        "Each matched criterion carries a signed 'score': positive weights are things the "
+        "candidate wants (a preferred role, skill or field), negative weights are things the "
+        "candidate wants to avoid (a large negative is close to disqualifying). An unmatched "
+        "criterion scores 0. 'type' (role/skill/field/location) is the category the criterion "
+        "belongs to:\n"
         f"{json.dumps(evaluated_criteria, indent=2)}\n"
         f"{guidance_block}\n"
         "Using the rubric evaluation as grounding for factual claims about what the ad does "
         "or doesn't mention, produce a final compatibility judgment. Weigh criteria by their "
-        "'score', note unmatched criteria only if they were important (high weight) "
-        "requirement_matches, and apply the additional scoring guidance above if any was given.\n\n"
+        "signed 'score', let negative scores pull the judgment down, note an unmatched "
+        "criterion only if a strongly positive one is missing, and apply the additional "
+        "scoring guidance above if any was given.\n\n"
         'Respond with only a JSON object: {"compatibility_score": <integer 0-100>, '
         '"rationale": <explanation citing which matched/unmatched criteria drove the score>}.',
         max_tokens=1024,
@@ -125,7 +128,8 @@ def evaluate_job(url, force=False):
 
     job = scrape_post(url)
     commute = commute_score(job["company"], job["location"], job["description"])
-    compatibility = compatibility_score(job["job_title"], job["company"], job["description"], rubric=rubric)
+    compatibility = compatibility_score(job["job_title"], job["company"], job["location"],
+                                        job["description"], rubric=rubric)
     overview = summarize_evaluation(job, commute, compatibility)
 
     storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview)
