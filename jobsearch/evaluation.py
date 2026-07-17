@@ -18,11 +18,13 @@ from jobsearch.rubric import load_or_compile_rubric, evaluate_rubric
 from jobsearch.scrape import scrape_post
 
 
-def compatibility_score(job_title, company, description):
+def compatibility_score(job_title, company, description, rubric=None):
     """ score 0-100 how well a job posting matches the candidate, using the cached rubric.
         returns {"compatibility_score": int, "rationale": str, "criteria": [...evaluated rubric criteria]}
+        
+        If no rubric is provided, the cached rubric will be checked for staleness and recompiled if needed.
     """
-    rubric = load_or_compile_rubric()
+    rubric = load_or_compile_rubric() if rubric is None else rubric
     evaluated_criteria = evaluate_rubric(rubric, description)
     scoring_guidance = rubric.get("scoring_guidance")
     guidance_block = f"\nAdditional scoring guidance from the candidate:\n{scoring_guidance}\n" if scoring_guidance else ""
@@ -123,7 +125,7 @@ def evaluate_job(url, force=False):
 
     job = scrape_post(url)
     commute = commute_score(job["company"], job["location"], job["description"])
-    compatibility = compatibility_score(job["job_title"], job["company"], job["description"])
+    compatibility = compatibility_score(job["job_title"], job["company"], job["description"], rubric=rubric)
     overview = summarize_evaluation(job, commute, compatibility)
 
     storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview)

@@ -10,6 +10,11 @@ data/search_queries.json
 data/evaluations.db
 evals/cases.json
 
+# Stored job ads - verbatim scraped ad text (third-party content, personal corpus) -
+# and per-run result snapshots. Both are local-only, rebuilt by evals/capture.py.
+evals/ads/
+evals/runs/
+
 # Python
 __pycache__/
 *.pyc

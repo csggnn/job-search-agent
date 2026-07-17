@@ -15,6 +15,7 @@ from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, test_regex
 from jobsearch.discovery import _validate_queries
 from jobsearch.llm import _parse_json_reply
+from jobsearch.scrape import ScrapeError, validate_post
 
 
 class NormalizeUrlTest(unittest.TestCase):
@@ -91,6 +92,37 @@ class TestRegexToolTest(unittest.TestCase):
 
     def test_returns_error_for_invalid_pattern(self):
         self.assertIn("error", test_regex(r"(unclosed", "text"))
+
+
+class ValidatePostTest(unittest.TestCase):
+    POST = {
+        "job_title": "Widget Inspector",
+        "company": "Acme",
+        "location": "Metropolis, Freedonia",
+        "description": "Inspect widgets on the night shift.",
+    }
+
+    def test_accepts_a_complete_post(self):
+        self.assertEqual(validate_post(dict(self.POST), "test"), self.POST)
+
+    def test_rejects_a_missing_field_naming_it(self):
+        post = self.POST.copy()
+        post.pop("description")
+        with self.assertRaises(ScrapeError) as caught:
+            validate_post(post, "test")
+        self.assertIn("description", str(caught.exception))
+
+    def test_rejects_a_blank_field(self):
+        post = self.POST.copy()
+        post["company"] = "   "
+        # without this check, a blank field reaches commute_score() and compatibility_score()
+        with self.assertRaises(ScrapeError):
+            validate_post(post, "test")
+
+    def test_error_names_the_source(self):
+        with self.assertRaises(ScrapeError) as caught:
+            validate_post({}, "https://example.com/jobs/1")
+        self.assertIn("https://example.com/jobs/1", str(caught.exception))
 
 
 class ExtractSectionTest(unittest.TestCase):

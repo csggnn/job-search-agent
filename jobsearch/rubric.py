@@ -137,16 +137,31 @@ def compile_rubric():
     return rubric
 
 
+def load_rubric():
+    """ return the rubric cached on disk, or None if RUBRIC_PATH is absent.
+
+        Callers that require one fixed rubric for a sequence of evaluations, such as the eval
+        harness, use this with rubric_is_stale() in place of load_or_compile_rubric().
+    """
+    if not os.path.exists(RUBRIC_PATH):
+        return None
+    with open(RUBRIC_PATH) as f:
+        return json.load(f)
+
+
+def rubric_is_stale(rubric):
+    """ True if resume.md/job_preferences.md have changed since rubric was compiled """
+    return (
+        rubric.get("resume_hash") != file_hash(RESUME_PATH)
+        or rubric.get("preferences_hash") != file_hash(JOB_PREFERENCES_PATH)
+    )
+
+
 def load_or_compile_rubric():
     """ return the cached rubric if resume.md/job_preferences.md haven't changed, else recompile """
-    if os.path.exists(RUBRIC_PATH):
-        with open(RUBRIC_PATH) as f:
-            cached = json.load(f)
-        if (
-            cached.get("resume_hash") == file_hash(RESUME_PATH)
-            and cached.get("preferences_hash") == file_hash(JOB_PREFERENCES_PATH)
-        ):
-            return cached
+    cached = load_rubric()
+    if cached is not None and not rubric_is_stale(cached):
+        return cached
     return compile_rubric()
 
 

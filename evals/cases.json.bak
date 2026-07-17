@@ -1,0 +1,1313 @@
+[
+  {
+    "name": "cgi-ai-expert-team-lead",
+    "url": "https://www.linkedin.com/jobs/view/4345669460/",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:42:23.099937+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Airport Plaza Building C, Kyoto Leonardo Da Vincilaan 19C bus 6, Diegem, Belgium",
+      "commute_score": [
+        16.7,
+        36.7
+      ],
+      "compatibility_score": [
+        0,
+        15
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "mymove-product-technical-lead",
+    "url": "https://www.linkedin.com/jobs/view/4431500982",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:42:56.775631+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        2,
+        2
+      ],
+      "address_contains": "Cantersteen 12, 1000 Brussels, Belgium",
+      "commute_score": [
+        0,
+        15.1
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Software-related company"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "nikon-metrology-software-architect-xsw",
+    "url": "https://www.linkedin.com/jobs/view/4425791403/",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:43:15.531044+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Interleuvenlaan 86, 3001 Leuven, Flemish Region, Belgium",
+      "commute_score": [
+        28.0,
+        48.0
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Software Architect role"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "space-applications-robotics-technical-lead",
+    "url": "https://www.spaceapplications.com/career?id=1400438330",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:43:40.957528+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "compatibility_score": [
+        67,
+        97
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Project management role",
+        "Software-related company",
+        "Computer Vision field",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "canonical-swe-manager-multipass",
+    "url": "https://www.linkedin.com/jobs/view/4376349866",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:44:15.025152+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        0,
+        0
+      ],
+      "commute_score": [
+        0,
+        10.0
+      ],
+      "compatibility_score": [
+        63,
+        93
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "People management role",
+        "Software-related company",
+        "Fully remote work"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field"
+      ]
+    }
+  },
+  {
+    "name": "bricsys-part-of-octave-principal-software-developer-manufacturing-3d-c",
+    "url": "https://careers.octave.com/job/Principal-Software-Developer-Manufacturing-3D-%28C%2B%2B%29/3073-en_US",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:44:40.888035+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "address_contains": "Bellevue 5/201, Gent, Oost-Vlaanderen 9050, BE",
+      "commute_score": [
+        32.9,
+        52.9
+      ],
+      "compatibility_score": [
+        70,
+        100
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "Software-related company"
+      ],
+      "criteria_unmatched_contains": [
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "octave-bricscad-c-developer-building-core-team",
+    "url": "https://careers.octave.com/job/Principal-Software-Developer-Building-Core-%28C%2B%2B%29/2904-en_US",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:45:04.997188+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "address_contains": "Bellevue, 5/201 - 9050 GENT - Belgium",
+      "commute_score": [
+        32.9,
+        52.9
+      ],
+      "compatibility_score": [
+        63,
+        93
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Software-related company"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "speechify-senior-software-engineer-core-experiences",
+    "url": "https://grnh.se/ckyrwx414us",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:45:28.036412+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        0,
+        0
+      ],
+      "commute_score": [
+        0,
+        10.0
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Fully remote work"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field"
+      ]
+    }
+  },
+  {
+    "name": "alstom-system-hotline-engineer",
+    "url": "https://jobsearch.alstom.com/job/Charleroi-System-Hotline-Engineer/1405984133/",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:45:53.846495+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Rue Cambier Dupret 50-52, 6001 Charleroi, Belgium",
+      "commute_score": [
+        82.8,
+        102.8
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "m-diane-syst-me-n-a",
+    "url": "https://www.jobposting.pro/emploi-2616184-109",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:46:19.988326+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        20
+      ],
+      "criteria_matched_contains": [
+        "Software-related company"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "keyrock-engineering-lead-options",
+    "url": "https://www.linkedin.com/jobs/view/4404460794",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:46:39.209465+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        20
+      ],
+      "criteria_matched_contains": [
+        "Technical Lead role"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "keyrock-head-of-engineering-options",
+    "url": "https://www.linkedin.com/jobs/view/4404472743",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:47:06.568420+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        0,
+        0
+      ],
+      "commute_score": [
+        0,
+        10.0
+      ],
+      "compatibility_score": [
+        0,
+        19
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "Project management role",
+        "Trading field",
+        "Fully remote work"
+      ],
+      "criteria_unmatched_contains": [
+        "People management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field"
+      ]
+    }
+  },
+  {
+    "name": "tmc-high-tech-consultancy-company-senior-python-developer",
+    "url": "https://www.themembercompany.com/careers/senior-python-developer-ZnEAJ",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:47:47.711732+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "compatibility_score": [
+        0,
+        25
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Software-related company",
+        "Dutch required"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "equans-iga-engineer-m-f-x",
+    "url": "https://www.equans.com/en/jobs/88153-iga-engineer-m-f-x",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:48:08.752924+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "4th Floor, 6 Bevis Marks, EC3A 7BA, London, United Kingdom",
+      "commute_score": [
+        526.5,
+        546.5
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "canonical-software-engineering-manager-cross-platform-c-multipass",
+    "url": "https://www.linkedin.com/jobs/view/4374478741",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:48:34.393526+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        0,
+        0
+      ],
+      "commute_score": [
+        0,
+        10.0
+      ],
+      "compatibility_score": [
+        67,
+        97
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "People management role",
+        "Software-related company",
+        "Fully remote work"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field"
+      ]
+    }
+  },
+  {
+    "name": "amarris-be-engineering-manager-cdi-bruxelles-hybride",
+    "url": "https://www.linkedin.com/jobs/view/4415456325",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:49:00.361483+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "compatibility_score": [
+        0,
+        19
+      ],
+      "criteria_matched_contains": [
+        "People management role"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "canonical-software-engineering-manager-cross-platform-c-multipass",
+    "url": "http://job-boards.greenhouse.io/canonicaljobs/jobs/7487869?gh_src=pa0logvt1us",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:49:14.122312+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        0,
+        0
+      ],
+      "commute_score": [
+        0,
+        10.0
+      ],
+      "compatibility_score": [
+        0,
+        26
+      ],
+      "criteria_matched_contains": [
+        "People management role",
+        "Software-related company",
+        "Fully remote work"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field"
+      ]
+    }
+  },
+  {
+    "name": "mantis-robotics-senior-robotics-engineer",
+    "url": "https://mantis-robotics.com/archives/careers/senior-robotics-engineer",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:49:35.163822+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Kapeldreef 60, 3001 Leuven, Belgium",
+      "commute_score": [
+        27.6,
+        47.6
+      ],
+      "compatibility_score": [
+        53,
+        83
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "mantis-robotics-radar-signal-processing-engineer",
+    "url": "https://mantis-robotics.com/archives/careers/radar-signal-processing-engineer",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:49:58.066671+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Gaston Geenslaan 6, 3001 Leuven, Belgium",
+      "commute_score": [
+        24.1,
+        44.1
+      ],
+      "compatibility_score": [
+        0,
+        18
+      ],
+      "criteria_matched_contains": [
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "movu-robotics-r-d-onboard-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4435050392",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:50:30.649452+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Lokeren, East Flanders, Belgium",
+      "commute_score": [
+        78.7,
+        98.7
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "robovision-robotics-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4435137492",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:50:50.175852+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Foreestelaan 88, 9000 Ghent, Belgium",
+      "commute_score": [
+        57.5,
+        77.5
+      ],
+      "compatibility_score": [
+        0,
+        15
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "axon-software-engineer-ii",
+    "url": "https://www.linkedin.com/jobs/view/4418914715",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:51:45.802040+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "compatibility_score": [
+        63,
+        93
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Software-related company",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "axon-senior-embedded-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4378387669",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:52:27.162134+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        15
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "sphere-defense-senior-robotics-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4426973163",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:52:47.734901+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Robotics field",
+        "Fully remote work"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field"
+      ]
+    }
+  },
+  {
+    "name": "intermodalics-sr-robotics-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4418089766",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:53:07.334531+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        18
+      ],
+      "criteria_matched_contains": [
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "axon-sr-robotics-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4355072021",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:53:35.408500+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        18
+      ],
+      "criteria_matched_contains": [
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "intermodalics-robotics-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4420468036",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:53:53.998656+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Dorpstraat 26, 2040 Berendrecht, Belgium",
+      "commute_score": [
+        72.9,
+        92.9
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "vivid-resourcing-software-engineer-c-python",
+    "url": "https://www.linkedin.com/jobs/view/4426357522",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:54:34.507986+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "address_contains": "Michel De Braeystraat 52, 2000 Antwerpen, Belgium",
+      "commute_score": [
+        42.5,
+        62.5
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Software-related company",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "aidoptation-av-senior-engineer-simulation-and-testing",
+    "url": "https://www.linkedin.com/jobs/view/4396581586",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:54:56.817644+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "DronePort, Sint-Truiden, Belgium",
+      "commute_score": [
+        82.4,
+        102.4
+      ],
+      "compatibility_score": [
+        0,
+        22
+      ],
+      "criteria_matched_contains": [
+        "Principal/Senior IC engineering role",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "octiva-experienced-robot-software-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4420947271",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:55:40.188160+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        27
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Software-related company",
+        "Dutch required",
+        "Computer Vision field",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Trading field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "aidoptation-av-engineer-software-development-and-integration",
+    "url": "https://www.linkedin.com/jobs/view/4396590138",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:56:02.038468+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "DronePort, Sint-Truiden, Belgium",
+      "commute_score": [
+        82.4,
+        102.4
+      ],
+      "compatibility_score": [
+        0,
+        20
+      ],
+      "criteria_matched_contains": [
+        "Software-related company"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "space-applications-services-nv-sa-technical-lead-robotics-software",
+    "url": "https://www.linkedin.com/jobs/view/4435636830",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:56:21.603659+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Leuvensesteenweg 325, 1932 Zaventem, Belgium",
+      "commute_score": [
+        15.0,
+        35.0
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Software-related company",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "sia-machine-learning-engineer",
+    "url": "https://jobs.smartrecruiters.com/Sia/744000136404442-machine-learning-engineer",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:56:49.375656+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "address_contains": "Amstelplein 1, 1096HA, Amsterdam, 1083 HN, NL",
+      "commute_score": [
+        199.5,
+        219.5
+      ],
+      "compatibility_score": [
+        0,
+        20
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Software-related company",
+        "Dutch required"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "sia-machine-learning-engineer",
+    "url": "https://jobs.smartrecruiters.com/Sia/744000136408978-machine-learning-engineer",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:57:08.457292+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Dutch required"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Trading field",
+        "Computer Vision field",
+        "Robotics field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "vesuvius-r-d-automation-engineer-advanced-refractories",
+    "url": "https://genius-people.com/job/en_US/YFUQkLnAq9Ees79Cfb_QEQ/r-d-automation-engineer-advanced-refractories",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:57:34.158781+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        5,
+        5
+      ],
+      "compatibility_score": [
+        0,
+        23
+      ],
+      "criteria_matched_contains": [
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "C++ or C required",
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Software-related company",
+        "Dutch required",
+        "Trading field",
+        "Computer Vision field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "abb-senior-computer-vision-ai-ml-engineer",
+    "url": "https://www.linkedin.com/jobs/view/4431742427",
+    "verified": false,
+    "notes": "Draft generated from evaluate_job() on 2026-07-15T13:58:09.388807+00:00. Review and adjust ground truth by hand.",
+    "expected": {
+      "days_on_office": [
+        4,
+        4
+      ],
+      "compatibility_score": [
+        67,
+        97
+      ],
+      "criteria_matched_contains": [
+        "C++ or C required",
+        "Software-related company",
+        "Computer Vision field",
+        "Robotics field"
+      ],
+      "criteria_unmatched_contains": [
+        "Technical Lead role",
+        "People management role",
+        "Project management role",
+        "Software Architect role",
+        "Principal/Senior IC engineering role",
+        "Dutch required",
+        "Trading field",
+        "Medical field",
+        "Fully remote work"
+      ]
+    }
+  },
+  {
+    "name": "canonical-ubuntu-software-engineer",
+    "url": "https://canonical.com/careers/6707824",
+    "verified": false,
+    "notes": "Drafted 2026-07-16: 2 value(s) pre-filled by the pipeline and not yet reviewed.",
+    "expected": {
+      "criteria": {
+        "C++ skill mentioned": false,
+        "Preferred field: CV/Robotics/SLAM/Imaging/Medical": false,
+        "Role: Technical Lead": false,
+        "Role: Team Manager/Team Lead": false,
+        "Role: Project Manager": false,
+        "Role: Software Architect": false,
+        "Role: Principal/Staff Developer": false,
+        "Role: Scrum Master": false,
+        "Role: Senior Developer": false,
+        "Dealbreaker: Dutch required": false,
+        "Dealbreaker: Trading field": false,
+        "Target location match": false,
+        "Non-software field disqualifier": false
+      },
+      "days_on_office": 0,
+      "address_contains": "Fully Remote",
+      "commute_score": 0,
+      "compatibility_score": 45
+    },
+    "ad": "canonical-ubuntu-software-engineer.json"
+  }
+]
