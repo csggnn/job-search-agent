@@ -60,8 +60,8 @@ class RubricContentHashTest(unittest.TestCase):
 class EvaluateRubricTest(unittest.TestCase):
     RUBRIC = {
         "criteria": [
-            {"name": "want", "pattern": r"widgets?", "type": "requirement_match", "weight": 3},
-            {"name": "avoid", "pattern": r"night-?shift", "type": "dealbreaker", "weight": 5},
+            {"name": "want", "pattern": r"widgets?", "type": "skill", "weight": 3},
+            {"name": "avoid", "pattern": r"night-?shift", "type": "field", "weight": -5},
         ]
     }
 
@@ -72,7 +72,7 @@ class EvaluateRubricTest(unittest.TestCase):
         self.assertFalse(avoid["matched"])
         self.assertEqual(avoid["score"], 0)
 
-    def test_matched_dealbreaker_scores_negative_weight(self):
+    def test_matched_negative_weight_scores_negative(self):
         [want, avoid] = evaluate_rubric(self.RUBRIC, "Rotating night-shift, gadgets only")
         self.assertTrue(avoid["matched"])
         self.assertEqual(avoid["score"], -5)
@@ -97,7 +97,7 @@ class MatchTextTest(unittest.TestCase):
 
     def test_a_criterion_matches_evidence_in_the_title(self):
         rubric = {"criteria": [
-            {"name": "role", "pattern": r"widget\s+inspector", "type": "requirement_match",
+            {"name": "role", "pattern": r"widget\s+inspector", "type": "role",
              "weight": 3},
         ]}
         # the role is named only in the title; the description never restates it
@@ -107,7 +107,7 @@ class MatchTextTest(unittest.TestCase):
 
     def test_a_criterion_matches_evidence_in_the_location(self):
         rubric = {"criteria": [
-            {"name": "where", "pattern": r"springfield", "type": "requirement_match",
+            {"name": "where", "pattern": r"springfield", "type": "field",
              "weight": 3},
         ]}
         text = match_text("Widget Inspector", "Springfield, Utopia", "You will check things.")

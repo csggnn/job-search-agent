@@ -142,7 +142,7 @@ data/compatibility_rubric.json  {resume_hash, preferences_hash, criteria[], scor
         ▼
 evaluate_rubric(rubric, match_text(job_title, location, description))
         -- pure regex, no LLM: each criterion gets matched (bool) and score
-           (+weight / -weight if dealbreaker / 0)
+           (its signed weight in [-5, 5] if matched, 0 if not)
 ```
 
 Patterns match against `match_text()` — title, location and description joined — not the

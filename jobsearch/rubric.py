@@ -204,8 +204,8 @@ def match_text(job_title, location, description):
 def evaluate_rubric(rubric, text):
     """ deterministically check which rubric criteria match a posting, via regex. text is
         match_text() output.
-        each criterion gets a "score": its signed weight if matched (positive for a wanted
-        role/skill/field, negative for one to avoid), 0 if unmatched.
+        each criterion gets a "score": its weight if matched, 0 if unmatched. weights are
+        already signed - positive for a wanted role/skill/field, negative for one to avoid.
     """
     evaluated = []
     for criterion in rubric["criteria"]:
