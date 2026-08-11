@@ -1,5 +1,5 @@
 """
-CLI entrypoint: discover new candidate job postings.
+CLI entrypoint: discover new job ads.
 
 The discovery pipeline lives in jobsearch.discovery; this file only parses arguments so
 that `python discover_jobs.py` keeps working.
@@ -13,9 +13,9 @@ from jobsearch.discovery import discover_jobs, DEFAULT_MAX_RESULTS
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--evaluate", action="store_true",
-                        help="run the full evaluate_job() pipeline on each new candidate")
+                        help="run the full evaluate_job() pipeline on each new job ad")
     parser.add_argument("--limit", type=int, default=None,
-                        help="cap how many new candidates get evaluated when --evaluate is set")
+                        help="cap how many new job ads get evaluated when --evaluate is set")
     parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS,
                         help="max JobSpy results to keep per query")
     parser.add_argument("--force", action="store_true",

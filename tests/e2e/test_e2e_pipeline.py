@@ -236,7 +236,7 @@ class PipelineEndToEndTest(unittest.TestCase):
         _log(f"cache-hit run OK in {cache_secs:.1f}s (served from cache, no re-scrape/LLM)")
 
     def test_discover_smoke(self):
-        """ run discover_jobs.py end to end and confirm it produces a candidate listing """
+        """ run discover_jobs.py end to end and confirm it produces a job ad listing """
         if not RUN_DISCOVERY_SMOKE:
             self.skipTest(
                 "discovery smoke test is opt-in (slow, scrapes live job boards): set "
@@ -250,8 +250,8 @@ class PipelineEndToEndTest(unittest.TestCase):
             timeout=PIPELINE_TIMEOUT_S,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        # both the "N new job candidate(s):" and "No new job candidates found." paths match
-        self.assertIn("job candidate", result.stdout.lower(), result.stdout)
+        # both the "N new job ad(s):" and "No new job ads found." paths match
+        self.assertIn("job ad", result.stdout.lower(), result.stdout)
 
 
 if __name__ == "__main__":

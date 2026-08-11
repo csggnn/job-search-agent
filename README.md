@@ -59,14 +59,14 @@ preferences file rather than in code.
 
 ### Discovering postings — `discover_jobs.py`
 
-`discover_jobs.py` finds new candidate URLs instead of requiring one to be pasted in:
+`discover_jobs.py` finds new job ad URLs instead of requiring one to be pasted in:
 
 - derives search phrases from `resume.md` + `job_preferences.md` (cached in
   `data/search_queries.json`, invalidated the same way the rubric is);
 - runs each phrase against Indeed and LinkedIn via
   [JobSpy](https://github.com/speedyapply/JobSpy);
 - dedupes results against URLs already in `evaluations.db`;
-- lists the new candidates, or with `--evaluate` runs them through `evaluate_job()`.
+- lists the new job ads, or with `--evaluate` runs them through `evaluate_job()`.
 
 **Fallback when a URL can't be scraped.** Some boards (LinkedIn, Ashby, and other
 JS-rendered or login-walled pages) reliably fail Tavily extraction, and `scrape_post()`
@@ -74,7 +74,7 @@ raises `ScrapeError`. `discover_jobs.py` then searches the web for the same post
 full description published by the same company, explicitly excluding third-party
 re-poster domains (Indeed, Glassdoor, jobleads, ...) whose copies tend to be thin or
 stale. If a genuine match is found — typically the company's own careers page or ATS —
-`evaluate_job()` runs against that URL instead; otherwise the candidate is skipped.
+`evaluate_job()` runs against that URL instead; otherwise the job ad is skipped.
 
 ## Setup
 
@@ -108,14 +108,14 @@ runs inside the provided container.
 |------|---------|
 | Evaluate a posting | `python evaluate_job_post.py <url>` |
 | Force a fresh evaluation (ignore the cache) | `python evaluate_job_post.py <url> --force` |
-| List new candidate jobs (no scoring) | `python discover_jobs.py` |
-| Find and score new candidate jobs | `python discover_jobs.py --evaluate` (`--limit N` caps how many are scored) |
+| List new job ads (no scoring) | `python discover_jobs.py` |
+| Find and score new job ads | `python discover_jobs.py --evaluate` (`--limit N` caps how many are scored) |
 | List the top-scoring saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company, compatibility_score FROM evaluations ORDER BY compatibility_score DESC LIMIT 5;"` |
 | Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs (e.g. remote, score > 75) | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
 | Mark a job reviewed / applied / discarded | `import storage; storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
 | Save a posting as a replayable eval ad | `python evals/capture.py <url>` |
-| Review the eval set before picking cases | `python evals/capture.py --list-candidates` |
+| Review the eval set before picking cases | `python evals/capture.py --list-cases` |
 | Pre-fill a case's ground truth | `python evals/draft.py <url\|NAME>` (`--all` for every incomplete case) |
 | Check the rubric's regexes (free, no network) | `python evals/run_evals.py --criteria-only` |
 | Check accuracy against verified ground truth | `python evals/run_evals.py --verified-only` |

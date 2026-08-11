@@ -52,10 +52,10 @@ def search_office_address(company, location, debug=False):
     urls = [r["url"] for r in results["results"]]
     if debug:
         print(f"[search_office_address] query={query!r}")
-        print(f"[search_office_address] candidate urls: {urls}")
+        print(f"[search_office_address] result urls: {urls}")
 
     # Addresses usually live in a page footer/contact section, which search snippets
-    # truncate away. Extracting full page content from the top candidates catches those.
+    # truncate away. Extracting full page content from the top results catches those.
     extracted = tavily.extract(urls[:3], format="text")
     context = "\n\n---\n\n".join(
         f"{r['url']}\n{r['raw_content']}" for r in extracted["results"]
