@@ -26,6 +26,10 @@ from jobsearch.config import (
 )
 from jobsearch.llm import ask_json
 from jobsearch.evaluation import evaluate_job
+from jobsearch.preselection import (
+    preselect, format_preselection, DEFAULT_N, AGGREGATOR_DOMAINS as _AGGREGATOR_DOMAINS,
+)
+from jobsearch.rubric import load_or_compile_rubric
 from jobsearch.scrape import ScrapeError
 
 QUERIES_PATH = os.path.join(DATA_DIR, "search_queries.json")
@@ -38,13 +42,8 @@ _COUNTRY_NAMES = {c.value[1]: c.value[0] for c in Country}  # alpha-2 -> JobSpy 
 # third-party re-posters/aggregators tend to carry a thin/stale copy of the posting (missing
 # the detail an LLM needs to score it well) - excluded from the fallback search alongside
 # whichever domain originally failed to scrape, so results are biased toward the company's
-# own careers page
-_AGGREGATOR_DOMAINS = {
-    "linkedin.com", "indeed.com", "glassdoor.com", "jobleads.com", "bebee.com",
-    "monster.com", "jobrapido.com", "jooble.org", "careerjet.com", "simplyhired.com",
-    "ziprecruiter.com", "talent.com", "adzuna.com", "neuvoo.com", "jobsora.com",
-    "trabajo.org", "whatjobs.com", "learn4good.com", "receptix.com",
-}
+# own careers page. Defined in jobsearch.preselection, which ranks the same domains when it
+# picks the surviving url of a duplicate collapse.
 
 
 def _resolve_target_locations(resume, preferences):
@@ -170,8 +169,21 @@ def load_or_compile_queries():
 
 
 def _clean(value):
-    """ normalize a pandas cell to a plain Python value, turning NaN/missing into None """
+    """ normalize a pandas cell to a plain Python value, turning NaN/missing into None.
+        Container cells (JobSpy returns a few list-valued columns) are passed through, since
+        pd.isna() answers element-wise for those.
+    """
+    if isinstance(value, (list, tuple, set, dict)):
+        return value or None
     return None if pd.isna(value) else value
+
+
+def _clean_text(value):
+    """ _clean() for a cell rendered as text (e.g. date_posted, which JobSpy returns as a
+        datetime.date), so a job ad dict stays JSON-shaped
+    """
+    value = _clean(value)
+    return None if value is None else str(value)
 
 
 def _best_apply_link(record):
@@ -182,9 +194,14 @@ def _best_apply_link(record):
     return _clean(record.get("job_url_direct")) or _clean(record.get("job_url"))
 
 
-def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
-    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning job ad
-        dicts: {url, title, company, location}
+def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False,
+                  linkedin_descriptions=True):
+    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning job ad dicts
+        holding the fields pre-selection judges an ad on without re-fetching it.
+
+        linkedin_descriptions=True costs one extra HTTP request per LinkedIn result (latency
+        and block risk, no API spend). Without it LinkedIn ads carry no description, so
+        pre-selection judges them on their title while Indeed ads are judged on their text.
     """
     country_name = _COUNTRY_NAMES.get(country, "worldwide")
     location = query["location"] if not query["is_remote"] else _COUNTRY_NAMES.get(country)
@@ -196,6 +213,7 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
         is_remote=query["is_remote"],
         country_indeed=country_name,
         results_wanted=max_results,
+        linkedin_fetch_description=linkedin_descriptions,
     )
     if debug:
         print(f"[jobspy_search] params={params}")
@@ -209,6 +227,16 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
             "title": _clean(r.get("title")),
             "company": _clean(r.get("company")),
             "location": _clean(r.get("location")),
+            "description": _clean(r.get("description")),
+            "is_remote": _clean(r.get("is_remote")),
+            "date_posted": _clean_text(r.get("date_posted")),
+            "job_type": _clean_text(r.get("job_type")),
+            "job_level": _clean_text(r.get("job_level")),
+            "min_amount": _clean(r.get("min_amount")),
+            "max_amount": _clean(r.get("max_amount")),
+            "currency": _clean(r.get("currency")),
+            "company_industry": _clean(r.get("company_industry")),
+            "work_from_home_type": _clean(r.get("work_from_home_type")),
         }
         for r in records
     ]
@@ -218,16 +246,17 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
     return job_ads
 
 
-def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=False):
+def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=False,
+                     linkedin_descriptions=True):
     """ run one JobSpy search per cached query, aggregating job ads deduped by
-        normalized url (first occurrence keeps title/company/location; matched_queries collects
+        normalized url (first occurrence keeps the ad's fields; matched_queries collects
         every query phrase that surfaced it)
     """
     primary_country = cache["primary_country"]
     aggregated = {}
     for q in cache["queries"]:
         country = q["country"] if not q["is_remote"] else primary_country
-        results = jobspy_search(q, country, max_results_per_query, debug)
+        results = jobspy_search(q, country, max_results_per_query, debug, linkedin_descriptions)
         for r in results:
             normalized = storage.normalize_url(r["url"])
             if normalized not in aggregated:
@@ -306,43 +335,86 @@ def find_company_posting_url(company, title, excluded_domain, debug=False):
     return result.get("url")
 
 
+def _evaluate_job_ad(job_ad, debug=False):
+    """ evaluate one pre-selected job ad, returning the evaluation or None if no url for it
+        could be scraped.
+
+        The urls pre-selection collapsed into this one as "alternates" are tried before
+        find_company_posting_url(), which pays a Tavily search plus an LLM call to rediscover
+        a url this run already had.
+    """
+    for url in [job_ad["url"], *(job_ad.get("alternates") or [])]:
+        try:
+            return evaluate_job(url)
+        except ScrapeError as e:
+            print(f"  could not scrape {url} ({e})")
+
+    print(f"  searching {job_ad['company']}'s site directly")
+    alt_url = find_company_posting_url(
+        job_ad["company"], job_ad["title"], urlsplit(job_ad["url"]).netloc, debug=debug,
+    )
+    if not alt_url:
+        print(f"  skipping {job_ad['url']}: no matching posting found on {job_ad['company']}'s site")
+        return None
+    try:
+        return evaluate_job(alt_url)
+    except Exception as e:
+        print(f"  skipping {job_ad['url']}: fallback {alt_url} also failed: {e}")
+        return None
+
+
 def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_RESULTS,
-                   force_queries=False, debug=False):
-    """ full discovery pipeline: compile/reuse search queries, search Google Jobs, dedupe
-        within-run and against storage, then either list new job ads or run evaluate_job()
-        on them
+                   force_queries=False, preselect_job_ads=True, linkedin_descriptions=True,
+                   debug=False):
+    """ full discovery pipeline: compile/reuse search queries, search the job boards, dedupe
+        within-run and against storage, pre-select the job ads worth evaluating, then either
+        list them or run evaluate_job() on them.
+
+        limit is pre-selection's N - the number of job ads handed to evaluation - not a
+        truncation of the tail. preselect_job_ads=False restores the pre-selection-free
+        behaviour (evaluate the first `limit` job ads in discovery order), so the two are
+        comparable on one job ad set.
     """
     cache = compile_queries() if force_queries else load_or_compile_queries()
-    job_ads = discover_job_ads(cache, max_results_per_query, debug)
+
+    # resolved before discovery so a recompile cannot land partway through a run:
+    # evaluate_job() loads the rubric per job, and prescoring against one rubric while
+    # scoring against another makes the two stages disagree
+    rubric = load_or_compile_rubric() if preselect_job_ads else None
+
+    job_ads = discover_job_ads(cache, max_results_per_query, debug, linkedin_descriptions)
     new_job_ads = filter_new_job_ads(job_ads)
 
     if not new_job_ads:
         print("No new job ads found.")
         return []
 
-    _print_job_ads(new_job_ads)
+    if preselect_job_ads:
+        result = preselect(
+            new_job_ads,
+            n=limit or DEFAULT_N,
+            rubric=rubric,
+            resume=read_resume(),
+            preferences=read_job_preferences(),
+            known_job_openings=storage.list_evaluated_job_openings(),
+        )
+        print(format_preselection(result))
+        to_run = result["selected"]
+    else:
+        _print_job_ads(new_job_ads)
+        to_run = new_job_ads[:limit] if limit else new_job_ads
 
     if not evaluate:
         print("\nRun with --evaluate to score these (costs LLM/Tavily-extract/ORS calls per url).")
-        return new_job_ads
+        return to_run
 
-    to_run = new_job_ads[:limit] if limit else new_job_ads
     results = []
-    for c in to_run:
+    for job_ad in to_run:
         try:
-            results.append(evaluate_job(c["url"]))
-        except ScrapeError as e:
-            print(f"  could not scrape {c['url']} ({e}) - searching {c['company']}'s site directly")
-            alt_url = find_company_posting_url(
-                c["company"], c["title"], urlsplit(c["url"]).netloc, debug=debug,
-            )
-            if not alt_url:
-                print(f"  skipping {c['url']}: no matching posting found on {c['company']}'s site")
-                continue
-            try:
-                results.append(evaluate_job(alt_url))
-            except Exception as e2:
-                print(f"  skipping {c['url']}: fallback {alt_url} also failed: {e2}")
+            evaluation = _evaluate_job_ad(job_ad, debug)
         except Exception as e:
-            print(f"  skipping {c['url']}: {e}")
+            print(f"  skipping {job_ad['url']}: {e}")
+            continue
+        if evaluation is not None:
+            results.append(evaluation)
     return results
