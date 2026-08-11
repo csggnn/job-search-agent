@@ -1,7 +1,7 @@
 """
-Discover new job ad candidates from the web: derive search queries from resume.md +
+Discover new job ads from the web: derive search queries from resume.md +
 job_preferences.md (+ HOME_ADDRESS) via an LLM, search Indeed + LinkedIn (via the JobSpy
-library), and surface new candidate URLs not already in the evaluations DB - optionally
+library), and surface new job ad URLs not already in the evaluations DB - optionally
 running them straight through evaluate_job().
 
 JobSpy is used instead of the SerpApi google_jobs engine because Google Jobs' index is
@@ -183,7 +183,7 @@ def _best_apply_link(record):
 
 
 def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
-    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning candidate job
+    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning job ad
         dicts: {url, title, company, location}
     """
     country_name = _COUNTRY_NAMES.get(country, "worldwide")
@@ -203,7 +203,7 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
     jobs = scrape_jobs(**params)
     records = jobs.to_dict("records")
 
-    candidates = [
+    job_ads = [
         {
             "url": _best_apply_link(r),
             "title": _clean(r.get("title")),
@@ -212,14 +212,14 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
         }
         for r in records
     ]
-    candidates = [c for c in candidates if c["url"]]
+    job_ads = [c for c in job_ads if c["url"]]
     if debug:
-        print(f"[jobspy_search] {len(candidates)} candidate(s)")
-    return candidates
+        print(f"[jobspy_search] {len(job_ads)} job ad(s)")
+    return job_ads
 
 
-def discover_candidates(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=False):
-    """ run one JobSpy search per cached query, aggregating candidates deduped by
+def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=False):
+    """ run one JobSpy search per cached query, aggregating job ads deduped by
         normalized url (first occurrence keeps title/company/location; matched_queries collects
         every query phrase that surfaced it)
     """
@@ -237,16 +237,16 @@ def discover_candidates(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=
     return list(aggregated.values())
 
 
-def filter_new_candidates(candidates):
-    """ drop candidates already present in storage.py's evaluations DB (by normalized url) """
+def filter_new_job_ads(job_ads):
+    """ drop job ads already present in storage.py's evaluations DB (by normalized url) """
     known = {normalized for _, normalized in storage.list_evaluated_urls()}
-    return [c for c in candidates if storage.normalize_url(c["url"]) not in known]
+    return [c for c in job_ads if storage.normalize_url(c["url"]) not in known]
 
 
-def _print_candidates(candidates):
-    """ print newly discovered candidate job urls for manual review """
-    print(f"\n{len(candidates)} new job candidate(s):\n")
-    for c in candidates:
+def _print_job_ads(job_ads):
+    """ print newly discovered job ad urls for manual review """
+    print(f"\n{len(job_ads)} new job ad(s):\n")
+    for c in job_ads:
         print(f"- {c['title'] or '(untitled)'} at {c['company'] or '(unknown company)'} "
               f"({c['location'] or 'location unknown'})")
         print(f"  {c['url']}")
@@ -265,17 +265,17 @@ def find_company_posting_url(company, title, excluded_domain, debug=False):
     results = tavily.search(query, max_results=5)
     # skip the domain that already failed to extract (retrying there just reproduces the
     # original failure) and known aggregators/re-posters, biasing toward the company's own site
-    candidate_urls = [
+    result_urls = [
         r["url"] for r in results["results"]
         if urlsplit(r["url"]).netloc != excluded_domain
         and not any(d in urlsplit(r["url"]).netloc for d in _AGGREGATOR_DOMAINS)
     ][:3]
     if debug:
-        print(f"[find_company_posting_url] query={query!r} candidates={candidate_urls}")
-    if not candidate_urls:
+        print(f"[find_company_posting_url] query={query!r} results={result_urls}")
+    if not result_urls:
         return None
 
-    extracted = tavily.extract(candidate_urls, format="text")
+    extracted = tavily.extract(result_urls, format="text")
     if not extracted["results"]:
         return None
 
@@ -294,7 +294,7 @@ def find_company_posting_url(company, title, excluded_domain, debug=False):
         f"3. The page's own content identifies the employer as {company} - this is critical, "
         "since job titles repeat across many unrelated employers, so a title/seniority match "
         "alone is not enough.\n\n"
-        "It is common and expected for NONE of the candidates to qualify (e.g. the only "
+        "It is common and expected for NONE of these results to qualify (e.g. the only "
         "results are re-posters, unrelated companies, or listing pages) - in that case you "
         "must respond with null rather than picking the closest/least-bad option. Respond "
         'with only a JSON object: {"url": <the matching url, or null if none of these pages '
@@ -309,24 +309,24 @@ def find_company_posting_url(company, title, excluded_domain, debug=False):
 def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_RESULTS,
                    force_queries=False, debug=False):
     """ full discovery pipeline: compile/reuse search queries, search Google Jobs, dedupe
-        within-run and against storage, then either list new candidates or run evaluate_job()
+        within-run and against storage, then either list new job ads or run evaluate_job()
         on them
     """
     cache = compile_queries() if force_queries else load_or_compile_queries()
-    candidates = discover_candidates(cache, max_results_per_query, debug)
-    new_candidates = filter_new_candidates(candidates)
+    job_ads = discover_job_ads(cache, max_results_per_query, debug)
+    new_job_ads = filter_new_job_ads(job_ads)
 
-    if not new_candidates:
-        print("No new job candidates found.")
+    if not new_job_ads:
+        print("No new job ads found.")
         return []
 
-    _print_candidates(new_candidates)
+    _print_job_ads(new_job_ads)
 
     if not evaluate:
         print("\nRun with --evaluate to score these (costs LLM/Tavily-extract/ORS calls per url).")
-        return new_candidates
+        return new_job_ads
 
-    to_run = new_candidates[:limit] if limit else new_candidates
+    to_run = new_job_ads[:limit] if limit else new_job_ads
     results = []
     for c in to_run:
         try:

@@ -10,7 +10,7 @@ evals/draft.py fills.
 
 Run with:
     python evals/capture.py <url> [<url> ...] [--name NAME]
-    python evals/capture.py --list-candidates            # print the eval set
+    python evals/capture.py --list-cases                 # print the eval set
     python evals/capture.py --from-cases NAME [NAME ...] # capture named existing cases
     python evals/capture.py --re-extract NAME | --all    # rebuild post from stored raw text
 """
@@ -132,7 +132,7 @@ def _report_truncated(truncated):
               f"site, or drop the case. run_evals.py skips these ads.")
 
 
-def _list_candidates(cases):
+def _list_cases(cases):
     """ print each case's name, ad/verified state, and drafted ground truth.
 
         days_on_office and address_contains are independent of the rubric and remain valid
@@ -165,7 +165,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("urls", nargs="*", help="posting url(s) to capture")
     parser.add_argument("--name", help="case name (only when capturing a single url)")
-    parser.add_argument("--list-candidates", action="store_true",
+    parser.add_argument("--list-cases", action="store_true",
                         help="print the eval set so cases can be picked by hand")
     parser.add_argument("--from-cases", nargs="+", metavar="NAME",
                         help="capture ads for these existing cases, dropping the rest")
@@ -175,8 +175,8 @@ def main():
 
     cases = dataset.load_cases()
 
-    if args.list_candidates:
-        _list_candidates(cases)
+    if args.list_cases:
+        _list_cases(cases)
         return
 
     if args.re_extract is not None:
@@ -220,7 +220,7 @@ def main():
         return
 
     if not args.urls:
-        parser.error("give a url, --from-cases, --re-extract, or --list-candidates")
+        parser.error("give a url, --from-cases, --re-extract, or --list-cases")
     if args.name and len(args.urls) > 1:
         parser.error("--name only makes sense with a single url")
 

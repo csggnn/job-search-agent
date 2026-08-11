@@ -49,7 +49,7 @@ Beyond those, the eval harness replays a hand-curated set of saved postings:
 
 ```
 podman-compose exec job-search python3 evals/capture.py <url>              # save a posting as a replayable ad
-podman-compose exec job-search python3 evals/capture.py --list-candidates  # review the eval set before picking cases
+podman-compose exec job-search python3 evals/capture.py --list-cases       # review the eval set before picking cases
 podman-compose exec job-search python3 evals/capture.py --re-extract --all # rebuild extracted fields from saved text
 podman-compose exec job-search python3 evals/draft.py --all                # pre-fill ground truth for a human to correct
 podman-compose exec job-search python3 evals/run_evals.py --criteria-only  # rubric regexes only: free, no network, ~1s
@@ -96,7 +96,7 @@ Modules, by concern:
 - `jobsearch/rubric.py` — the compatibility rubric: draft/reflect/cache + regex application.
 - `jobsearch/commute.py` — commute scoring.
 - `jobsearch/evaluation.py` — score a job against the rubric + `evaluate_job` orchestrator.
-- `jobsearch/discovery.py` — candidate discovery.
+- `jobsearch/discovery.py` — job ad discovery.
 
 ### Pipeline (`jobsearch/evaluation.py:evaluate_job`)
 
