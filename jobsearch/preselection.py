@@ -2,11 +2,6 @@
 Pre-selection: cut the L job ads discovery found down to the N worth fully evaluating,
 using only data already available at discovery time.
 
-MOCK MODULE. Every function below has its final signature and returns correctly shaped
-output, but no real logic: deterministic steps are stubbed to trivial behaviour and the one
-LLM call returns a fabricated reply. Each stub carries a "MOCK:" note stating what the real
-implementation does.
-
 Vocabulary: a *job ad* is one posting as discovery found it, a thin record keyed by url. A
 *job opening* is the position an ad advertises - several ads at several urls can advertise
 one job opening, which is what collapse_duplicates() reduces. "Candidate" is reserved
@@ -29,7 +24,7 @@ The module opens no database and reads no files: the rubric, resume, preferences
 set of already-evaluated job openings are all passed in. That keeps the deterministic stage
 unit-testable offline, and keeps storage access owned by the caller.
 
-Integration seams (not implemented here), all inside `jobsearch/discovery.py`:
+Integration seams, all inside `jobsearch/discovery.py`:
 
   - `discover_jobs()` calls `preselect()` after `filter_new_job_ads()`, prints
     `format_preselection()` in place of `_print_job_ads()`, and evaluates
@@ -39,14 +34,20 @@ Integration seams (not implemented here), all inside `jobsearch/discovery.py`:
   - `discover_jobs()` resolves the rubric once, before discovery, and passes it in.
     `evaluate_job()` loads the rubric per job, so an unpinned recompile partway through a
     run would prescore against one rubric and score against another.
-  - `jobspy_search()` retains the JobSpy columns it currently drops, and sets
+  - `jobspy_search()` retains the JobSpy columns it would otherwise drop, and sets
     `linkedin_fetch_description=True`; without it there is no description to prescore.
-  - `jobsearch/storage.py` needs a new read-only accessor supplying `known_job_openings`:
-    `list_evaluated_job_openings() -> [(normalized_url, company, job_title,
-    application_status)]`. `list_evaluated_urls()` returns URLs only.
+  - `jobsearch/storage.py`'s `list_evaluated_job_openings()` supplies
+    `known_job_openings`; `list_evaluated_urls()` returns URLs only.
 
 `jobsearch/evaluation.py` is untouched.
 """
+
+import re
+from datetime import date
+from urllib.parse import urlsplit
+
+from jobsearch.llm import ask_json
+from jobsearch.rubric import evaluate_rubric, match_text
 
 # stage tags recorded on every dropped job ad, so a listing can report why each one went
 DROP_STALE = "stale"
@@ -85,6 +86,9 @@ TAIL_MIN_POSITION = 0.6
 # deliberately kept - the same role in two cities is two openings with different commutes.
 TITLE_NOISE_PATTERN = r"\((?:m|v|h|f|d|w|x)[/|]\S*\)"
 TITLE_ABBREVIATIONS = {"sr": "senior", "snr": "senior", "jr": "junior"}
+# punctuation stripped off a title word before it is looked up in TITLE_ABBREVIATIONS, so
+# "Sr." and "Sr" normalize alike
+TITLE_PUNCTUATION = ".,;:"
 
 # job ad count past which the batch prompt approaches the model's input window
 BUDGET_WARN_JOB_ADS = 250
@@ -93,13 +97,26 @@ BUDGET_WARN_JOB_ADS = 250
 # full ad, a source board is usually scrapeable, a re-poster carries a thin copy
 SOURCE_BOARDS = {"linkedin.com", "indeed.com"}
 
+# Third-party re-posters and aggregators, which tend to carry a thin or stale copy of a
+# posting. Owned here because this module ranks a duplicate collapse's urls by source;
+# jobsearch/discovery.py imports it for the same reason in its scrape fallback search.
+AGGREGATOR_DOMAINS = SOURCE_BOARDS | {
+    "glassdoor.com", "jobleads.com", "bebee.com", "monster.com", "jobrapido.com",
+    "jooble.org", "careerjet.com", "simplyhired.com", "ziprecruiter.com", "talent.com",
+    "adzuna.com", "neuvoo.com", "jobsora.com", "trabajo.org", "whatjobs.com",
+    "learn4good.com", "receptix.com",
+}
+
+# max_tokens for the batch call: one id + one short reason per selected job ad
+SELECTION_MAX_TOKENS = 2048
+
 
 # ---------------------------------------------------------------------------
 # shapes
 # ---------------------------------------------------------------------------
 
-# INPUT - one job ad as discovery produces it, after jobspy_search() is widened to retain
-# the JobSpy columns it currently discards:
+# INPUT - one job ad as discovery produces it, from the JobSpy columns jobspy_search()
+# retains:
 #
 #   {"url": str, "title": str|None, "company": str|None, "location": str|None,
 #    "matched_queries": [str], "description": str|None, "is_remote": bool|None,
@@ -112,24 +129,6 @@ SOURCE_BOARDS = {"linkedin.com", "indeed.com"}
 # the selected.
 #
 # OUTPUT - see preselect().
-
-_MOCK_JOB_AD = {
-    "url": "https://example.invalid/jobs/1",
-    "title": "Example Position",
-    "company": "Example Company",
-    "location": "Example City",
-    "matched_queries": ["example query"],
-    "description": "Example posting body.",
-    "is_remote": False,
-    "date_posted": "2026-01-01",
-    "job_type": None,
-    "job_level": None,
-    "min_amount": None,
-    "max_amount": None,
-    "currency": None,
-    "company_industry": None,
-    "work_from_home_type": None,
-}
 
 
 def _dropped(job_ad, stage, reason):
@@ -148,11 +147,26 @@ def job_opening_key(company, title):
         Lowercases, collapses whitespace, strips TITLE_NOISE_PATTERN and expands
         TITLE_ABBREVIATIONS. Location suffixes are left in place: the same role advertised
         in two cities is two openings with different commutes, not a duplicate.
-
-        MOCK: lowercase + whitespace collapse only; the noise and abbreviation passes are
-        not applied yet.
     """
-    return " ".join(f"{company or ''} {title or ''}".lower().split())
+    text = re.sub(TITLE_NOISE_PATTERN, " ", f"{company or ''} {title or ''}", flags=re.IGNORECASE)
+    words = []
+    for word in text.lower().split():
+        stripped = word.strip(TITLE_PUNCTUATION)
+        if stripped:
+            words.append(TITLE_ABBREVIATIONS.get(stripped, stripped))
+    return " ".join(words)
+
+
+def _parse_date(value):
+    """ the date part of a JobSpy date_posted cell (a date object or an ISO string), or None
+        when it is absent or unparseable
+    """
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
 
 
 def drop_stale(job_ads, max_age_days):
@@ -163,12 +177,38 @@ def drop_stale(job_ads, max_age_days):
         remoteness is scored later by the commute modifier, on a posting whose days_on_office
         has been read from the full ad, rather than filtered here on JobSpy's is_remote flag.
 
-        Domain is not grounds for a drop either - _AGGREGATOR_DOMAINS contains the boards
+        Domain is not grounds for a drop either - AGGREGATOR_DOMAINS contains the boards
         discovery searches. Domain is used only to pick a duplicate collapse's survivor.
-
-        MOCK: keeps everything.
     """
-    return list(job_ads), []
+    today = date.today()
+    kept, dropped = [], []
+    for job_ad in job_ads:
+        posted = _parse_date(job_ad.get("date_posted"))
+        age_days = (today - posted).days if posted else None
+        if age_days is not None and age_days > max_age_days:
+            dropped.append(_dropped(
+                job_ad, DROP_STALE,
+                f"posted {age_days} days ago, past the {max_age_days}-day cutoff",
+            ))
+        else:
+            kept.append(job_ad)
+    return kept, dropped
+
+
+def _source_rank(url):
+    """ how likely a url is to scrape into a full ad: 0 for a domain no board is known to
+        own (the company's own careers page), 1 for a source board, 2 for a re-poster
+    """
+    host = urlsplit(url or "").netloc.lower()
+
+    def owned_by(domains):
+        return any(host == domain or host.endswith("." + domain) for domain in domains)
+
+    if owned_by(SOURCE_BOARDS):
+        return 1
+    if owned_by(AGGREGATOR_DOMAINS):
+        return 2
+    return 0
 
 
 def collapse_duplicates(job_ads):
@@ -177,13 +217,25 @@ def collapse_duplicates(job_ads):
         (own careers page > source board > re-poster); the losers' urls are attached to it as
         "alternates" for evaluate_job()'s ScrapeError fallback.
         returns (kept, dropped).
-
-        MOCK: attaches a key and an empty alternates list, collapses nothing.
     """
-    kept = [{**ad, "job_opening_key": job_opening_key(ad.get("company"), ad.get("title")),
-             "alternates": []}
-            for ad in job_ads]
-    return kept, []
+    groups = {}
+    for job_ad in job_ads:
+        groups.setdefault(job_opening_key(job_ad.get("company"), job_ad.get("title")),
+                          []).append(job_ad)
+
+    kept, dropped = [], []
+    for key, group in groups.items():
+        # min() is stable, so an equally ranked url loses to the one discovery found first
+        survivor = min(group, key=lambda job_ad: _source_rank(job_ad.get("url")))
+        losers = [job_ad for job_ad in group if job_ad is not survivor]
+        kept.append({**survivor,
+                     "job_opening_key": key,
+                     "alternates": [job_ad["url"] for job_ad in losers]})
+        dropped += [
+            _dropped(job_ad, DROP_DUPLICATE, f"same job opening as {survivor['url']}")
+            for job_ad in losers
+        ]
+    return kept, dropped
 
 
 def drop_already_evaluated(job_ads, known_job_openings):
@@ -194,10 +246,17 @@ def drop_already_evaluated(job_ads, known_job_openings):
         application_status is ignored: having been evaluated is itself the drop rule, and a
         discarded opening says nothing about a different opening at the same company, so a
         discard never suppresses the employer.
-
-        MOCK: keeps everything.
     """
-    return list(job_ads), []
+    known = {job_opening_key(company, title) for _, company, title, _ in known_job_openings}
+    kept, dropped = [], []
+    for job_ad in job_ads:
+        key = job_opening_key(job_ad.get("company"), job_ad.get("title"))
+        if key in known:
+            dropped.append(_dropped(job_ad, DROP_EVALUATED,
+                                    "this job opening already has a saved evaluation"))
+        else:
+            kept.append(job_ad)
+    return kept, dropped
 
 
 def prescore_job_ads(job_ads, rubric):
@@ -208,10 +267,18 @@ def prescore_job_ads(job_ads, rubric):
         Adds "prescore" (signed sum of matched criterion weights) and "matched_criteria"
         ([name]). An annotation, never a filter: an unmatched criterion on thin ad text is
         evidence of thin text, not of a bad job.
-
-        MOCK: zero score, no matched criteria.
     """
-    return [{**ad, "prescore": 0, "matched_criteria": []} for ad in job_ads]
+    scored = []
+    for job_ad in job_ads:
+        criteria = evaluate_rubric(rubric, match_text(job_ad.get("title"),
+                                                      job_ad.get("location"),
+                                                      job_ad.get("description")))
+        scored.append({
+            **job_ad,
+            "prescore": sum(criterion["score"] for criterion in criteria),
+            "matched_criteria": [c["name"] for c in criteria if c["matched"]],
+        })
+    return scored
 
 
 # ---------------------------------------------------------------------------
@@ -226,29 +293,57 @@ def description_excerpt(description):
         Starts at the first SECTION_START_PATTERN match, or 0 when none matches. Ends at the
         last SECTION_TAIL_PATTERN match occurring past TAIL_MIN_POSITION of the text, or at
         the end. Caps the result at EXCERPT_CHARS.
-
-        MOCK: head truncation, the fallback path.
     """
-    return (description or "")[:EXCERPT_CHARS]
+    text = description or ""
+    head = re.search(SECTION_START_PATTERN, text, re.IGNORECASE)
+    start = head.start() if head else 0
+
+    end = len(text)
+    tail_guard = TAIL_MIN_POSITION * len(text)
+    for match in re.finditer(SECTION_TAIL_PATTERN, text, re.IGNORECASE):
+        if match.start() >= tail_guard and match.start() > start:
+            end = match.start()
+
+    return text[start:end][:EXCERPT_CHARS]
 
 
 def summarize_job_ad(job_ad, index):
     """ render one job ad as a prompt line: its integer id, the structured fields, the
         prescore annotation, and description_excerpt() of its description.
-
-        MOCK: id and title only.
     """
-    return f"[{index}] {job_ad.get('title')}"
+    matched = job_ad.get("matched_criteria") or []
+    details = [
+        f"work mode: {'remote' if job_ad.get('is_remote') else 'on-site/hybrid'}",
+        f"posted: {job_ad.get('date_posted') or 'unknown'}",
+    ]
+    for field in ("job_type", "job_level", "company_industry"):
+        if job_ad.get(field):
+            details.append(f"{field.replace('_', ' ')}: {job_ad[field]}")
+    if job_ad.get("min_amount") or job_ad.get("max_amount"):
+        details.append(f"salary: {job_ad.get('min_amount')}-{job_ad.get('max_amount')} "
+                       f"{job_ad.get('currency') or ''}".strip())
+
+    return "\n".join([
+        f"[{index}] {job_ad.get('title') or '(untitled)'} "
+        f"at {job_ad.get('company') or '(unknown company)'} "
+        f"({job_ad.get('location') or 'location unknown'})",
+        f"  {' | '.join(details)}",
+        f"  rubric prescore: {job_ad.get('prescore', 0)}; "
+        f"matched criteria: {', '.join(matched) if matched else 'none'}",
+        f"  {description_excerpt(job_ad.get('description'))}",
+    ])
 
 
 def check_budget(job_ads):
     """ warn when the job ad count approaches the batch prompt's input window. Past this
         point the whole set no longer fits in one call and a ranked cut becomes necessary,
         which reintroduces ordering as a load-bearing step.
-
-        MOCK: prints nothing.
     """
-    return len(job_ads) <= BUDGET_WARN_JOB_ADS
+    if len(job_ads) > BUDGET_WARN_JOB_ADS:
+        print(f"Warning: {len(job_ads)} job ads exceeds the {BUDGET_WARN_JOB_ADS} the batch "
+              "prompt is budgeted for - the selection call may exceed the model's input window")
+        return False
+    return True
 
 
 def select_batch(job_ads, n, resume, preferences):
@@ -257,11 +352,28 @@ def select_batch(job_ads, n, resume, preferences):
         returns the raw reply: {"selected": [{"id": int, "reason": str}, ...]}.
 
         Not chunked - chunking makes the call count O(L).
-
-        MOCK: picks the first n ids in order, which is exactly the behaviour pre-selection
-        exists to replace.
     """
-    return {"selected": [{"id": i, "reason": "mock selection"} for i in range(min(n, len(job_ads)))]}
+    listing = "\n\n".join(summarize_job_ad(job_ad, i) for i, job_ad in enumerate(job_ads))
+
+    return ask_json(
+        "You are pre-selecting which job ads a candidate should spend a full, expensive "
+        "evaluation on. Every ad below was found by a job-board search, and only some of "
+        "them are worth reading in depth.\n\n"
+        f"Candidate resume:\n{resume}\n\n"
+        f"Candidate job preferences:\n{preferences}\n\n"
+        f"Job ads, each with an integer id, its structured fields, the score a regex rubric "
+        f"derived from the resume and preferences already gave it, and an excerpt of its "
+        f"description:\n{listing}\n\n"
+        f"Select the ids of the {n} job ads most likely to score well once fully evaluated "
+        f"against the resume and preferences above. If fewer than {n} ads are listed, select "
+        "all of them. Judge each ad on its own merit - the order they are listed in carries no "
+        "meaning. The rubric prescore is evidence, not a verdict: a thin ad matches few "
+        "criteria because it says little, not because the job is a poor fit. Do not select "
+        "an ad that contradicts a stated disqualifier.\n\n"
+        'Respond with only a JSON object: {"selected": [{"id": <int>, "reason": <one short '
+        'sentence on why this ad is worth evaluating>}, ...]}',
+        max_tokens=SELECTION_MAX_TOKENS,
+    )
 
 
 def validate_selection(reply, job_ads, n):
@@ -269,13 +381,35 @@ def validate_selection(reply, job_ads, n):
         range with a warning, collapse repeats, and backfill any shortfall by descending
         prescore. Mirrors discovery._validate_queries()'s guard against a non-compliant reply.
         returns (selected, dropped) where selected carries "selection_reason".
-
-        MOCK: trusts the reply, no validation or backfill.
     """
-    chosen = {entry["id"]: entry["reason"] for entry in reply["selected"]}
+    if not job_ads:
+        return [], []
+
+    target = min(n, len(job_ads))
+    chosen = {}
+    for entry in (reply or {}).get("selected") or []:
+        job_id = entry.get("id") if isinstance(entry, dict) else None
+        if not isinstance(job_id, int) or isinstance(job_id, bool) \
+                or not 0 <= job_id < len(job_ads):
+            print(f"Warning: dropping selected id {job_id!r} - outside the "
+                  f"0-{len(job_ads) - 1} range of job ads presented")
+            continue
+        if job_id in chosen or len(chosen) >= target:
+            continue
+        chosen[job_id] = entry.get("reason") or "selected by the batch pass"
+
+    # a reply naming fewer ids than asked for still has to fill the evaluation budget; the
+    # prescore is the only ordering available at this point that is not the discovery order
+    # pre-selection exists to replace
+    if len(chosen) < target:
+        by_prescore = sorted((i for i in range(len(job_ads)) if i not in chosen),
+                             key=lambda i: (-job_ads[i].get("prescore", 0), i))
+        for i in by_prescore[:target - len(chosen)]:
+            chosen[i] = "backfilled by rubric prescore: the batch pass named too few ids"
+
     selected = [{**job_ads[i], "selection_reason": reason} for i, reason in chosen.items()]
-    dropped = [_dropped(ad, DROP_NOT_SELECTED, "not among the selected ids")
-               for i, ad in enumerate(job_ads) if i not in chosen]
+    dropped = [_dropped(job_ad, DROP_NOT_SELECTED, "not among the selected ids")
+               for i, job_ad in enumerate(job_ads) if i not in chosen]
     return selected, dropped
 
 
@@ -294,8 +428,6 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
 
         Every discovered job ad appears exactly once across "selected" and "dropped", so a
         listing can account for all of them.
-
-        MOCK: wires the stubs together; the shape is real, the selection is not.
     """
     dropped = []
 
@@ -336,7 +468,35 @@ def format_preselection(result):
     """ render a preselect() result for the terminal: the selected N with their reason, then
         the dropped job ads grouped by stage, then the stats line. This is what makes the
         stage inspectable without paying for evaluation.
-
-        MOCK: stats line only.
     """
-    return str(result["stats"])
+    stats = result["stats"]
+    lines = [f"\n{len(result['selected'])} job ad(s) selected for evaluation:\n"]
+    for job_ad in result["selected"]:
+        lines.append(f"- {job_ad.get('title') or '(untitled)'} "
+                     f"at {job_ad.get('company') or '(unknown company)'} "
+                     f"({job_ad.get('location') or 'location unknown'})")
+        lines.append(f"  {job_ad['url']}")
+        lines.append(f"  prescore {job_ad.get('prescore', 0)}: "
+                     f"{', '.join(job_ad.get('matched_criteria') or []) or 'no criteria matched'}")
+        lines.append(f"  why: {job_ad.get('selection_reason', '')}")
+        if job_ad.get("alternates"):
+            lines.append(f"  alternates: {', '.join(job_ad['alternates'])}")
+
+    for stage in (DROP_STALE, DROP_DUPLICATE, DROP_EVALUATED, DROP_NOT_SELECTED):
+        records = [r for r in result["dropped"] if r["stage"] == stage]
+        if not records:
+            continue
+        lines.append(f"\n{len(records)} job ad(s) dropped - {stage}:\n")
+        for record in records:
+            job_ad = record["job_ad"]
+            lines.append(f"- {job_ad.get('title') or '(untitled)'} "
+                         f"at {job_ad.get('company') or '(unknown company)'}")
+            lines.append(f"  {job_ad['url']}")
+            lines.append(f"  {record['reason']}")
+
+    lines.append(
+        f"\n{stats['discovered']} discovered -> {stats['after_stale']} fresh -> "
+        f"{stats['after_dedup']} distinct openings -> {stats['after_known']} not yet evaluated "
+        f"-> {stats['selected']} selected ({stats['llm_calls']} LLM call)"
+    )
+    return "\n".join(lines)
