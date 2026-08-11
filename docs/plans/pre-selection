@@ -1,0 +1,179 @@
+# Pre-selection instructions
+
+Insert a PRE-SELECTION stage between discovery and evaluation:
+
+```
+DISCOVERY > PRE-SELECTION > EVALUATION > SORTING & SELECTION
+   L               N              N              M
+```
+
+It cuts L discovered job ads to the N that get fully evaluated, using only data already
+available at discovery time.
+
+Today the cut is `new_job_ads[:limit]` in `discovery.discover_jobs`, over a list ordered
+by insertion into the aggregation dict: query order, then JobSpy order within a query. With
+`--limit 10` and 10 results per query the run evaluates the first query's results and
+nothing else.
+
+Pre-selection targets selecting ads which have the highest chance to lead to a high evaluation, with limited computational cost.
+
+## Invariants
+
+1. Pre-selection favours programmatic checks which do not require LLM calls. These may include de-duplicate, & regexpr.
+2. Pre-selection can include up to a fixed number of LLM calls (1 - 3) per discovery run. Number of calls must not grow with L.
+3. Every dropped job ad is reported with the stage that dropped it.
+4. `--no-preselect` restores today's behaviour, so the two are comparable on one job ad
+   set.
+5. No candidate content in `.py`. Role, domain and location knowledge comes from
+   `resume.md` / `job_preferences.md` / the rubric.
+
+L is bounded at roughly 100 (4-10 drafted queries x `--max-results`, default 10), and a
+~150-token job ad summary puts the full set around 15k tokens against Haiku 4.5's 200k
+input window. Assert the job ad count and warn as it approaches the budget: if L outgrows
+it, a ranked cut becomes necessary and invariant 2 has to be revisited.
+
+
+
+# Current implementation plan:
+
+## Prerequisite: retain the discovery data already being fetched
+
+`jobspy.scrape_jobs` returns 34 columns; `discovery.jobspy_search` keeps four (`url`,
+`title`, `company`, `location`). Retain also: `description`, `is_remote`, `date_posted`,
+`job_type`, `job_level`, `min_amount` / `max_amount` / `currency`, `company_industry`,
+`work_from_home_type`.
+
+Set `linkedin_fetch_description=True`. Indeed populates `description` already; LinkedIn
+needs the flag, at one extra HTTP request per result (latency and block risk, no API spend).
+Without it, LinkedIn job ads are judged on titles while Indeed ones are judged on ad
+text. Measure the added latency on the first run.
+
+
+## Stage 1: deterministic pass (free, no LLM, any L)
+
+Drops and annotations only, no ordering. Run the steps in this order.
+
+**1. Drop Stale Job Ads.** Drop job ads whose `date_posted` is older than `MAX_AGE_DAYS`
+(45). A missing `date_posted` is kept: absent data is not evidence. Staleness is the only unconditional drop. The cutoff should eventually become a user parameter rather than a constant.
+
+Location and work mode play no part in pre-selection. Remoteness reaches the score later through ranking's commute modifier.
+
+
+**2. Duplicate collapse.** One job opening at one company appears once.
+
+`filter_new_job_ads` dedupes on normalized URL only, so the same posting on LinkedIn, Indeed and the company's careers page survives as three job ads. Add a second key,
+`job_opening_key()`: normalized `(company, title)`, lowercased and whitespace-collapsed, with gender markers
+(`(m/f/d)`, `(h/f/x)`) stripped and `Sr.`/`Snr`/`Jr` expanded. Location suffixes stay: the same role advertised in two cities is two job openings with different commutes.
+
+Applied in two places, both owned by `preselection.py` so the key has one owner
+(`filter_new_job_ads` keeps only the URL check):
+
+- within the run, collapsing duplicates to one job ad;
+- against storage, dropping job ads whose `(company, title)` was already evaluated. Needs
+  a new read-only accessor in `storage.py` returning `(normalized_url, company, job_title,
+  application_status)`; `list_evaluated_urls()` returns URLs only. No schema change.
+
+`application_status` is ignored. Having been evaluated is the drop rule on its own, and a
+discarded role is not evidence about a different role at the same company, so a discard
+never suppresses the employer.
+
+The survivor of a collapse is the URL most likely to scrape into a full ad: prefer a domain
+absent from `_AGGREGATOR_DOMAINS` (the company's own careers page), then a source board,
+then a third-party re-poster. Attach the discarded siblings to the survivor as `alternates`.
+When `evaluate_job` raises `ScrapeError`, discovery tries those alternates before calling
+`find_company_posting_url`, which otherwise pays a Tavily search plus an LLM call to
+rediscover a URL this stage already had.
+
+**3. Rubric prescore**: `evaluate_rubric(rubric, match_text(title, location, description))`,
+over the **full** description since regex has no token budget. Attach the signed score and
+matched criterion names to each job ad as grounding for stage 2, the role the rubric
+already plays in `compatibility_score`. It is an annotation, never a filter: an unmatched
+criterion on thin ad text is evidence of thin text, not of a bad job.
+
+## Stage 2: LLM batch judgment (one call)
+
+One call, with invariant 2's remaining budget left unspent: a screen pass is added only if
+evaluation shows one call is not enough.
+
+Input: every surviving job ad as a summary with a short integer id, plus the resume and
+the preferences. Output: the N selected ids with a one-line reason each. N defaults to 10.
+
+The excerpt is anchored, not head-truncated: the opening of an ad is company blurb and the
+close is benefits boilerplate, so the window starts at the first responsibilities /
+requirements anchor, ends at an offer / benefits anchor occurring past 60% of the text, and
+caps at `EXCERPT_CHARS` (900). No anchor match falls back to head truncation.
+
+Measured over `evals/ads/`: a requirements anchor appears in 7/7 ads at 21-79% of the way
+in, a responsibilities anchor in 6/7 at 11-43%, an offer anchor in 4/7 with three past 76%
+and one false positive at 8% inside a company blurb, which is what the 60% guard exists for.
+Headings appear in 0/7 and bullets in 4/7, so neither can anchor the window. Those fixtures
+are `scrape.py` output; JobSpy descriptions are markdown and likely more structured, so the
+heuristic needs re-measuring against real discovery output.
+
+Validate as `_validate_queries` does: drop out-of-range ids with a warning, collapse
+duplicates, backfill a short reply by prescore order so the stage always returns exactly N.
+
+Do not chunk. Chunking makes calls O(L) and breaks invariant 2.
+
+Present job ads with explicit ids and prescore annotations rather than as a bare ordered
+list, to blunt position bias over a ~100-item list. If evaluation shows position bias
+anyway, fix it with a deterministic interleave of presentation order, not a ranked cut.
+
+Query-coverage diversity is not enforced: with no truncation, every query's results compete
+on merit, and a query contributing nothing to the selected N is a signal about the query.
+Per-company caps and role-family spread are deferred until a run shows one of them binding.
+
+## Interfaces
+
+- New module `jobsearch/preselection.py` (mocked in place) exporting
+  `preselect(job_ads, n, rubric, resume, preferences, known_job_openings)`, returning
+  `{"selected", "dropped", "stats"}` with every discovered job ad appearing exactly once
+  across the first two. `discovery.py` calls it; it does not call back into discovery, opens
+  no database and reads no files, so stage 1 is unit-testable offline.
+- `storage.py` gains `list_evaluated_job_openings() -> [(normalized_url, company, job_title,
+  application_status)]`, supplying `known_job_openings`.
+- `discover_jobs` calls `preselect()` after `filter_new_job_ads()` (which keeps its
+  URL-level check), prints `format_preselection()` in place of `_print_job_ads()`, and
+  evaluates `result["selected"]`. Its `except ScrapeError` block tries the survivor's
+  `alternates` before `find_company_posting_url()`. `evaluation.py` is untouched.
+- `discover_jobs` resolves the rubric once, before discovery, and passes it to `preselect()`.
+  `evaluate_job()` loads the rubric per job, so an unpinned recompile partway through a run
+  would prescore against one rubric and score against another.
+- `discover_jobs.py`: `--no-preselect`, and a flag to disable the LinkedIn description fetch.
+- `--limit` becomes N, the pre-selection target, not a truncation of the tail, defaulting to
+  `DEFAULT_N` (10) instead of today's "evaluate everything".
+- Without `--evaluate`, pre-selection still runs and `_print_job_ads` lists every
+  job ad, marking the selected N and the stage that dropped each of the others
+  (invariant 3). This makes a bare listing cost one LLM call where it previously cost none;
+  `--no-preselect` is the zero-call path.
+
+## Evaluation
+
+Pre-selection is a selector, so pass/fail on one run says nothing. Measure precision@N: of
+the job ads kept, what fraction score above a threshold once fully evaluated. Recall needs
+one batch where all L were evaluated, affordable at small L, and is the only way to detect a
+good job being dropped.
+
+Add a fixture holding a captured job ad list as returned by discovery, under `evals/`.
+The existing `evals/ads/` files are single postings and cannot exercise a stage whose input
+is a list. That fixture is data: it never reaches a `.py` file, and nothing under `evals/`
+touches `data/evaluations.db`.
+
+Unit-test stage 1 offline: the duplicate key, survivor choice and alternates, the staleness
+drop, the prescore annotation, id validation against a fabricated reply, and the backfill
+path.
+
+## Open
+
+No decisions remain open. Two things need measuring against real discovery output rather
+than deciding:
+
+1. The section anchors, calibrated on `scrape.py` fixtures, against JobSpy's markdown
+   descriptions.
+2. Whether the dedup key's noise stripping catches the variants boards actually produce.
+
+## Deferred
+
+The end-to-end "propose M jobs" entrypoint. `discover_jobs.py --evaluate` stops at
+evaluation, and M (jobs proposed) would need to be distinguished from N (jobs evaluated) at
+the CLI. Ranking, which it would also compose, lives on branch `feat/job-ranking`.
