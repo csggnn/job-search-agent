@@ -228,6 +228,11 @@ podman-compose exec job-search python3 -m unittest discover -s tests/unit   # un
 podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # end-to-end, needs keys
 ```
 
+`.github/workflows/unit-tests.yml` runs the unit suite on every pull request. It builds the
+image from the `Dockerfile` and runs `unittest discover -s tests/unit` inside it, mounting the
+checkout at `/workspace` as `podman-compose` does. The e2e suite is not run in CI — it needs
+API keys and a live posting.
+
 The eval harness answers a different question from the tests: not "does it run?" but "did
 this change make the judgments better?". It is a small hand-curated set (5-10 cases),
 deliberately not the whole database — the database records real usage and grows on its own,
