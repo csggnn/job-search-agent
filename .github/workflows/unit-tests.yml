@@ -6,9 +6,15 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check out the code
         uses: actions/checkout@v4
+        with:
+          # The checkout is bind-mounted into the test container, so a persisted
+          # token would be readable from inside it. Nothing here writes to git.
+          persist-credentials: false
 
       - name: Build the container image
         run: podman build -t job-search-agent:ci .
