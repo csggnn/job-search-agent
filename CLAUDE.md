@@ -97,6 +97,7 @@ Modules, by concern:
 - `jobsearch/commute.py` — commute scoring.
 - `jobsearch/evaluation.py` — score a job against the rubric + `evaluate_job` orchestrator.
 - `jobsearch/discovery.py` — job ad discovery.
+- `jobsearch/preselection.py` — cut the L discovered job ads to the N worth evaluating.
 
 ### Pipeline (`jobsearch/evaluation.py:evaluate_job`)
 
@@ -119,6 +120,38 @@ quality there justifies a stronger, pricier model while the per-job hot path sta
 needs it: rubric drafting. Both functions disable Anthropic extended-thinking
 (`_provider_kwargs`) because aisuite's response converter can't parse a leading
 `ThinkingBlock` (it reads `content[0].text`).
+
+### Pre-selection (`jobsearch/preselection.py`)
+
+Sits between discovery and evaluation, cutting the L discovered job ads to the N that get
+fully evaluated, on the data JobSpy already returned:
+
+```
+preselect(job_ads, n, rubric, resume, preferences, known_job_openings)
+  -> drop_stale             date_posted older than MAX_AGE_DAYS (45); missing date = keep
+  -> collapse_duplicates    one normalized (company, title) = one job opening; survivor is the
+                            likeliest-to-scrape url, losers become its "alternates"
+  -> drop_already_evaluated the job opening already has a saved evaluation
+  -> prescore_job_ads       regex-apply the rubric to the untruncated ad; annotation, not a filter
+  -> select_batch           1 LLM call, never chunked, whatever L is
+  -> validate_selection     police the reply's ids, backfill a short reply by prescore
+  => {"selected", "dropped", "stats"} - every input ad in exactly one of the first two
+```
+
+Invariants the module exists to hold: **the LLM call count does not grow with L** (one call,
+so `select_batch` must never be chunked), and **every dropped ad is reported with the stage
+that dropped it**. The module opens no database and reads no files — rubric, resume,
+preferences and `known_job_openings` are passed in — which is what keeps stage 1
+unit-testable offline in `tests/unit/test_preselection.py`.
+
+`discovery.discover_jobs()` owns the seams: it resolves the rubric once *before* discovery
+(`evaluate_job` loads the rubric per job, so an unpinned recompile mid-run would prescore
+against one rubric and score against another), supplies `known_job_openings` from
+`storage.list_evaluated_job_openings()`, prints `format_preselection()`, and tries a job
+ad's `alternates` before paying for `find_company_posting_url()`. `--no-preselect` restores
+the pre-selection-free path so the two are comparable on one job ad set.
+`AGGREGATOR_DOMAINS` lives here, not in `discovery.py`, because this module ranks those
+domains when picking a collapse's survivor.
 
 ### The compatibility rubric: LLM-generated once, regex-applied many times
 

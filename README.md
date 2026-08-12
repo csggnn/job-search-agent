@@ -66,15 +66,59 @@ preferences file rather than in code.
 - runs each phrase against Indeed and LinkedIn via
   [JobSpy](https://github.com/speedyapply/JobSpy);
 - dedupes results against URLs already in `evaluations.db`;
-- lists the new job ads, or with `--evaluate` runs them through `evaluate_job()`.
+- pre-selects the N job ads worth evaluating out of the L discovered;
+- lists the result, or with `--evaluate` runs the selected N through `evaluate_job()`.
+
+### Pre-selection — `jobsearch/preselection.py`
+
+Discovery returns roughly 100 job ads (4-10 query phrases × `--max-results`); evaluating
+one costs a Tavily extract, 3-5 LLM calls and up to 3 routing calls. Pre-selection is the
+cut between the two, made on the data JobSpy already returned:
+
+```
+DISCOVERY  ──►  PRE-SELECTION  ──►  EVALUATION
+    L               N (10)             N
+```
+
+```
+preselect(job_ads, n, rubric, resume, preferences, known_job_openings)
+  │
+  ├─ stage 1 — deterministic, free, no LLM, any L:
+  │    drop_stale             date_posted older than MAX_AGE_DAYS (45); a missing date is kept
+  │    collapse_duplicates    one job opening = one normalized (company, title); the surviving
+  │                           url is the one likeliest to scrape (own careers page > source
+  │                           board > re-poster), the rest become its "alternates"
+  │    drop_already_evaluated the same job opening already has a saved evaluation
+  │    prescore_job_ads       regex-apply the rubric to the untruncated ad — an annotation for
+  │                           stage 2, never a filter
+  │
+  └─ stage 2 — one LLM call, whatever L is:
+       every survivor is presented with an integer id, its fields, its prescore and an
+       excerpt of its description; the reply names the N ids to evaluate, with a reason each
+```
+
+The call count does not grow with L: the batch is never chunked. A reply naming
+out-of-range or repeated ids is policed the way `_validate_queries` polices a query reply,
+and a reply naming too few ids is backfilled by descending prescore, so the stage always
+returns exactly N. Every job ad that does not reach evaluation is reported with the stage
+that dropped it, listed or evaluated alike.
+
+Location and work mode are deliberately not pre-selection filters. Remoteness reaches the
+score later through the commute step, on a posting whose office and in-office days have been
+read from the full ad rather than from JobSpy's `is_remote` flag.
+
+`--no-preselect` skips the stage entirely (and its one LLM call), evaluating the first
+`--limit` job ads in discovery order — which is what the pipeline did before pre-selection
+existed, so the two are comparable on one job ad set.
 
 **Fallback when a URL can't be scraped.** Some boards (LinkedIn, Ashby, and other
 JS-rendered or login-walled pages) reliably fail Tavily extraction, and `scrape_post()`
-raises `ScrapeError`. `discover_jobs.py` then searches the web for the same posting's
-full description published by the same company, explicitly excluding third-party
-re-poster domains (Indeed, Glassdoor, jobleads, ...) whose copies tend to be thin or
-stale. If a genuine match is found — typically the company's own careers page or ATS —
-`evaluate_job()` runs against that URL instead; otherwise the job ad is skipped.
+raises `ScrapeError`. Discovery first retries the duplicate-collapse `alternates` — other
+urls this run already found for the same job opening — and only then searches the web for
+the same posting's full description published by the same company, explicitly excluding
+third-party re-poster domains (Indeed, Glassdoor, jobleads, ...) whose copies tend to be
+thin or stale. If a genuine match is found — typically the company's own careers page or
+ATS — `evaluate_job()` runs against that URL instead; otherwise the job ad is skipped.
 
 ## Setup
 
@@ -108,8 +152,9 @@ runs inside the provided container.
 |------|---------|
 | Evaluate a posting | `python evaluate_job_post.py <url>` |
 | Force a fresh evaluation (ignore the cache) | `python evaluate_job_post.py <url> --force` |
-| List new job ads (no scoring) | `python discover_jobs.py` |
-| Find and score new job ads | `python discover_jobs.py --evaluate` (`--limit N` caps how many are scored) |
+| List new job ads, pre-selected (no scoring) | `python discover_jobs.py` |
+| List new job ads without pre-selecting (no LLM call) | `python discover_jobs.py --no-preselect` |
+| Find and score new job ads | `python discover_jobs.py --evaluate` (`--limit N` sets how many are pre-selected and scored, default 10) |
 | List the top-scoring saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company, compatibility_score FROM evaluations ORDER BY compatibility_score DESC LIMIT 5;"` |
 | Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs (e.g. remote, score > 75) | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
@@ -139,6 +184,8 @@ jobsearch/              the package
   rubric.py             the compatibility rubric: draft/reflect/cache + regex application
   evaluation.py         score a job against the rubric + commute; evaluate_job orchestrator
   discovery.py          derive queries, search Indeed + LinkedIn, surface/evaluate new URLs
+  preselection.py       cut the discovered job ads to the N worth evaluating: deterministic
+                        drops + rubric prescore, then one batched LLM selection call
 evals/                  the eval harness
   dataset.py            cases.json + stored-ad I/O; ground-truth shape checks
   scoring.py            pure scoring: criteria labels, scalars, aggregation, run diffs
@@ -149,7 +196,7 @@ evals/                  the eval harness
   ads/                  saved posting inputs, one JSON per case
   runs/                 per-run result snapshots
 tests/
-  unit/                 offline unit tests (test_units.py, test_evals.py)
+  unit/                 offline unit tests (test_units.py, test_evals.py, test_preselection.py)
   e2e/                  live end-to-end smoke test (test_e2e_pipeline.py, needs keys)
 scripts/check_setup.py  smoke-test API keys / provider wiring
 docs/plan.md            original course-assignment scope note (historical)
@@ -197,6 +244,19 @@ Two independent caches keep repeated runs cheap:
 
 Geocoding and routing use OpenRouteService (a free external API, not an LLM).
 
+Discovery's cost is dominated by what it evaluates, which is what pre-selection bounds:
+
+| Stage | Cost per discovery run |
+|-------|------------------------|
+| Search queries | 1 LLM call, cached until `resume.md`/`job_preferences.md`/`HOME_ADDRESS` change |
+| JobSpy search | no API spend; `--no-linkedin-descriptions` drops one HTTP request per LinkedIn result, at the price of pre-selecting those ads on their title alone |
+| Pre-selection stage 1 | free — dates, url domains and regex, no LLM |
+| Pre-selection stage 2 | exactly 1 LLM call, whatever L is; `--no-preselect` skips it |
+| Evaluation | per selected job ad: 1 Tavily extract, 3-5 LLM calls, up to 3 routing calls |
+
+Listing job ads without `--evaluate` therefore costs one LLM call where it previously cost
+none; `--no-preselect` is the zero-call listing.
+
 Eval runs add a third cache: **stored ads**. A case replays against its saved posting text
 rather than re-scraping, so `evals/run_evals.py` picks a tier by what it needs to check:
 
@@ -217,8 +277,8 @@ Two tiers under `tests/`, in separate subdirectories so the offline suite runs w
 credentials, plus the eval harness:
 
 - `tests/unit/` — offline unit tests for the deterministic helpers (URL normalization,
-  rubric hashing/application, section extraction, query validation, JSON parsing). No
-  LLM, network, or `.env` required.
+  rubric hashing/application, section extraction, query validation, JSON parsing) and for
+  pre-selection, whose one LLM call is patched out. No LLM, network, or `.env` required.
 - `tests/e2e/` — a live end-to-end smoke test that drives the pipeline through the CLI
   entrypoint and inspects the saved SQLite row. Requires API keys; set `TARGET_URL` near
   the top of `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
@@ -285,7 +345,14 @@ Items below require code changes, not just documentation or configuration.
    `query.py`/`review.py` wrapper would remove the need to hand-write SQL for routine
    use.
 
-3. **Ground truth is reviewed by hand-editing JSON.** `draft.py` pre-fills a case and the
+3. **Pre-selection is not measured.** It is a selector, so a single run says nothing about
+   it: the question is precision@N — of the job ads it kept, what fraction score above a
+   threshold once fully evaluated — and recall, which needs one batch where every discovered
+   ad was evaluated and is the only way to detect a good job being dropped. Both need a
+   fixture holding a captured job ad list as discovery returns it (the existing `evals/ads/`
+   files are single postings and cannot exercise a stage whose input is a list).
+
+4. **Ground truth is reviewed by hand-editing JSON.** `draft.py` pre-fills a case and the
    human corrects it in `cases.json`. At this size (5-10 cases) this is fine; a guided
    review loop that walks unverified cases one at a time — showing the posting alongside
    what the pipeline claimed, and prompting accept/flip/skip — would make it faster and

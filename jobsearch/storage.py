@@ -121,6 +121,22 @@ def list_evaluated_urls():
     return rows
 
 
+def list_evaluated_job_openings():
+    """ return [(normalized_url, company, job_title, application_status), ...] for every saved
+        evaluation - the job-opening identity fields, for callers that dedupe on the opening
+        rather than on the url it was found under (jobsearch.preselection). Read-only, no
+        schema of its own: list_evaluated_urls() returns urls only.
+    """
+    conn = _get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT normalized_url, company, job_title, application_status FROM evaluations"
+        ).fetchall()
+    finally:
+        conn.close()
+    return rows
+
+
 _EVALUATION_COLUMNS = (
     "job_title", "company", "commute_score", "commute_address", "days_on_office",
     "compatibility_score", "compatibility_rationale", "works_well", "does_not_work",
