@@ -1,0 +1,51 @@
+# Ranking
+
+Order evaluated jobs into the shortlist proposed to the candidate. `jobsearch/ranking.py`.
+
+Independent of pre-selection: ranking reads `evaluations` rows from SQLite and does not care
+how a row got there, whether via discovery, `evaluate_job_post.py`, or a pasted URL. The two
+would only meet in an end-to-end "propose M jobs" entrypoint, which does not exist.
+
+## The combination formula
+
+`compatibility_score` is 0-100 and higher is better. `commute_score` is weighted minutes and
+lower is better, with 0 meaning fully remote. They are incommensurable, so commute is applied
+as a modifier to compatibility rather than as a second sort key:
+
+    modifier = 15 * (1 - commute_score / 30)     # 0 -> +15, 30 -> 0, 60 -> -15, 80 -> -25
+    combined = clamp(compatibility_score + modifier, 0, 100)
+    commute_score > 80 -> combined = 0
+
+The four anchors are colinear, so this is one line through them at -0.5 points per weighted
+minute, not a piecewise table.
+
+Clamped to [0, 100]: a strong job with no commute would otherwise exceed 100, and a weak one
+with a long commute would go negative. The cutoff is strict, so exactly 80 takes the -25 and
+81 zeroes out.
+
+`commute_score is None` means `figure_address()` could not resolve an office. It scores as
+`COMMUTE_NEUTRAL`, the modifier's zero point, so compatibility passes through unchanged and
+the job is neither rewarded nor punished for a scraping failure. The row carries
+`commute_known: False` for the caller to surface.
+
+Derived at ranking time, never stored: the formula can change without invalidating saved
+evaluations, which would otherwise need their own hash invalidation alongside the rubric's.
+
+The thresholds encode this candidate's commute tolerance, which is personalization. They
+stay as named constants for now and should eventually become user parameters read from
+`job_preferences.md`.
+
+## State
+
+`combined_score()` and `commute_modifier()` are implemented and reproduce all four anchors.
+`rank_evaluations()` and `propose()` are mocked: correct signatures and output shape, no
+ordering or exclusion logic.
+
+`propose()` is specified to exclude rows whose `application_status` is `applied` or
+`discarded`, the user-tracked state `save_evaluation()` preserves across re-evaluation.
+
+## Next
+
+Tests are the immediate gap. `combined_score()` is pure, deterministic and fully specified,
+so the four anchors, the clamp at both ends, the strict cutoff and the `None` case are
+testable with no credentials and no network.
