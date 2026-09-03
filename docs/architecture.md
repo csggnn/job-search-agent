@@ -172,8 +172,8 @@ defaults to the cached one when omitted.
 
 `discover_jobs.py` finds new job ad URLs instead of requiring one to be pasted in:
 
-- derives search phrases from `resume.md` and `job_preferences.md`, cached in
-  `data/search_queries.json` and invalidated the same way the rubric is;
+- derives search phrases from `resume.md`, `job_preferences.md` and `HOME_ADDRESS`, cached
+  in `data/search_queries.json` and invalidated when any of the three changes;
 - runs each phrase against Indeed and LinkedIn via
   [JobSpy](https://github.com/speedyapply/JobSpy);
 - dedupes results against URLs already in `evaluations.db`;
@@ -240,7 +240,8 @@ or evaluating.
 
 A reply naming out-of-range or repeated ids is policed the way `_validate_queries` polices
 a query reply. A reply naming too few ids is backfilled by descending prescore, so the
-stage always returns exactly N.
+stage returns up to N: exactly N once at least N ads survive stage 1, fewer only when stage
+1 leaves fewer than N candidates to choose from.
 
 The module opens no database and reads no files. Rubric, resume, preferences and
 `known_job_openings` are passed in, which is what keeps stage 1 unit-testable offline in
@@ -321,12 +322,13 @@ but have the **skip-worktree** bit set. Once edited with real keys, resume or pr
 those edits do not appear in `git status` or `git diff` and are not picked up by
 `git add -A`, so personal data and API keys cannot be committed by accident.
 
-Changing the template itself requires re-enabling tracking first:
+Changing a template itself requires re-enabling tracking first, for whichever of the three
+files (`.env`, `data/resume.md`, `data/job_preferences.md`) is being changed:
 
 ```
-git update-index --no-skip-worktree .env
+git update-index --no-skip-worktree <file>
 # edit, commit the template change
-git update-index --skip-worktree .env
+git update-index --skip-worktree <file>
 ```
 
 ## Cost and caching

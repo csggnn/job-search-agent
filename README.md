@@ -14,7 +14,8 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 - Pre-filtering, deduping and pre-ranking results, ensuring LLM tokens are spent only on the most promising job ads.
 - Using AI to score pre-selected ads against the user's skills and preferences, including
   real driving time from the candidate's home.
-- Storing every evaluation in a database, so no posting is scored twice.
+- Storing every evaluation in a database, so a posting is not re-scored on a later run
+  unless you force it.
 
 ## Default usage
 
@@ -64,7 +65,7 @@ search and commute-routing calls; it is currently configured to work with Anthro
 each selected ad in turn. Shown here with `--limit 3` to keep the example short:
 
 ```
-$ python discover_jobs.py --evaluate --limit 3
+$ podman-compose exec job-search python3 discover_jobs.py --evaluate --limit 3
 
 3 job ad(s) selected for evaluation:
 
