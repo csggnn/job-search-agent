@@ -75,6 +75,13 @@ rubrics.
 (`reviewed`, `application_status`, `status_reason`, `notes`) are preserved across
 re-evaluation of the same URL.
 
+**`combined_score` is computed by `ranking.rank_evaluations()` and never persisted.** It is
+derived from `compatibility_score` and `commute_score` on every rank, so the modifier
+constants can change with no cache to invalidate. Do not add a stored column for it.
+
+**`ranking.propose()` excludes `application_status` `applied` and `discarded`**, and every
+input row appears exactly once across `proposed` and `excluded`.
+
 ## Commands
 
 The host machine has no Python deps installed. Everything runs inside the podman compose

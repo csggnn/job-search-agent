@@ -1,7 +1,7 @@
 # Architecture
 
-The code is a `jobsearch/` package with two root CLI entrypoints, `evaluate_job_post.py`
-and `discover_jobs.py`, that parse arguments and delegate into it.
+The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_job_post.py`,
+`discover_jobs.py` and `propose_jobs.py`, that parse arguments and delegate into it.
 
 ## Modules
 
@@ -16,6 +16,7 @@ and `discover_jobs.py`, that parse arguments and delegate into it.
 | `jobsearch/evaluation.py` | Score a job against the rubric and commute; the `evaluate_job` orchestrator. |
 | `jobsearch/discovery.py` | Derive queries, search Indeed and LinkedIn, surface or evaluate new URLs. |
 | `jobsearch/preselection.py` | Cut the discovered job ads to the N worth evaluating. |
+| `jobsearch/ranking.py` | Combine compatibility and commute into one score, order the saved evaluations, cut to the proposed shortlist. |
 
 Fetch and extract are separate in `scrape.py` so a posting's raw page text can be saved
 once and re-extracted later without re-fetching. `scrape_post` composes them for the live
@@ -66,11 +67,12 @@ provider whose response converter has a similar quirk.
 |------------|---------|
 | `discover_jobs.py` | Find, pre-select and optionally score new postings. `--help` lists every flag. |
 | `evaluate_job_post.py <url>` | Score one posting directly, the manual path into the same pipeline. `--force` re-scrapes and re-scores, ignoring the cache. |
+| `propose_jobs.py <n>` | Discover, pre-select and evaluate `3n` job ads, then print the top `n` over every saved evaluation and the top `n` over just this run's. `--no-discover` ranks the database as it stands, printing the overall shortlist only. |
 | `scripts/recompile_rubric.py` | Force-rebuild the compatibility rubric, bypassing the file-hash cache. `--if-changed` respects it instead. |
 
-Every flag has its own help string; the three commands above are the definitive list,
-kept here only as pointers so it never needs to be transcribed and re-synced by hand. Test
-and eval commands are in [evals.md](evals.md).
+Every flag has its own help string; the four commands above are the definitive list, kept
+here only as pointers so it never needs to be transcribed and re-synced by hand. Test and
+eval commands are in [evals.md](evals.md).
 
 ### Scoring one posting directly
 
@@ -187,6 +189,12 @@ mid-run would prescore against one rubric and score against another. It supplies
 `format_preselection()`, and tries a job ad's `alternates` before paying for
 `find_company_posting_url()`.
 
+`discover_jobs.py` and `propose_jobs.py` register the shared discovery flags
+(`--max-results`, `--no-linkedin-descriptions`, `--force`, `--debug`) through
+`discovery.add_discovery_arguments(parser)`, so a new pipeline knob reaches both from one
+edit. `--force` here recompiles the search queries; `evaluate_job_post.py --force` is
+unrelated and re-runs one evaluation.
+
 ### Fallback when a URL cannot be scraped
 
 Some boards (LinkedIn, Ashby, and other JS-rendered or login-walled pages) reliably fail
@@ -260,6 +268,41 @@ the full ad rather than from JobSpy's `is_remote` flag.
 ads in discovery order. That is the path the pipeline took before pre-selection existed, so
 the two are comparable on one job ad set.
 
+## Ranking
+
+`jobsearch/ranking.py` turns the two stored axes into one number and cuts the saved
+evaluations to the shortlist a person actually reads. `propose_jobs.py` drives it:
+
+```
+DISCOVERY  ──►  PRE-SELECTION  ──►  EVALUATION  ──►  RANKING
+    L               3N              3N          top N of the whole DB
+                                                + top N of this run
+```
+
+```
+combined = clamp(round(compatibility_score + modifier), 0, 100)
+modifier  = 15 * (1 - commute_score / 30)     # 0 -> +15, 30 -> 0, 60 -> -15, 80 -> -25
+commute_score > 80  -> combined = 0           # strict cutoff
+commute_score is None -> scored at 30, the modifier's zero point (commute_known: False)
+```
+
+Compatibility and commute are incommensurable (`compatibility_score` is 0-100, higher
+better; `commute_score` is weighted minutes, lower better), so commute is a modifier on
+compatibility, not a second sort key. The constants encode this candidate's commute
+tolerance and should eventually move to `job_preferences.md`.
+
+`rank_evaluations()` computes `combined_score` from `compatibility_score` and
+`commute_score` on every call and it is never persisted, so a change to the constants needs
+no cache invalidation.
+
+`propose(evaluations, m)` ranks descending by `combined_score`, breaks ties on
+`compatibility_score`, drops rows whose `application_status` is `applied` or `discarded`,
+and returns the top `m` alongside an `excluded` list that accounts for every other row.
+`propose_jobs.py` calls it twice per run, over `storage.list_evaluations()` (the whole
+database) and over this run's evaluations, rendering each result under a heading via
+`format_proposal(result, m, heading)`. `--no-discover` skips discovery and the second
+call.
+
 ## Storage
 
 SQLite, two tables:
@@ -278,13 +321,18 @@ User-tracked fields (`reviewed`, `application_status`, `status_reason`, `notes`)
 preserved across re-evaluation of the same URL. Only pipeline-derived fields and
 `evaluation_criteria` are overwritten.
 
+`list_evaluations()` returns the ranking inputs (`compatibility_score`, `commute_score`,
+`application_status`) and the display fields for every row, newest first, without the
+rationale or per-criterion detail. `jobsearch/ranking.py` derives `combined_score` from
+those inputs at rank time; it is not a stored column (see [Ranking](#ranking)).
+
 ### Querying the database
 
 No CLI wrapper yet (see [roadmap.md](roadmap.md)), so this is raw SQL and one Python call:
 
 | Task | Command |
 |------|---------|
-| List the top-scoring saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company, compatibility_score FROM evaluations ORDER BY compatibility_score DESC LIMIT 5;"` |
+| List the top-ranked saved jobs | `propose_jobs.py 5 --no-discover` (ranks the saved evaluations on the combined score without searching or evaluating) |
 | Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
 | Mark a job reviewed, applied or discarded | `storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
@@ -294,8 +342,9 @@ No CLI wrapper yet (see [roadmap.md](roadmap.md)), so this is raw SQL and one Py
 ```
 evaluate_job_post.py    CLI entrypoint: evaluate one posting by URL
 discover_jobs.py        CLI entrypoint: find, pre-select and optionally score new postings
+propose_jobs.py         CLI entrypoint: evaluate 3N job ads, propose the top N by combined score
 jobsearch/              the package: scrape, commute, rubric, evaluation, discovery,
-                        pre-selection, storage, LLM wrapper, config
+                        pre-selection, ranking, storage, LLM wrapper, config
 evals/                  the eval harness and its hand-curated case set
 tests/                  unit/ (offline) and e2e/ (live, needs keys)
 scripts/                check_setup.py, recompile_rubric.py
@@ -363,5 +412,8 @@ Geocoding and routing use OpenRouteService, a free external API, not an LLM.
 
 Listing job ads without `--evaluate` costs one LLM call where it previously cost none.
 `--no-preselect` is the zero-call listing.
+
+`propose_jobs.py <n>` costs one discovery run plus the evaluation of `3n` job ads, then
+ranks for free. `--no-discover` ranks the existing database at zero cost.
 
 Eval-run costs are in [evals.md](evals.md).

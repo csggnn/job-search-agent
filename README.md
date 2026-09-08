@@ -21,14 +21,7 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 
 - The user edits `data/resume.md` and `data/job_preferences.md`, with their own resume and
   preferences.
-- At any time, the user asks the agent to find and present a set of best fitting jobs.
-
-**Note:** The implementation of a single end-to-end CLI for selective presentation of jobs
-is in progress. For the moment, ask your AI harness to "pre-select 20 job ads and evaluate
-them, then report the top 5". Under the hood, your harness will run
-`discover_jobs.py --evaluate --limit 20`, which will evaluate 20 job ads scoring them on
-fit and commute. You may want to add extra instructions on how to combine fitness and
-commute metrics in the selection of the jobs to be presented to you.
+- At any time, the user runs `propose_jobs.py <n>` to get the `n` best fitting newly DISCOVERED jobs and the `n` overall best fitting jobs in their job database
 
 ## Setup
 
@@ -54,15 +47,20 @@ search and commute-routing calls; it is currently configured to work with Anthro
    podman-compose exec job-search python3 scripts/check_setup.py
    ```
 
-4. Ask your harness to find and present the best fitting jobs, or run it directly:
+4. Find and present the best fitting jobs:
    ```
-   podman-compose exec job-search python3 discover_jobs.py --evaluate --limit 3
+   podman-compose exec job-search python3 propose_jobs.py 3
    ```
 
 ## What to expect
 
-`discover_jobs.py --evaluate` first reports pre-selection's own reasoning, then evaluates
-each selected ad in turn. Shown here with `--limit 3` to keep the example short:
+`propose_jobs.py <n>` runs `discover_jobs.py --evaluate` for `3n` ads, then prints a final
+ranked block: the top `n` jobs with their combined score, and a count of what was held back
+(already applied to or discarded, or ranked below the cut).
+
+The discovery phase it wraps first reports pre-selection's own reasoning, then evaluates
+each selected ad in turn. Shown here with `discover_jobs.py --evaluate --limit 3` to keep
+the example short:
 
 ```
 $ podman-compose exec job-search python3 discover_jobs.py --evaluate --limit 3

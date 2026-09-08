@@ -1,10 +1,12 @@
 # Ranking
 
-Order evaluated jobs into the shortlist proposed to the candidate. `jobsearch/ranking.py`.
+Order evaluated jobs into the shortlist proposed to the candidate. `jobsearch/ranking.py`,
+driven end to end by `propose_jobs.py`.
 
-Independent of pre-selection: ranking reads `evaluations` rows from SQLite and does not care
-how a row got there, whether via discovery, `evaluate_job_post.py`, or a pasted URL. The two
-would only meet in an end-to-end "propose M jobs" entrypoint, which does not exist.
+Independent of pre-selection: ranking reads `evaluations` rows and does not care how a row
+got there, whether via discovery, `evaluate_job_post.py`, or a pasted URL. `propose_jobs.py`
+is where the two meet: it runs discovery + pre-selection + evaluation for `3 * N` job ads,
+then prints the top `N` over the whole database and the top `N` over this run's evaluations.
 
 ## The combination formula
 
@@ -13,7 +15,7 @@ lower is better, with 0 meaning fully remote. They are incommensurable, so commu
 as a modifier to compatibility rather than as a second sort key:
 
     modifier = 15 * (1 - commute_score / 30)     # 0 -> +15, 30 -> 0, 60 -> -15, 80 -> -25
-    combined = clamp(compatibility_score + modifier, 0, 100)
+    combined = clamp(round(compatibility_score + modifier), 0, 100)
     commute_score > 80 -> combined = 0
 
 The four anchors are colinear, so this is one line through them at -0.5 points per weighted
@@ -28,24 +30,40 @@ with a long commute would go negative. The cutoff is strict, so exactly 80 takes
 the job is neither rewarded nor punished for a scraping failure. The row carries
 `commute_known: False` for the caller to surface.
 
-Derived at ranking time, never stored: the formula can change without invalidating saved
-evaluations, which would otherwise need their own hash invalidation alongside the rubric's.
-
 The thresholds encode this candidate's commute tolerance, which is personalization. They
 stay as named constants for now and should eventually become user parameters read from
 `job_preferences.md`.
 
-## State
+## Where the score lives
 
-`combined_score()` and `commute_modifier()` are implemented and reproduce all four anchors.
-`rank_evaluations()` and `propose()` are mocked: correct signatures and output shape, no
-ordering or exclusion logic.
+Nowhere on disk. `rank_evaluations()` computes `combined_score` from each row's
+`compatibility_score` and `commute_score` every time it runs. There is no
+`evaluations.combined_score` column, so a change to the modifier constants takes effect on
+the next rank with nothing to invalidate or backfill. `propose_jobs.py --no-discover` is
+the way to list the ranked jobs without re-searching.
 
-`propose()` is specified to exclude rows whose `application_status` is `applied` or
-`discarded`, the user-tracked state `save_evaluation()` preserves across re-evaluation.
+## Proposing
 
-## Next
+`propose(evaluations, m)` returns `{"proposed": [...], "excluded": [{"evaluation", "reason"}]}`.
+Every input row lands in exactly one of the two lists. A row whose `application_status` is
+`applied` or `discarded` (the user-tracked state `save_evaluation()` preserves across
+re-evaluation) is excluded with that status as the reason; the rest fill `proposed` up to
+`m` in rank order, and any remainder is excluded as `ranked below the top m`.
 
-Tests are the immediate gap. `combined_score()` is pure, deterministic and fully specified,
-so the four anchors, the clamp at both ends, the strict cutoff and the `None` case are
-testable with no credentials and no network.
+`propose_jobs.py`:
+
+- default: prints two shortlists, one over `storage.list_evaluations()` (the whole database,
+  so a strong job from an earlier run resurfaces alongside today's) and one over just the
+  evaluations produced by this run's discovery pass. A job good enough for both appears in
+  both.
+- `--no-discover`: skips search and evaluation, ranking the database as it stands and
+  printing the overall shortlist only.
+- `--preselect-multiplier K`: discover and evaluate `K * N` job ads instead of `3 * N`.
+
+## Tests
+
+`tests/unit/test_ranking.py` covers `commute_modifier`, `combined_score` (the four anchors,
+both clamps, the strict cutoff, the `None` case), `rank_evaluations` (ordering, the
+recompute-over-stored rule, the tie-break, the `commute_known` flag), `propose` (the top-m
+cut, status exclusion, and the every-row-once invariant) and `format_proposal` (the counts,
+the exclusion reasons, and the optional heading). All pure, no credentials, no network.
