@@ -21,14 +21,7 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 
 - The user edits `data/resume.md` and `data/job_preferences.md`, with their own resume and
   preferences.
-- At any time, the user asks the agent to find and present a set of best fitting jobs.
-
-**Note:** The implementation of a single end-to-end CLI for selective presentation of jobs
-is in progress. For the moment, ask your AI harness to "pre-select 20 job ads and evaluate
-them, then report the top 5". Under the hood, your harness will run
-`discover_jobs.py --evaluate --limit 20`, which will evaluate 20 job ads scoring them on
-fit and commute. You may want to add extra instructions on how to combine fitness and
-commute metrics in the selection of the jobs to be presented to you.
+- At any time, the user runs `propose_jobs.py <n>` to get the `n` best-fitting newly-discovered jobs and the `n` overall best-fitting jobs in their job database
 
 ## Setup
 
@@ -53,20 +46,23 @@ search and commute-routing calls; it is currently configured to work with Anthro
    podman-compose exec job-search python3 scripts/check_setup.py
    ```
 
-4. Ask your harness to find and present the best fitting jobs, or run it directly:
+4. Find and present the best-fitting jobs:
    ```
-   podman-compose exec job-search python3 discover_jobs.py --evaluate --limit 3
+   podman-compose exec job-search python3 propose_jobs.py 3
    ```
 
 ## What to expect
 
-`discover_jobs.py --evaluate` first reports pre-selection's own reasoning, then evaluates
-each selected ad in turn. Shown here with `--limit 3` to keep the example short:
+`propose_jobs.py <n>` searches the job boards, pre-selects the most promising ads, evaluates
+up to `3n` of them on fit and commute, and prints two shortlists of `n`: the best of this run,
+and the best across every job evaluated so far.
+
+Shown here with `propose_jobs.py 2`, so up to 6 ads are evaluated:
 
 ```
-$ podman-compose exec job-search python3 discover_jobs.py --evaluate --limit 3
+$ podman-compose exec job-search python3 propose_jobs.py 2
 
-3 job ad(s) selected for evaluation:
+6 job ad(s) selected for evaluation:
 
 - Senior Backend Engineer at Acme Robotics (Zurich, Switzerland)
   https://example-ats.com/acme/senior-backend-engineer
@@ -74,24 +70,53 @@ $ podman-compose exec job-search python3 discover_jobs.py --evaluate --limit 3
   why: strong skills match, hybrid schedule fits stated preferences
 ...
 
-8 job ad(s) dropped - not_selected:
+11 job ad(s) dropped - not_selected:
 
 - Support Engineer at Initech
   https://example-ats.com/initech/support-engineer
-  below the top 3 by prescore and reviewer judgment
+  below the top 6 by prescore and reviewer judgment
 ...
 
-18 discovered -> 16 fresh -> 14 distinct openings -> 11 not yet evaluated -> 3 selected (1 LLM call)
+24 discovered -> 20 fresh -> 17 distinct openings -> 13 not yet evaluated -> 6 selected (1 LLM call)
 
 Evaluating Position: Senior Backend Engineer at Acme Robotics
-Commute score: 41.5 min (2 days/week, Bahnhofstrasse 1, 8001 Zurich, Switzerland)
+Commute score: 40.0 min (2 days/week, Bahnhofstrasse 1, 8001 Zurich, Switzerland)
 Compatibility score: 78/100
 Works well: Backend-heavy role in robotics; Python and distributed systems match.
 Does not work: Requires on-call rotation; team language is German.
 Reviewed: no
 Application status: new
 ...
+
+=== Best overall ===
+
+2 job(s) proposed out of 58 evaluated:
+
+1. [89] Robotics Software Engineer at Vector Dynamics
+   fit 74/100 | no commute (remote)
+   https://example-ats.com/vector/robotics-software-engineer
+2. [80] Staff Engineer, Perception at Northwind Labs
+   fit 80/100 | commute unknown
+   https://example-ats.com/northwind/staff-engineer-perception
+
+56 evaluated but ranked below the top 2.
+
+=== Best of this run ===
+
+2 job(s) proposed out of 6 evaluated:
+
+1. [77] Perception Engineer at Helios Optics
+   fit 71/100 | commute 18 (weighted min)
+   https://example-ats.com/helios/perception-engineer
+2. [73] Senior Backend Engineer at Acme Robotics
+   fit 78/100 | commute 40 (weighted min)
+   https://example-ats.com/acme/senior-backend-engineer
+
+4 evaluated but ranked below the top 2.
 ```
+
+The bracketed number is the combined score: fit adjusted by commute. Helios outranks Acme
+despite the lower fit, because its commute is shorter.
 
 ## Learn more
 
