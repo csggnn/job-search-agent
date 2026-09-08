@@ -10,7 +10,7 @@ query validation, JSON-reply parsing):
 
 import unittest
 
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
 from jobsearch.discovery import _validate_queries
@@ -168,6 +168,46 @@ class ExtractSectionTest(unittest.TestCase):
 
     def test_extracts_last_section_to_end_of_document(self):
         self.assertEqual(extract_section(self.DOC, "Other"), "ignore me")
+
+
+class HomeAddressTest(unittest.TestCase):
+    # config.home_address() reads the "## Home Address" section of job_preferences.md
+
+    def setUp(self):
+        self._real_read = config.read_job_preferences
+
+    def tearDown(self):
+        config.read_job_preferences = self._real_read
+
+    def _with_preferences(self, text):
+        config.read_job_preferences = lambda: text
+
+    def test_reads_the_address_from_its_section(self):
+        self._with_preferences(
+            "# Job Preferences\n\n## Location\n- Metropolis, FD\n\n"
+            "## Home Address\n1 Riverside Dr, 00001 Metropolis, Freedonia\n\n## Scoring Notes\nweigh A\n"
+        )
+        self.assertEqual(config.home_address(), "1 Riverside Dr, 00001 Metropolis, Freedonia")
+
+    def test_skips_blank_lines_before_the_address(self):
+        self._with_preferences("## Home Address\n\n\n  1 Riverside Dr, Metropolis  \n")
+        self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
+
+    def test_raises_naming_the_file_when_section_absent(self):
+        self._with_preferences("# Job Preferences\n\n## Location\n- Metropolis, FD\n")
+        with self.assertRaises(RuntimeError) as ctx:
+            config.home_address()
+        self.assertIn("job_preferences.md", str(ctx.exception))
+
+    def test_raises_when_section_still_holds_the_placeholder(self):
+        self._with_preferences("## Home Address\n(fill in: full street address, e.g. 1 Riverside Dr)\n")
+        with self.assertRaises(RuntimeError):
+            config.home_address()
+
+    def test_raises_when_section_is_empty(self):
+        self._with_preferences("## Home Address\n\n## Scoring Notes\nweigh A\n")
+        with self.assertRaises(RuntimeError):
+            config.home_address()
 
 
 class ValidateQueriesTest(unittest.TestCase):

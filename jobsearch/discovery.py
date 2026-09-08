@@ -1,8 +1,8 @@
 """
 Discover new job ads from the web: derive search queries from resume.md +
-job_preferences.md (+ HOME_ADDRESS) via an LLM, search Indeed + LinkedIn (via the JobSpy
-library), and surface new job ad URLs not already in the evaluations DB - optionally
-running them straight through evaluate_job().
+job_preferences.md via an LLM, search Indeed + LinkedIn (via the JobSpy library), and
+surface new job ad URLs not already in the evaluations DB - optionally running them
+straight through evaluate_job().
 
 JobSpy is used instead of the SerpApi google_jobs engine because Google Jobs' index is
 effectively empty for some markets (e.g. Belgium) - JobSpy scrapes job boards directly and
@@ -49,7 +49,8 @@ _COUNTRY_NAMES = {c.value[1]: c.value[0] for c in Country}  # alpha-2 -> JobSpy 
 def _resolve_target_locations(resume, preferences):
     """ return the location strings usable for non-remote search queries: job_preferences.md's
         Location section if present and filled in, else resume.md's Contact location
-        (skipped if still template placeholder text), else HOME_ADDRESS
+        (skipped if still template placeholder text), else the home address from
+        job_preferences.md
     """
     section = extract_section(preferences, "Location")
     if section:
@@ -124,7 +125,7 @@ def _validate_queries(queries, target_locations):
 
 
 def compile_queries():
-    """ (re)build the search query set from resume.md + job_preferences.md + HOME_ADDRESS """
+    """ (re)build the search query set from resume.md + job_preferences.md """
     resume = read_resume()
     preferences = read_job_preferences()
     target_locations = _resolve_target_locations(resume, preferences)
@@ -143,7 +144,6 @@ def compile_queries():
     cache = {
         "resume_hash": file_hash(RESUME_PATH),
         "preferences_hash": file_hash(JOB_PREFERENCES_PATH),
-        "home_address": config.home_address(),
         "primary_country": primary_country,
         "queries": queries,
     }
@@ -153,8 +153,8 @@ def compile_queries():
 
 
 def load_or_compile_queries():
-    """ return the cached query set if resume.md/job_preferences.md/HOME_ADDRESS haven't
-        changed, else recompile
+    """ return the cached query set if resume.md/job_preferences.md haven't changed, else
+        recompile
     """
     if os.path.exists(QUERIES_PATH):
         with open(QUERIES_PATH) as f:
@@ -162,7 +162,6 @@ def load_or_compile_queries():
         if (
             cached.get("resume_hash") == file_hash(RESUME_PATH)
             and cached.get("preferences_hash") == file_hash(JOB_PREFERENCES_PATH)
-            and cached.get("home_address") == config.home_address()
         ):
             return cached
     return compile_queries()

@@ -43,7 +43,6 @@ search and commute-routing calls; it is currently configured to work with Anthro
 | `TAVILY_API_KEY` | Web search and extraction (job ads, office addresses) | Free tier available |
 | `ORS_API_KEY` | OpenRouteService geocoding and driving-time routing | Free |
 | `GROQ_API_KEY` | Only `scripts/check_setup.py` for the moment | Free tier available |
-| `HOME_ADDRESS` | The address commute times are computed from | Not a key |
 
 2. Edit `data/resume.md` and `data/job_preferences.md` with your own resume and
    preferences. An example is provided in each file.

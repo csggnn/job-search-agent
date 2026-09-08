@@ -7,7 +7,7 @@ and `discover_jobs.py`, that parse arguments and delegate into it.
 
 | Module | Concern |
 |--------|---------|
-| `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, and lazy env access (`require_env`, `home_address`) so modules import without a populated `.env`. |
+| `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, lazy env access (`require_env`) so modules import without a populated `.env`, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
 | `jobsearch/scrape.py` | Content acquisition: `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
@@ -172,8 +172,8 @@ defaults to the cached one when omitted.
 
 `discover_jobs.py` finds new job ad URLs instead of requiring one to be pasted in:
 
-- derives search phrases from `resume.md`, `job_preferences.md` and `HOME_ADDRESS`, cached
-  in `data/search_queries.json` and invalidated when any of the three changes;
+- derives search phrases from `resume.md` and `job_preferences.md`, cached in
+  `data/search_queries.json` and invalidated when either file changes;
 - runs each phrase against Indeed and LinkedIn via
   [JobSpy](https://github.com/speedyapply/JobSpy);
 - dedupes results against URLs already in `evaluations.db`;
@@ -307,7 +307,7 @@ docs/                   architecture, evals, roadmap
 |------|-----------|--------|-------|
 | `.env` | user | template only | real values are local-only |
 | `data/resume.md` | user | template only | real content is local-only |
-| `data/job_preferences.md` | user | template only | `## Scoring Notes` is passed to the LLM verbatim |
+| `data/job_preferences.md` | user | template only | `## Scoring Notes` is passed to the LLM verbatim; `## Home Address` is the commute origin |
 | `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume or preferences change |
 | `data/search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
 | `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL plus per-criterion breakdown; real usage only, never eval runs |
@@ -338,8 +338,9 @@ conflated:
 
 - **Rubric cache.** `load_or_compile_rubric()` invalidates the rubric against `resume.md`
   and `job_preferences.md` file hashes. The hash is whole-file, so any edit, including one
-  to `## Scoring Notes`, triggers a recompile. `compile_rubric()` runs an agentic drafting
-  loop plus a reflection pass and is the most expensive operation in the codebase.
+  to `## Scoring Notes` or `## Home Address`, triggers a recompile. `compile_rubric()` runs
+  an agentic drafting loop plus a reflection pass and is the most expensive operation in
+  the codebase.
 - **Evaluation cache.** `storage.rubric_content_hash(rubric)` invalidates a saved job
   evaluation against the compiled rubric's `criteria` and `scoring_guidance`. A saved
   evaluation is reused when the same normalized URL is requested and that hash is
@@ -355,7 +356,7 @@ Geocoding and routing use OpenRouteService, a free external API, not an LLM.
 
 | Stage | Cost |
 |-------|------|
-| Search queries | 1 LLM call, cached until `resume.md`, `job_preferences.md` or `HOME_ADDRESS` change |
+| Search queries | 1 LLM call, cached until `resume.md` or `job_preferences.md` change |
 | JobSpy search | No API spend. `--no-linkedin-descriptions` drops one HTTP request per LinkedIn result, at the price of pre-selecting those ads on their title alone |
 | Pre-selection stage 1 | Free: dates, url domains and regex, no LLM |
 | Pre-selection stage 2 | Exactly 1 LLM call, whatever L is. `--no-preselect` skips it |

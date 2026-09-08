@@ -150,7 +150,7 @@ def geocode_address(address):
 
 
 def commute_route(address, profile="driving-car"):
-    """ return (duration_minutes, distance_km) from HOME_ADDRESS to address """
+    """ return (duration_minutes, distance_km) from the candidate's home address to address """
     origin = geocode_address(config.home_address())
     destination = geocode_address(address)
 
