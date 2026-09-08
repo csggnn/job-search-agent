@@ -328,7 +328,9 @@ those inputs at rank time; it is not a stored column (see [Ranking](#ranking)).
 
 ### Querying the database
 
-No CLI wrapper yet (see [roadmap.md](roadmap.md)), so this is raw SQL and one Python call:
+CLI wrappers already cover evaluating, discovering and ranking jobs. Ad-hoc database queries
+and review-status updates have no dedicated CLI command yet (see [roadmap.md](roadmap.md)), so
+these use raw SQL and one Python call:
 
 | Task | Command |
 |------|---------|

@@ -21,7 +21,7 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 
 - The user edits `data/resume.md` and `data/job_preferences.md`, with their own resume and
   preferences.
-- At any time, the user runs `propose_jobs.py <n>` to get the `n` best fitting newly DISCOVERED jobs and the `n` overall best fitting jobs in their job database
+- At any time, the user runs `propose_jobs.py <n>` to get the `n` best-fitting newly-discovered jobs and the `n` overall best-fitting jobs in their job database
 
 ## Setup
 
@@ -46,7 +46,7 @@ search and commute-routing calls; it is currently configured to work with Anthro
    podman-compose exec job-search python3 scripts/check_setup.py
    ```
 
-4. Find and present the best fitting jobs:
+4. Find and present the best-fitting jobs:
    ```
    podman-compose exec job-search python3 propose_jobs.py 3
    ```
