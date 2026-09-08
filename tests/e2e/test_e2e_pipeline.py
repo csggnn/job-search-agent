@@ -42,7 +42,7 @@ DB_PATH = REPO_ROOT / "data" / "evaluations.db"
 ENV_PATH = REPO_ROOT / ".env"
 
 # env keys the pipeline needs to run for real; GROQ_API_KEY is only used by check_setup.py
-REQUIRED_ENV = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ORS_API_KEY", "HOME_ADDRESS")
+REQUIRED_ENV = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ORS_API_KEY")
 
 # the full pipeline can additionally (re)compile the rubric via an agentic LLM loop the
 # first time it runs, so give it a generous ceiling

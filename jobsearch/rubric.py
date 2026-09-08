@@ -64,14 +64,17 @@ TOOLS = {
 # its "## Scoring Notes" section as scoring_guidance for the per-job LLM judgment. Without
 # this, a rule meant for that judgment is drafted into a regex criterion instead: drafting
 # turns the rule's examples into the pattern, and reflection's "missing criteria" check adds
-# it back if drafting omits it.
+# it back if drafting omits it. The "## Home Address" section is the commute origin, an
+# input to commute scoring, not a posting attribute a pattern can match.
 SCORING_NOTES_GUARD = (
     "The preferences' '## Scoring Notes' section is NOT part of this rubric. It is passed "
     "verbatim to a separate LLM that judges each posting after this rubric's patterns have "
     "run, and its rules are applied there by reading the posting. Do not create criteria "
     "from that section and do not report it as uncovered. A rule that states a judgment "
     "about a posting as a whole has no regex that expresses it, and any examples it gives "
-    "are illustrations, not a list to match against.\n\n"
+    "are illustrations, not a list to match against. The '## Home Address' section is the "
+    "candidate's commute origin, used only by commute scoring; do not create a criterion "
+    "from it or report it as uncovered.\n\n"
 )
 
 

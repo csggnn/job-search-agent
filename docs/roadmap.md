@@ -10,7 +10,7 @@ filed.
 `evaluate_job(url, force=True)` re-scrapes, re-computes commute, and re-judges
 compatibility together. Splitting the cache into independent layers, scrape freshness,
 rubric freshness (already tracked via `rubric_content_hash`), and home-address/commute
-freshness, would let a single-dimension change such as a new `HOME_ADDRESS` refresh only
+freshness, would let a single-dimension change such as a new home address refresh only
 what it invalidates.
 
 This needs a place to keep the description first. `save_evaluation()` currently drops
