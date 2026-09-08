@@ -9,9 +9,9 @@ changes.
 ## What this is
 
 A job-search evaluation pipeline: given a job posting URL, it scrapes the ad, scores the
-commute against `HOME_ADDRESS`, scores fit against a candidate's resume and preferences via
-an LLM-drafted regex rubric, and caches the result in SQLite so the same URL is never
-re-evaluated for free.
+commute against the home address in `data/job_preferences.md`, scores fit against a
+candidate's resume and preferences via an LLM-drafted regex rubric, and caches the result
+in SQLite so the same URL is never re-evaluated for free.
 
 ## Rules
 

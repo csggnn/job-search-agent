@@ -41,8 +41,18 @@ def require_env(name):
 
 
 def home_address():
-    """ the candidate's home address, which commute times are measured from """
-    return require_env("HOME_ADDRESS")
+    """ the candidate's home address, from the "## Home Address" section of
+        job_preferences.md, which commute times are measured from. Raises if the section is
+        absent or still holds the "(fill in ...)" template placeholder.
+    """
+    section = extract_section(read_job_preferences(), "Home Address")
+    address = _first_content_line(section) if section else None
+    if not address:
+        raise RuntimeError(
+            "no home address found: add a '## Home Address' section with your full street "
+            f"address to {JOB_PREFERENCES_PATH}"
+        )
+    return address
 
 
 # --- personalization files ---
@@ -76,3 +86,17 @@ def extract_section(markdown_text, heading):
         re.DOTALL | re.MULTILINE,
     )
     return match.group(1).strip() if match else None
+
+
+def _first_content_line(text):
+    """ first stripped line of `text` that carries a value: non-empty and not a "(fill in
+        ...)" template placeholder. Returns None if that line is a markdown heading or
+        comment, which means the intended section was empty and extract_section() ran on
+        into the next one.
+    """
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("(fill in"):
+            continue
+        return None if line.startswith(("#", "<!--")) else line
+    return None

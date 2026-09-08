@@ -12,5 +12,8 @@
 ## Nice-to-Haves
 - (fill in: things that boost interest but aren't required)
 
+## Home Address
+(fill in: full street address commute times are measured from, e.g. 1 Riverside Dr, 00001 Metropolis)
+
 ## Compensation & Logistics
 - (fill in: salary expectations, contract type, notice period constraints, etc.)
