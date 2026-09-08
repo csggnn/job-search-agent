@@ -363,6 +363,22 @@ def _evaluate_job_ad(job_ad, debug=False):
         return None
 
 
+def add_discovery_arguments(parser):
+    """ register the discovery-pipeline flags shared by discover_jobs.py and propose_jobs.py
+        on an argparse parser. Defined here, next to discover_jobs(), so a new pipeline knob
+        reaches both entrypoints from one edit.
+    """
+    parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS,
+                        help="max JobSpy results to keep per query")
+    parser.add_argument("--no-linkedin-descriptions", action="store_true",
+                        help="skip JobSpy's per-result LinkedIn description fetch: faster and "
+                             "less likely to be blocked, but LinkedIn job ads are then "
+                             "pre-selected on their title alone")
+    parser.add_argument("--force", action="store_true",
+                        help="ignore the cached search queries and recompile them")
+    parser.add_argument("--debug", action="store_true", help="print intermediate search details")
+
+
 def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_RESULTS,
                    force_queries=False, preselect_job_ads=True, linkedin_descriptions=True,
                    debug=False):
