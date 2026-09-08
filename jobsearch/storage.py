@@ -137,8 +137,31 @@ def list_evaluated_job_openings():
     return rows
 
 
+_LIST_COLUMNS = (
+    "url", "job_title", "company", "is_remote", "days_on_office", "commute_address",
+    "commute_score", "compatibility_score", "application_status", "evaluated_at",
+)
+
+
+def list_evaluations():
+    """ return every saved evaluation as a dict of _LIST_COLUMNS, most recently evaluated
+        first. The fields ranking needs (compatibility_score, commute_score,
+        application_status) plus the identity and display fields, without the rationale and
+        per-criterion detail. For jobsearch.ranking, which scores rows regardless of how
+        they were evaluated.
+    """
+    conn = _get_connection()
+    try:
+        rows = conn.execute(
+            f"SELECT {', '.join(_LIST_COLUMNS)} FROM evaluations ORDER BY evaluated_at DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(zip(_LIST_COLUMNS, row)) for row in rows]
+
+
 _EVALUATION_COLUMNS = (
-    "job_title", "company", "commute_score", "commute_address", "days_on_office",
+    "url", "job_title", "company", "commute_score", "commute_address", "days_on_office",
     "compatibility_score", "compatibility_rationale", "works_well", "does_not_work",
     "rubric_hash", "evaluated_at", "reviewed", "application_status", "status_reason", "notes",
 )
