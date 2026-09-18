@@ -350,7 +350,7 @@ def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_
         to_run = new_job_ads[:limit] if limit else new_job_ads
 
     if not evaluate:
-        print("\nRun with --evaluate to score these (costs LLM/ORS calls per url).")
+        print("\nRun with --evaluate to score these (costs LLM, Tavily address-search and ORS calls per url).")
         return to_run
 
     results = []

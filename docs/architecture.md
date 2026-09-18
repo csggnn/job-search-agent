@@ -111,7 +111,7 @@ $ python discover_jobs.py --limit 3
 
 18 discovered -> 16 fresh -> 14 distinct openings -> 11 not yet evaluated -> 3 selected (1 LLM call)
 
-Run with --evaluate to score these (costs LLM/ORS calls per url).
+Run with --evaluate to score these (costs LLM, Tavily address-search and ORS calls per url).
 ```
 
 `--no-preselect` skips pre-selection entirely (see [Pre-selection](#pre-selection)) and
@@ -219,7 +219,8 @@ description. For the latter, the extraction prompt returns an empty description,
 
 `jobsearch/preselection.py` sits between discovery and evaluation. Discovery returns
 roughly 100 job ads (4-10 query phrases multiplied by `--max-results`), and evaluating one
-costs 3-5 LLM calls and up to 3 routing calls. Pre-selection is the cut
+costs 3-5 LLM calls, up to one office-address search and up to 3 routing calls.
+Pre-selection is the cut
 between the two, made on the data JobSpy already returned:
 
 ```
@@ -416,9 +417,9 @@ Geocoding and routing use OpenRouteService, a free external API, not an LLM.
 | JobSpy search | No API spend. One extra HTTP request per LinkedIn result, for its description |
 | Pre-selection stage 1 | Free: dates, url domains and regex, no LLM |
 | Pre-selection stage 2 | Exactly 1 LLM call, whatever L is. `--no-preselect` skips it |
-| Evaluation | Per selected job ad: 3-5 LLM calls, up to 3 routing calls |
+| Evaluation | Per selected job ad: 3-5 LLM calls, 1 Tavily search and extract when the ad names no street address, up to 3 routing calls |
 
-Listing job ads without `--evaluate` costs one LLM call where it previously cost none.
+Listing job ads without `--evaluate` costs one LLM call, pre-selection stage 2.
 `--no-preselect` is the zero-call listing.
 
 `propose_jobs.py <n>` costs one discovery run plus the evaluation of `3n` job ads, then
