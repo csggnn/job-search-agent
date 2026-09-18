@@ -15,7 +15,9 @@ from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
 from jobsearch.discovery import _validate_queries
 from jobsearch.llm import _parse_json_reply
-from jobsearch.scrape import ScrapeError, validate_post
+from jobsearch.scrape import (
+    LINKEDIN_GUEST_POSTING_URL, ScrapeError, public_posting_url, validate_post,
+)
 
 
 class NormalizeUrlTest(unittest.TestCase):
@@ -155,6 +157,33 @@ class ValidatePostTest(unittest.TestCase):
         with self.assertRaises(ScrapeError) as caught:
             validate_post({}, "https://example.com/jobs/1")
         self.assertIn("https://example.com/jobs/1", str(caught.exception))
+
+
+class PublicPostingUrlTest(unittest.TestCase):
+    GUEST = LINKEDIN_GUEST_POSTING_URL.format("4452901048")
+
+    def test_linkedin_job_view_url(self):
+        self.assertEqual(public_posting_url("https://www.linkedin.com/jobs/view/4452901048"),
+                         self.GUEST)
+
+    def test_linkedin_slug_url_on_a_country_subdomain(self):
+        self.assertEqual(public_posting_url("https://be.linkedin.com/jobs/view/"
+                                            "senior-embedded-engineer-at-acme-4452901048/?trk=x"),
+                         self.GUEST)
+
+    def test_linkedin_current_job_id_parameter(self):
+        self.assertEqual(public_posting_url("https://www.linkedin.com/jobs/search/"
+                                            "?keywords=widgets&currentJobId=4452901048"),
+                         self.GUEST)
+
+    def test_linkedin_url_without_a_job_id_has_none(self):
+        self.assertIsNone(public_posting_url("https://www.linkedin.com/company/acme/"))
+
+    def test_non_linkedin_url_has_none(self):
+        # a lookalike host ending in "linkedin.com" is not a LinkedIn subdomain
+        for url in ("https://acme.example/careers/jobs/view/4452901048",
+                    "https://notlinkedin.com/jobs/view/4452901048"):
+            self.assertIsNone(public_posting_url(url))
 
 
 class ExtractSectionTest(unittest.TestCase):

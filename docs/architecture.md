@@ -10,7 +10,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 | `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, lazy env access (`require_env`) so modules import without a populated `.env`, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
-| `jobsearch/scrape.py` | Content acquisition: `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
+| `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
 | `jobsearch/commute.py` | Office-address lookup and commute-time scoring via OpenRouteService. |
 | `jobsearch/rubric.py` | The compatibility rubric: draft, reflect, cache, and regex application. |
 | `jobsearch/evaluation.py` | Score a job against the rubric and commute; the `evaluate_job` orchestrator. |
@@ -197,8 +197,16 @@ unrelated and re-runs one evaluation.
 
 ### Fallback when a URL cannot be scraped
 
-Some boards (LinkedIn, Ashby, and other JS-rendered or login-walled pages) reliably fail
-Tavily extraction, and `scrape_post()` raises `ScrapeError`. Discovery first retries the
+LinkedIn's `/jobs/view/` page serves clients without a session either the posting or a
+sign-in page with no description. `public_posting_url()` maps a LinkedIn URL naming a job
+id (`/jobs/view/<id>`, `/jobs/view/<slug>-<id>`, or a `currentJobId` query parameter) to
+LinkedIn's guest job-posting endpoint, which serves the posting. `fetch_page_text()`
+fetches that address when there is one, and the URL itself otherwise.
+
+`scrape_post()` raises `ScrapeError` for a page that cannot be extracted or holds no job
+description. For the latter, the extraction prompt returns an empty description, which
+`validate_post()` rejects. Boards such as Ashby and other JS-rendered or login-walled pages
+raise it reliably. Discovery first retries the
 duplicate-collapse `alternates`, other urls this run already found for the same job
 opening. It then searches the web for the same posting's full description published by the
 same company, excluding third-party re-poster domains (Indeed, Glassdoor, jobleads) whose
