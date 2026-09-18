@@ -10,8 +10,8 @@ against.
 
 Two stages, in `preselect()`:
 
-  1. deterministic pass - staleness drop, duplicate collapse, rubric prescore. Free, no LLM,
-     works at any L.
+  1. deterministic pass - incomplete drop, staleness drop, duplicate collapse, rubric
+     prescore. Free, no LLM, works at any L.
 
 Location and work mode are deliberately absent. Remoteness reaches the score later, through
 ranking's commute modifier, on a posting whose office and in-office days have been resolved
@@ -50,13 +50,14 @@ from jobsearch.llm import ask_json
 from jobsearch.rubric import evaluate_rubric, match_text
 
 # stage tags recorded on every dropped job ad, so a listing can report why each one went
+DROP_INCOMPLETE = "incomplete"
 DROP_STALE = "stale"
 DROP_DUPLICATE = "duplicate"
 DROP_EVALUATED = "already_evaluated"
 DROP_NOT_SELECTED = "not_selected"
 
-# default number of job ads pre-selection hands to evaluation; each one costs a Tavily
-# extract, 3-5 LLM calls and up to 3 ORS calls downstream
+# default number of job ads pre-selection hands to evaluation; each one costs 3-5 LLM calls,
+# up to one Tavily office-address search and up to 3 ORS calls downstream
 DEFAULT_N = 10
 
 # description characters kept per job ad in the batch prompt, measured from the start of
@@ -167,11 +168,30 @@ def _parse_date(value):
         return None
 
 
+# the job ad fields evaluation reads (see scrape.POST_FIELDS)
+EVALUATED_FIELDS = ("title", "company", "location", "description")
+
+
+def drop_incomplete(job_ads):
+    """ drop job ads with a blank EVALUATED_FIELDS value, which evaluation cannot score.
+        returns (kept, dropped) where dropped holds _dropped() records.
+    """
+    kept, dropped = [], []
+    for job_ad in job_ads:
+        blank = [field for field in EVALUATED_FIELDS
+                 if not isinstance(job_ad.get(field), str) or not job_ad[field].strip()]
+        if blank:
+            dropped.append(_dropped(job_ad, DROP_INCOMPLETE, f"no {', '.join(blank)}"))
+        else:
+            kept.append(job_ad)
+    return kept, dropped
+
+
 def drop_stale(job_ads, max_age_days):
     """ drop job ads whose date_posted is older than max_age_days.
         returns (kept, dropped) where dropped holds _dropped() records.
 
-        The only unconditional drop. Location and work mode play no part in pre-selection:
+        Location and work mode play no part in pre-selection:
         remoteness is scored later by the commute modifier, on a posting whose days_on_office
         has been read from the full ad, rather than filtered here on JobSpy's is_remote flag.
 
@@ -211,9 +231,8 @@ def _source_rank(url):
 
 def collapse_duplicates(job_ads):
     """ collapse job ads sharing a job_opening_key() to one, so a single opening at a single
-        company appears once. The survivor is a job ad with a description, evaluation's input,
-        and among those the preferred url source (own careers page > source board >
-        re-poster).
+        company appears once. The survivor is the preferred url source (own careers page >
+        source board > re-poster).
         returns (kept, dropped).
     """
     groups = {}
@@ -223,9 +242,8 @@ def collapse_duplicates(job_ads):
 
     kept, dropped = [], []
     for key, group in groups.items():
-        # min() is stable, so an equally ranked job ad loses to the one discovery found first
-        survivor = min(group, key=lambda job_ad: (not job_ad.get("description"),
-                                                  _source_rank(job_ad.get("url"))))
+        # min() is stable, so an equally ranked url loses to the one discovery found first
+        survivor = min(group, key=lambda job_ad: _source_rank(job_ad.get("url")))
         losers = [job_ad for job_ad in group if job_ad is not survivor]
         kept.append({**survivor, "job_opening_key": key})
         dropped += [
@@ -420,7 +438,8 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
 
         {"selected": [job_ad + selection_reason, ...],   # <= n, in evaluation order
          "dropped":  [{"job_ad": {...}, "stage": <DROP_*>, "reason": str}, ...],
-         "stats":    {"discovered": int, "after_stale": int, "after_dedup": int,
+         "stats":    {"discovered": int, "after_incomplete": int, "after_stale": int,
+                      "after_dedup": int,
                       "after_known": int, "selected": int, "llm_calls": int}}
 
         Every discovered job ad appears exactly once across "selected" and "dropped", so a
@@ -428,7 +447,11 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
     """
     dropped = []
 
-    kept, stale = drop_stale(job_ads, MAX_AGE_DAYS)
+    kept, incomplete = drop_incomplete(job_ads)
+    dropped += incomplete
+    after_incomplete = len(kept)
+
+    kept, stale = drop_stale(kept, MAX_AGE_DAYS)
     dropped += stale
     after_stale = len(kept)
 
@@ -452,6 +475,7 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
         "dropped": dropped,
         "stats": {
             "discovered": len(job_ads),
+            "after_incomplete": after_incomplete,
             "after_stale": after_stale,
             "after_dedup": after_dedup,
             "after_known": after_known,
@@ -477,7 +501,8 @@ def format_preselection(result):
                      f"{', '.join(job_ad.get('matched_criteria') or []) or 'no criteria matched'}")
         lines.append(f"  why: {job_ad.get('selection_reason', '')}")
 
-    for stage in (DROP_STALE, DROP_DUPLICATE, DROP_EVALUATED, DROP_NOT_SELECTED):
+    for stage in (DROP_INCOMPLETE, DROP_STALE, DROP_DUPLICATE, DROP_EVALUATED,
+                  DROP_NOT_SELECTED):
         records = [r for r in result["dropped"] if r["stage"] == stage]
         if not records:
             continue
@@ -490,7 +515,8 @@ def format_preselection(result):
             lines.append(f"  {record['reason']}")
 
     lines.append(
-        f"\n{stats['discovered']} discovered -> {stats['after_stale']} fresh -> "
+        f"\n{stats['discovered']} discovered -> {stats['after_incomplete']} complete -> "
+        f"{stats['after_stale']} fresh -> "
         f"{stats['after_dedup']} distinct openings -> {stats['after_known']} not yet evaluated "
         f"-> {stats['selected']} selected ({stats['llm_calls']} LLM call)"
     )

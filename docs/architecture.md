@@ -109,7 +109,7 @@ $ python discover_jobs.py --limit 3
   why: strong skills match, hybrid schedule fits stated preferences
 ...
 
-18 discovered -> 16 fresh -> 14 distinct openings -> 11 not yet evaluated -> 3 selected (1 LLM call)
+18 discovered -> 18 complete -> 16 fresh -> 14 distinct openings -> 11 not yet evaluated -> 3 selected (1 LLM call)
 
 Run with --evaluate to score these (costs LLM, Tavily address-search and ORS calls per url).
 ```
@@ -191,8 +191,9 @@ mid-run would prescore against one rubric and score against another. It supplies
 
 A selected job ad is evaluated on the title, company, location and description JobSpy
 returned, so pre-selection and evaluation judge the same text. A job ad without a location
-takes the location of the search that found it. A job ad with a blank title, company or
-description is skipped and reported.
+takes the location of the search that found it. Pre-selection drops a job ad with a blank
+title, company, location or description as `incomplete`; with `--no-preselect`, evaluation
+skips it and reports it.
 
 `discover_jobs.py` and `propose_jobs.py` register the shared discovery flags
 (`--max-results`, `--force`, `--debug`) through
@@ -232,6 +233,8 @@ DISCOVERY  ──►  PRE-SELECTION  ──►  EVALUATION
 preselect(job_ads, n, rubric, resume, preferences, known_job_openings)
   │
   ├─ stage 1: deterministic, free, no LLM, any L
+  │    drop_incomplete        a blank title, company, location or description, which
+  │                           evaluation cannot score
   │    drop_stale             date_posted older than MAX_AGE_DAYS; a missing date is kept
   │    collapse_duplicates    one job opening = one normalized (company, title); the
   │                           survivor has a description, then the preferred url source

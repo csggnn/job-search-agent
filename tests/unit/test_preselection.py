@@ -20,10 +20,10 @@ from unittest.mock import patch
 
 from jobsearch import preselection
 from jobsearch.preselection import (
-    BUDGET_WARN_JOB_ADS, DEFAULT_N, DROP_DUPLICATE, DROP_EVALUATED, DROP_NOT_SELECTED,
-    DROP_STALE, EXCERPT_CHARS, MAX_AGE_DAYS,
+    BUDGET_WARN_JOB_ADS, DEFAULT_N, DROP_DUPLICATE, DROP_EVALUATED, DROP_INCOMPLETE,
+    DROP_NOT_SELECTED, DROP_STALE, EXCERPT_CHARS, MAX_AGE_DAYS,
     check_budget, collapse_duplicates, description_excerpt, drop_already_evaluated,
-    drop_stale, format_preselection, job_opening_key, prescore_job_ads, preselect,
+    drop_incomplete, drop_stale, format_preselection, job_opening_key, prescore_job_ads, preselect,
     select_batch, summarize_job_ad, validate_selection,
 )
 
@@ -113,8 +113,27 @@ class JobOpeningKeyTest(unittest.TestCase):
                          job_opening_key("", "Widget Inspector"))
 
 
+class DropIncompleteTest(unittest.TestCase):
+    """ a job ad evaluation cannot score, one with a blank title, company, location or
+        description, is dropped before it can take a selection slot
+    """
+
+    def test_keeps_a_complete_job_ad(self):
+        kept, dropped = drop_incomplete([make_job_ad("https://acme.example/1")])
+        self.assertEqual(urls(kept), ["https://acme.example/1"])
+        self.assertEqual(dropped, [])
+
+    def test_drops_a_job_ad_with_a_missing_or_blank_field_naming_it(self):
+        no_description = make_job_ad("https://acme.example/1", description=None)
+        blank_company = make_job_ad("https://acme.example/2", company="  ")
+        kept, dropped = drop_incomplete([no_description, blank_company])
+        self.assertEqual(kept, [])
+        self.assertEqual([(r["stage"], r["reason"]) for r in dropped],
+                         [(DROP_INCOMPLETE, "no description"), (DROP_INCOMPLETE, "no company")])
+
+
 class DropStaleTest(unittest.TestCase):
-    """ the one unconditional drop, on date_posted against a caller-supplied cutoff. A
+    """ a drop on date_posted against a caller-supplied cutoff. A
         missing or unparseable date is not evidence of staleness. No other field, work mode
         and location included, drops an ad at this step.
     """
@@ -192,14 +211,6 @@ class CollapseDuplicatesTest(unittest.TestCase):
     def test_survivor_prefers_a_source_board_over_a_re_poster(self):
         job_ads = [
             make_job_ad("https://www.jobleads.com/posting/9"),
-            make_job_ad("https://www.linkedin.com/jobs/view/1"),
-        ]
-        [kept], _ = collapse_duplicates(job_ads)
-        self.assertEqual(kept["url"], "https://www.linkedin.com/jobs/view/1")
-
-    def test_survivor_prefers_a_job_ad_with_a_description_over_url_source(self):
-        job_ads = [
-            make_job_ad("https://acme.example/careers/3", description=None),
             make_job_ad("https://www.linkedin.com/jobs/view/1"),
         ]
         [kept], _ = collapse_duplicates(job_ads)
@@ -579,6 +590,9 @@ class PreselectTest(unittest.TestCase):
                            days_ago=MAX_AGE_DAYS + 10),
             # dropped: already evaluated
             make_job_ad("https://acme.example/careers/4", title="Widget Packer"),
+            # dropped: incomplete
+            make_job_ad("https://acme.example/careers/5", title="Widget Sorter",
+                        description=None),
         ]
 
     KNOWN = [("https://other.example/x", "Acme", "Widget Packer", "discarded")]
@@ -600,6 +614,7 @@ class PreselectTest(unittest.TestCase):
     def test_each_stage_drops_what_it_owns(self):
         result, _ = self.run_preselect()
         by_url = {d["job_ad"]["url"]: d["stage"] for d in result["dropped"]}
+        self.assertEqual(by_url["https://acme.example/careers/5"], DROP_INCOMPLETE)
         self.assertEqual(by_url["https://acme.example/careers/3"], DROP_STALE)
         self.assertEqual(by_url["https://acme.example/careers/4"], DROP_EVALUATED)
         self.assertEqual(by_url["https://www.linkedin.com/jobs/view/1"], DROP_DUPLICATE)
@@ -608,7 +623,8 @@ class PreselectTest(unittest.TestCase):
     def test_stats_count_each_stage(self):
         result, _ = self.run_preselect()
         self.assertEqual(result["stats"], {
-            "discovered": 6,
+            "discovered": 7,
+            "after_incomplete": 6,
             "after_stale": 5,
             "after_dedup": 3,
             "after_known": 2,
@@ -676,8 +692,8 @@ class FormatPreselectionTest(unittest.TestCase):
             {"job_ad": make_job_ad("https://www.linkedin.com/jobs/view/3"),
              "stage": DROP_DUPLICATE, "reason": "same job opening as another url"},
         ],
-        "stats": {"discovered": 3, "after_stale": 2, "after_dedup": 1, "after_known": 1,
-                  "selected": 1, "llm_calls": 1},
+        "stats": {"discovered": 3, "after_incomplete": 3, "after_stale": 2, "after_dedup": 1,
+                  "after_known": 1, "selected": 1, "llm_calls": 1},
     }
 
     def test_lists_the_selected_with_their_reason(self):
