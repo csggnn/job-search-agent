@@ -9,11 +9,12 @@ query validation, JSON-reply parsing):
 """
 
 import unittest
+from unittest import mock
 
 from jobsearch import config, storage
 from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
-from jobsearch.discovery import _validate_queries
+from jobsearch.discovery import _evaluate_job_ad, _job_ad_post, _validate_queries
 from jobsearch.llm import _parse_json_reply
 from jobsearch.scrape import (
     LINKEDIN_GUEST_POSTING_URL, ScrapeError, public_posting_url, validate_post,
@@ -259,6 +260,43 @@ class ValidateQueriesTest(unittest.TestCase):
     def test_drops_onsite_query_with_invalid_country_code(self):
         q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia", "country": "notacode"}
         self.assertEqual(_validate_queries([q], self.TARGETS), [])
+
+
+class JobAdPostTest(unittest.TestCase):
+    JOB_AD = {
+        "url": "https://www.linkedin.com/jobs/view/1",
+        "title": "Widget Inspector",
+        "company": "Acme",
+        "location": "Metropolis, Freedonia",
+        "description": "Inspect widgets on the night shift.",
+    }
+
+    def test_maps_job_ad_fields_to_post_fields(self):
+        self.assertEqual(_job_ad_post(self.JOB_AD), {
+            "job_title": "Widget Inspector",
+            "company": "Acme",
+            "location": "Metropolis, Freedonia",
+            "description": "Inspect widgets on the night shift.",
+        })
+
+    def test_missing_description_returns_none(self):
+        # a LinkedIn ad whose description fetch failed
+        self.assertIsNone(_job_ad_post({**self.JOB_AD, "description": None}))
+
+
+class EvaluateJobAdTest(unittest.TestCase):
+    JOB_AD = JobAdPostTest.JOB_AD
+
+    @mock.patch("jobsearch.discovery.evaluate_job", return_value={"url": "saved"})
+    def test_complete_job_ad_is_evaluated_on_its_own_post(self, evaluate_job):
+        self.assertEqual(_evaluate_job_ad(self.JOB_AD), {"url": "saved"})
+        evaluate_job.assert_called_once_with(self.JOB_AD["url"], post=_job_ad_post(self.JOB_AD))
+
+    @mock.patch("jobsearch.discovery.evaluate_job")
+    def test_job_ad_without_description_is_skipped_unevaluated(self, evaluate_job):
+        with mock.patch("builtins.print"):
+            self.assertIsNone(_evaluate_job_ad({**self.JOB_AD, "description": None}))
+        evaluate_job.assert_not_called()
 
 
 class ParseJsonReplyTest(unittest.TestCase):

@@ -168,8 +168,7 @@ class DropStaleTest(unittest.TestCase):
 
 class CollapseDuplicatesTest(unittest.TestCase):
     """ one job opening reaches evaluation once, however many boards carry it. The survivor
-        is the url most likely to scrape into a full ad; the losers become its alternates
-        rather than being lost.
+        is a job ad with a description, and among those the preferred url source.
     """
 
     def test_same_job_opening_under_several_urls_collapses_to_one(self):
@@ -198,17 +197,13 @@ class CollapseDuplicatesTest(unittest.TestCase):
         [kept], _ = collapse_duplicates(job_ads)
         self.assertEqual(kept["url"], "https://www.linkedin.com/jobs/view/1")
 
-    def test_losers_urls_are_attached_as_alternates(self):
+    def test_survivor_prefers_a_job_ad_with_a_description_over_url_source(self):
         job_ads = [
+            make_job_ad("https://acme.example/careers/3", description=None),
             make_job_ad("https://www.linkedin.com/jobs/view/1"),
-            make_job_ad("https://acme.example/careers/3"),
-            make_job_ad("https://www.jobleads.com/posting/9"),
         ]
         [kept], _ = collapse_duplicates(job_ads)
-        self.assertEqual(
-            sorted(kept["alternates"]),
-            ["https://www.jobleads.com/posting/9", "https://www.linkedin.com/jobs/view/1"],
-        )
+        self.assertEqual(kept["url"], "https://www.linkedin.com/jobs/view/1")
 
     def test_dropped_records_name_the_stage(self):
         job_ads = [
@@ -219,7 +214,7 @@ class CollapseDuplicatesTest(unittest.TestCase):
         self.assertEqual(record["stage"], DROP_DUPLICATE)
         self.assertEqual(record["job_ad"]["url"], "https://www.linkedin.com/jobs/view/1")
 
-    def test_distinct_job_openings_both_survive_with_no_alternates(self):
+    def test_distinct_job_openings_both_survive(self):
         job_ads = [
             make_job_ad("https://acme.example/careers/3", title="Widget Inspector"),
             make_job_ad("https://acme.example/careers/4", title="Widget Engineer"),
@@ -227,7 +222,6 @@ class CollapseDuplicatesTest(unittest.TestCase):
         kept, dropped = collapse_duplicates(job_ads)
         self.assertEqual(len(kept), 2)
         self.assertEqual(dropped, [])
-        self.assertEqual([c["alternates"] for c in kept], [[], []])
 
     def test_collapse_uses_the_normalized_job_opening_key(self):
         job_ads = [
@@ -626,9 +620,6 @@ class PreselectTest(unittest.TestCase):
         result, _ = self.run_preselect()
         [selected] = result["selected"]
         self.assertEqual(selected["url"], "https://acme.example/careers/1")
-        self.assertEqual(selected["alternates"],
-                         ["https://www.linkedin.com/jobs/view/1",
-                          "https://www.jobleads.com/posting/1"])
         self.assertEqual(selected["prescore"], 5)
         self.assertEqual(selected["selection_reason"], "best fit")
 
@@ -676,7 +667,7 @@ class FormatPreselectionTest(unittest.TestCase):
 
     RESULT = {
         "selected": [{**make_job_ad("https://acme.example/1"), "prescore": 5,
-                      "matched_criteria": ["widgets"], "alternates": [],
+                      "matched_criteria": ["widgets"],
                       "selection_reason": "closest to the resume"}],
         "dropped": [
             {"job_ad": make_job_ad("https://globex.example/2", company="Globex",

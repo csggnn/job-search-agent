@@ -112,10 +112,13 @@ def _print_evaluation(evaluation, cached):
         print("Notes:", evaluation["notes"])
 
 
-def evaluate_job(url, force=False):
+def evaluate_job(url, force=False, post=None):
     """ scrape a job posting and produce a full evaluation: commute, compatibility, overview.
         returns a saved evaluation instead of re-running the pipeline if one already exists
         for this url and the compatibility rubric hasn't changed since, unless force=True.
+
+        post is the posting's already-extracted fields (see scrape.POST_FIELDS). When given,
+        the url is not scraped and serves as the storage key.
     """
     rubric = load_or_compile_rubric()
     rubric_hash = storage.rubric_content_hash(rubric)
@@ -126,7 +129,7 @@ def evaluate_job(url, force=False):
             _print_evaluation(existing, cached=True)
             return existing
 
-    job = scrape_post(url)
+    job = post if post is not None else scrape_post(url)
     commute = commute_score(job["company"], job["location"], job["description"])
     compatibility = compatibility_score(job["job_title"], job["company"], job["location"],
                                         job["description"], rubric=rubric)
