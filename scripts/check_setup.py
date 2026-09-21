@@ -15,7 +15,7 @@ QUERY = "What is the current state of AI agent frameworks in 2025?"
 
 MODELS = [
     "anthropic:claude-haiku-4-5-20251001",
-    "groq:llama-3.3-70b-versatile",
+    "groq:openai/gpt-oss-120b",
 ]
 
 
@@ -38,7 +38,7 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
     response = client.chat.completions.create(
         model=model,
         messages=messages,
-        max_tokens=256,
+        max_tokens=1024,
     )
     return response.choices[0].message.content
 
