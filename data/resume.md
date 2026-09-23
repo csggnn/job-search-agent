@@ -16,7 +16,7 @@ Web accessibility (WCAG 2.1), Core Web Vitals, design systems, Figma, Git, GitHu
 - Dutch (intermediate, B1)
 
 ## About Me
-Front-end engineer with 7 years of experience building React applications in TypeScript.
+Front-end engineer with 9 years of experience building React applications in TypeScript.
 Owns front-end architecture, design systems and accessibility for customer-facing products.
 Mentors junior developers and works directly with designers and product managers.
 
