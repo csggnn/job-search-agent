@@ -9,13 +9,16 @@ query validation, JSON-reply parsing):
 """
 
 import unittest
+from unittest import mock
 
 from jobsearch import config, storage
 from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
-from jobsearch.discovery import _validate_queries
+from jobsearch.discovery import _evaluate_job_ad, _validate_queries
 from jobsearch.llm import _parse_json_reply
-from jobsearch.scrape import ScrapeError, validate_post
+from jobsearch.scrape import (
+    LINKEDIN_GUEST_POSTING_URL, ScrapeError, public_posting_url, validate_post,
+)
 
 
 class NormalizeUrlTest(unittest.TestCase):
@@ -137,6 +140,10 @@ class ValidatePostTest(unittest.TestCase):
     def test_accepts_a_complete_post(self):
         self.assertEqual(validate_post(dict(self.POST), "test"), self.POST)
 
+    def test_accepts_extra_keys_unchanged(self):
+        job_ad = {**self.POST, "url": "https://example.com/jobs/1", "is_remote": None}
+        self.assertEqual(validate_post(dict(job_ad), "test"), job_ad)
+
     def test_rejects_a_missing_field_naming_it(self):
         post = self.POST.copy()
         post.pop("description")
@@ -155,6 +162,33 @@ class ValidatePostTest(unittest.TestCase):
         with self.assertRaises(ScrapeError) as caught:
             validate_post({}, "https://example.com/jobs/1")
         self.assertIn("https://example.com/jobs/1", str(caught.exception))
+
+
+class PublicPostingUrlTest(unittest.TestCase):
+    GUEST = LINKEDIN_GUEST_POSTING_URL.format("4452901048")
+
+    def test_linkedin_job_view_url(self):
+        self.assertEqual(public_posting_url("https://www.linkedin.com/jobs/view/4452901048"),
+                         self.GUEST)
+
+    def test_linkedin_slug_url_on_a_country_subdomain(self):
+        self.assertEqual(public_posting_url("https://be.linkedin.com/jobs/view/"
+                                            "senior-embedded-engineer-at-acme-4452901048/?trk=x"),
+                         self.GUEST)
+
+    def test_linkedin_current_job_id_parameter(self):
+        self.assertEqual(public_posting_url("https://www.linkedin.com/jobs/search/"
+                                            "?keywords=widgets&currentJobId=4452901048"),
+                         self.GUEST)
+
+    def test_linkedin_url_without_a_job_id_has_none(self):
+        self.assertIsNone(public_posting_url("https://www.linkedin.com/company/acme/"))
+
+    def test_non_linkedin_url_has_none(self):
+        # a lookalike host ending in "linkedin.com" is not a LinkedIn subdomain
+        for url in ("https://acme.example/careers/jobs/view/4452901048",
+                    "https://notlinkedin.com/jobs/view/4452901048"):
+            self.assertIsNone(public_posting_url(url))
 
 
 class ExtractSectionTest(unittest.TestCase):
@@ -230,6 +264,29 @@ class ValidateQueriesTest(unittest.TestCase):
     def test_drops_onsite_query_with_invalid_country_code(self):
         q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia", "country": "notacode"}
         self.assertEqual(_validate_queries([q], self.TARGETS), [])
+
+
+class EvaluateJobAdTest(unittest.TestCase):
+    JOB_AD = {
+        "url": "https://www.linkedin.com/jobs/view/1",
+        "job_title": "Widget Inspector",
+        "company": "Acme",
+        "location": "Metropolis, Freedonia",
+        "description": "Inspect widgets on the night shift.",
+        "matched_queries": ["widget inspector"],
+    }
+
+    @mock.patch("jobsearch.discovery.evaluate_job", return_value={"url": "saved"})
+    def test_complete_job_ad_is_evaluated_as_its_own_post(self, evaluate_job):
+        self.assertEqual(_evaluate_job_ad(self.JOB_AD), {"url": "saved"})
+        evaluate_job.assert_called_once_with(self.JOB_AD["url"], post=self.JOB_AD)
+
+    @mock.patch("jobsearch.discovery.evaluate_job")
+    def test_job_ad_without_description_is_skipped_unevaluated(self, evaluate_job):
+        # a LinkedIn ad whose description fetch failed
+        with mock.patch("builtins.print"):
+            self.assertIsNone(_evaluate_job_ad({**self.JOB_AD, "description": None}))
+        evaluate_job.assert_not_called()
 
 
 class ParseJsonReplyTest(unittest.TestCase):

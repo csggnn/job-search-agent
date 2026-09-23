@@ -77,7 +77,7 @@ $ podman-compose exec job-search python3 propose_jobs.py 2
   below the top 6 by prescore and reviewer judgment
 ...
 
-24 discovered -> 20 fresh -> 17 distinct openings -> 13 not yet evaluated -> 6 selected (1 LLM call)
+24 discovered -> 24 complete -> 20 fresh -> 17 distinct openings -> 13 not yet evaluated -> 6 selected (1 LLM call)
 
 Evaluating Position: Senior Backend Engineer at Acme Robotics
 Commute score: 40.0 min (2 days/week, Bahnhofstrasse 1, 8001 Zurich, Switzerland)

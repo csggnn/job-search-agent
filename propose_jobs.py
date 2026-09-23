@@ -44,7 +44,6 @@ def main():
             max_results_per_query=args.max_results,
             force_queries=args.force,
             preselect_job_ads=True,
-            linkedin_descriptions=not args.no_linkedin_descriptions,
             debug=args.debug,
         )
 

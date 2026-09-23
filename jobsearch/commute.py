@@ -83,7 +83,13 @@ def resolve_office_address(company, location, search_context, debug=False):
 
 
 def figure_address(company, location, debug=False):
-    """ return a full street address for company/location, or FULLY_REMOTE if no office applies """
+    """ return a full street address for company/location, or FULLY_REMOTE if no office applies.
+
+        A location already holding a street address is returned as is. A generic location
+        (city, region or country) is refined by a Tavily search for company + location, and
+        the LLM picks the matching office address from the results. The generic location
+        steers which office is picked; it is not itself checked against the posting.
+    """
     classification = classify_location(company, location, debug=debug)
 
     if classification["status"] == "remote":

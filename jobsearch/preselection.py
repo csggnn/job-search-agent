@@ -10,8 +10,8 @@ against.
 
 Two stages, in `preselect()`:
 
-  1. deterministic pass - staleness drop, duplicate collapse, rubric prescore. Free, no LLM,
-     works at any L.
+  1. deterministic pass - incomplete drop, staleness drop, duplicate collapse, rubric
+     prescore. Free, no LLM, works at any L.
 
 Location and work mode are deliberately absent. Remoteness reaches the score later, through
 ranking's commute modifier, on a posting whose office and in-office days have been resolved
@@ -29,13 +29,13 @@ Integration seams, all inside `jobsearch/discovery.py`:
   - `discover_jobs()` calls `preselect()` after `filter_new_job_ads()`, prints
     `format_preselection()` in place of `_print_job_ads()`, and evaluates
     `result["selected"]`.
-  - its `except ScrapeError` block tries the survivor's `alternates` before
-    `find_company_posting_url()`.
+  - `_evaluate_job_ad()` evaluates each selected job ad on its JobSpy fields.
   - `discover_jobs()` resolves the rubric once, before discovery, and passes it in.
     `evaluate_job()` loads the rubric per job, so an unpinned recompile partway through a
     run would prescore against one rubric and score against another.
   - `jobspy_search()` retains the JobSpy columns it would otherwise drop, and sets
-    `linkedin_fetch_description=True`; without it there is no description to prescore.
+    `linkedin_fetch_description=True`; without it there is no description to prescore or
+    evaluate.
   - `jobsearch/storage.py`'s `list_evaluated_job_openings()` supplies
     `known_job_openings`; `list_evaluated_urls()` returns URLs only.
 
@@ -48,15 +48,17 @@ from urllib.parse import urlsplit
 
 from jobsearch.llm import ask_json
 from jobsearch.rubric import evaluate_rubric, match_text
+from jobsearch.scrape import blank_post_fields
 
 # stage tags recorded on every dropped job ad, so a listing can report why each one went
+DROP_INCOMPLETE = "incomplete"
 DROP_STALE = "stale"
 DROP_DUPLICATE = "duplicate"
 DROP_EVALUATED = "already_evaluated"
 DROP_NOT_SELECTED = "not_selected"
 
-# default number of job ads pre-selection hands to evaluation; each one costs a Tavily
-# extract, 3-5 LLM calls and up to 3 ORS calls downstream
+# default number of job ads pre-selection hands to evaluation; each one costs 3-5 LLM calls,
+# up to one Tavily office-address search and up to 3 ORS calls downstream
 DEFAULT_N = 10
 
 # description characters kept per job ad in the batch prompt, measured from the start of
@@ -93,13 +95,12 @@ TITLE_PUNCTUATION = ".,;:"
 # job ad count past which the batch prompt approaches the model's input window
 BUDGET_WARN_JOB_ADS = 250
 
-# domain preference when collapsing duplicates: the company's own careers page carries the
-# full ad, a source board is usually scrapeable, a re-poster carries a thin copy
+# domain preference when collapsing duplicates: the company's own careers page first, then
+# a source board, then a re-poster
 SOURCE_BOARDS = {"linkedin.com", "indeed.com"}
 
 # Third-party re-posters and aggregators, which tend to carry a thin or stale copy of a
-# posting. Owned here because this module ranks a duplicate collapse's urls by source;
-# jobsearch/discovery.py imports it for the same reason in its scrape fallback search.
+# posting.
 AGGREGATOR_DOMAINS = SOURCE_BOARDS | {
     "glassdoor.com", "jobleads.com", "bebee.com", "monster.com", "jobrapido.com",
     "jooble.org", "careerjet.com", "simplyhired.com", "ziprecruiter.com", "talent.com",
@@ -118,14 +119,13 @@ SELECTION_MAX_TOKENS = 2048
 # INPUT - one job ad as discovery produces it, from the JobSpy columns jobspy_search()
 # retains:
 #
-#   {"url": str, "title": str|None, "company": str|None, "location": str|None,
+#   {"url": str, "job_title": str|None, "company": str|None, "location": str|None,
 #    "matched_queries": [str], "description": str|None, "is_remote": bool|None,
 #    "date_posted": str|None, "job_type": str|None, "job_level": str|None,
 #    "min_amount": float|None, "max_amount": float|None, "currency": str|None,
 #    "company_industry": str|None, "work_from_home_type": str|None}
 #
-# Stage 1 adds: "job_opening_key" (normalized company+title), "alternates" ([url]),
-# "prescore" (int), "matched_criteria" ([str]). Stage 2 adds "selection_reason" (str) to
+# Stage 1 adds: "job_opening_key" (normalized company+title), "prescore" (int), "matched_criteria" ([str]). Stage 2 adds "selection_reason" (str) to
 # the selected.
 #
 # OUTPUT - see preselect().
@@ -169,11 +169,25 @@ def _parse_date(value):
         return None
 
 
+def drop_incomplete(job_ads):
+    """ drop job ads with a blank scrape.POST_FIELDS value, which evaluation cannot score.
+        returns (kept, dropped) where dropped holds _dropped() records.
+    """
+    kept, dropped = [], []
+    for job_ad in job_ads:
+        blank = blank_post_fields(job_ad)
+        if blank:
+            dropped.append(_dropped(job_ad, DROP_INCOMPLETE, f"no {', '.join(blank)}"))
+        else:
+            kept.append(job_ad)
+    return kept, dropped
+
+
 def drop_stale(job_ads, max_age_days):
     """ drop job ads whose date_posted is older than max_age_days.
         returns (kept, dropped) where dropped holds _dropped() records.
 
-        The only unconditional drop. Location and work mode play no part in pre-selection:
+        Location and work mode play no part in pre-selection:
         remoteness is scored later by the commute modifier, on a posting whose days_on_office
         has been read from the full ad, rather than filtered here on JobSpy's is_remote flag.
 
@@ -196,8 +210,8 @@ def drop_stale(job_ads, max_age_days):
 
 
 def _source_rank(url):
-    """ how likely a url is to scrape into a full ad: 0 for a domain no board is known to
-        own (the company's own careers page), 1 for a source board, 2 for a re-poster
+    """ a url's source preference: 0 for a domain no board is known to own (the company's
+        own careers page), 1 for a source board, 2 for a re-poster
     """
     host = urlsplit(url or "").netloc.lower()
 
@@ -213,14 +227,13 @@ def _source_rank(url):
 
 def collapse_duplicates(job_ads):
     """ collapse job ads sharing a job_opening_key() to one, so a single opening at a single
-        company appears once. The survivor is the url most likely to scrape into a full ad
-        (own careers page > source board > re-poster); the losers' urls are attached to it as
-        "alternates" for evaluate_job()'s ScrapeError fallback.
+        company appears once. The survivor is the preferred url source (own careers page >
+        source board > re-poster).
         returns (kept, dropped).
     """
     groups = {}
     for job_ad in job_ads:
-        groups.setdefault(job_opening_key(job_ad.get("company"), job_ad.get("title")),
+        groups.setdefault(job_opening_key(job_ad.get("company"), job_ad.get("job_title")),
                           []).append(job_ad)
 
     kept, dropped = [], []
@@ -228,9 +241,7 @@ def collapse_duplicates(job_ads):
         # min() is stable, so an equally ranked url loses to the one discovery found first
         survivor = min(group, key=lambda job_ad: _source_rank(job_ad.get("url")))
         losers = [job_ad for job_ad in group if job_ad is not survivor]
-        kept.append({**survivor,
-                     "job_opening_key": key,
-                     "alternates": [job_ad["url"] for job_ad in losers]})
+        kept.append({**survivor, "job_opening_key": key})
         dropped += [
             _dropped(job_ad, DROP_DUPLICATE, f"same job opening as {survivor['url']}")
             for job_ad in losers
@@ -250,7 +261,7 @@ def drop_already_evaluated(job_ads, known_job_openings):
     known = {job_opening_key(company, title) for _, company, title, _ in known_job_openings}
     kept, dropped = [], []
     for job_ad in job_ads:
-        key = job_opening_key(job_ad.get("company"), job_ad.get("title"))
+        key = job_opening_key(job_ad.get("company"), job_ad.get("job_title"))
         if key in known:
             dropped.append(_dropped(job_ad, DROP_EVALUATED,
                                     "this job opening already has a saved evaluation"))
@@ -270,7 +281,7 @@ def prescore_job_ads(job_ads, rubric):
     """
     scored = []
     for job_ad in job_ads:
-        criteria = evaluate_rubric(rubric, match_text(job_ad.get("title"),
+        criteria = evaluate_rubric(rubric, match_text(job_ad.get("job_title"),
                                                       job_ad.get("location"),
                                                       job_ad.get("description")))
         scored.append({
@@ -324,7 +335,7 @@ def summarize_job_ad(job_ad, index):
                        f"{job_ad.get('currency') or ''}".strip())
 
     return "\n".join([
-        f"[{index}] {job_ad.get('title') or '(untitled)'} "
+        f"[{index}] {job_ad.get('job_title') or '(untitled)'} "
         f"at {job_ad.get('company') or '(unknown company)'} "
         f"({job_ad.get('location') or 'location unknown'})",
         f"  {' | '.join(details)}",
@@ -423,7 +434,8 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
 
         {"selected": [job_ad + selection_reason, ...],   # <= n, in evaluation order
          "dropped":  [{"job_ad": {...}, "stage": <DROP_*>, "reason": str}, ...],
-         "stats":    {"discovered": int, "after_stale": int, "after_dedup": int,
+         "stats":    {"discovered": int, "after_incomplete": int, "after_stale": int,
+                      "after_dedup": int,
                       "after_known": int, "selected": int, "llm_calls": int}}
 
         Every discovered job ad appears exactly once across "selected" and "dropped", so a
@@ -431,7 +443,11 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
     """
     dropped = []
 
-    kept, stale = drop_stale(job_ads, MAX_AGE_DAYS)
+    kept, incomplete = drop_incomplete(job_ads)
+    dropped += incomplete
+    after_incomplete = len(kept)
+
+    kept, stale = drop_stale(kept, MAX_AGE_DAYS)
     dropped += stale
     after_stale = len(kept)
 
@@ -455,6 +471,7 @@ def preselect(job_ads, n=DEFAULT_N, rubric=None, resume=None, preferences=None,
         "dropped": dropped,
         "stats": {
             "discovered": len(job_ads),
+            "after_incomplete": after_incomplete,
             "after_stale": after_stale,
             "after_dedup": after_dedup,
             "after_known": after_known,
@@ -472,30 +489,30 @@ def format_preselection(result):
     stats = result["stats"]
     lines = [f"\n{len(result['selected'])} job ad(s) selected for evaluation:\n"]
     for job_ad in result["selected"]:
-        lines.append(f"- {job_ad.get('title') or '(untitled)'} "
+        lines.append(f"- {job_ad.get('job_title') or '(untitled)'} "
                      f"at {job_ad.get('company') or '(unknown company)'} "
                      f"({job_ad.get('location') or 'location unknown'})")
         lines.append(f"  {job_ad['url']}")
         lines.append(f"  prescore {job_ad.get('prescore', 0)}: "
                      f"{', '.join(job_ad.get('matched_criteria') or []) or 'no criteria matched'}")
         lines.append(f"  why: {job_ad.get('selection_reason', '')}")
-        if job_ad.get("alternates"):
-            lines.append(f"  alternates: {', '.join(job_ad['alternates'])}")
 
-    for stage in (DROP_STALE, DROP_DUPLICATE, DROP_EVALUATED, DROP_NOT_SELECTED):
+    for stage in (DROP_INCOMPLETE, DROP_STALE, DROP_DUPLICATE, DROP_EVALUATED,
+                  DROP_NOT_SELECTED):
         records = [r for r in result["dropped"] if r["stage"] == stage]
         if not records:
             continue
         lines.append(f"\n{len(records)} job ad(s) dropped - {stage}:\n")
         for record in records:
             job_ad = record["job_ad"]
-            lines.append(f"- {job_ad.get('title') or '(untitled)'} "
+            lines.append(f"- {job_ad.get('job_title') or '(untitled)'} "
                          f"at {job_ad.get('company') or '(unknown company)'}")
             lines.append(f"  {job_ad['url']}")
             lines.append(f"  {record['reason']}")
 
     lines.append(
-        f"\n{stats['discovered']} discovered -> {stats['after_stale']} fresh -> "
+        f"\n{stats['discovered']} discovered -> {stats['after_incomplete']} complete -> "
+        f"{stats['after_stale']} fresh -> "
         f"{stats['after_dedup']} distinct openings -> {stats['after_known']} not yet evaluated "
         f"-> {stats['selected']} selected ({stats['llm_calls']} LLM call)"
     )

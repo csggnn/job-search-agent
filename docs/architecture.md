@@ -10,7 +10,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 | `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, lazy env access (`require_env`) so modules import without a populated `.env`, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
-| `jobsearch/scrape.py` | Content acquisition: `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
+| `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
 | `jobsearch/commute.py` | Office-address lookup and commute-time scoring via OpenRouteService. |
 | `jobsearch/rubric.py` | The compatibility rubric: draft, reflect, cache, and regex application. |
 | `jobsearch/evaluation.py` | Score a job against the rubric and commute; the `evaluate_job` orchestrator. |
@@ -32,8 +32,11 @@ evaluate_job(url)
   ├─ URL already evaluated and rubric unchanged?  ──►  return the saved evaluation
   │
   └─ otherwise run the pipeline, then save the result:
-       scrape_post              Tavily fetch, then extract title / company / location / description
-       commute_score            geocode + route the office via OpenRouteService; skipped when remote
+       scrape_post              Tavily fetch, then extract title / company / location / description;
+                                a caller holding these fields passes them as post=
+       commute_score            geocode + route the office via OpenRouteService; skipped when remote.
+                                A generic location (city, region, country) is first refined to
+                                an office address via a Tavily search for company + location
        compatibility_score      regex-match the cached rubric, then judge an overall 0-100 score
        summarize_evaluation     one-line "works well / doesn't work" summary
        storage.save_evaluation  upsert into SQLite, keyed by the normalized URL
@@ -108,9 +111,9 @@ $ python discover_jobs.py --limit 3
   why: strong skills match, hybrid schedule fits stated preferences
 ...
 
-18 discovered -> 16 fresh -> 14 distinct openings -> 11 not yet evaluated -> 3 selected (1 LLM call)
+18 discovered -> 18 complete -> 16 fresh -> 14 distinct openings -> 11 not yet evaluated -> 3 selected (1 LLM call)
 
-Run with --evaluate to score these (costs LLM/Tavily-extract/ORS calls per url).
+Run with --evaluate to score these (costs LLM, Tavily address-search and ORS calls per url).
 ```
 
 `--no-preselect` skips pre-selection entirely (see [Pre-selection](#pre-selection)) and
@@ -185,32 +188,42 @@ defaults to the cached one when omitted.
 `discovery.discover_jobs()` owns the seams between the stages. It resolves the rubric once
 before discovery, because `evaluate_job` loads the rubric per job and an unpinned recompile
 mid-run would prescore against one rubric and score against another. It supplies
-`known_job_openings` from `storage.list_evaluated_job_openings()`, prints
-`format_preselection()`, and tries a job ad's `alternates` before paying for
-`find_company_posting_url()`.
+`known_job_openings` from `storage.list_evaluated_job_openings()` and prints
+`format_preselection()`.
+
+A selected job ad is evaluated on the title, company, location and description JobSpy
+returned, so pre-selection and evaluation judge the same text. A job ad without a location
+takes the location of the search that found it. Pre-selection drops a job ad with a blank
+title, company, location or description as `incomplete`; with `--no-preselect`, evaluation
+skips it and reports it.
 
 `discover_jobs.py` and `propose_jobs.py` register the shared discovery flags
-(`--max-results`, `--no-linkedin-descriptions`, `--force`, `--debug`) through
+(`--max-results`, `--force`, `--debug`) through
 `discovery.add_discovery_arguments(parser)`, so a new pipeline knob reaches both from one
 edit. `--force` here recompiles the search queries; `evaluate_job_post.py --force` is
 unrelated and re-runs one evaluation.
 
-### Fallback when a URL cannot be scraped
+### Scraping a URL
 
-Some boards (LinkedIn, Ashby, and other JS-rendered or login-walled pages) reliably fail
-Tavily extraction, and `scrape_post()` raises `ScrapeError`. Discovery first retries the
-duplicate-collapse `alternates`, other urls this run already found for the same job
-opening. It then searches the web for the same posting's full description published by the
-same company, excluding third-party re-poster domains (Indeed, Glassdoor, jobleads) whose
-copies tend to be thin or stale. If a match is found, typically the company's own careers
-page or ATS, `evaluate_job()` runs against that URL instead. Otherwise the job ad is
-skipped.
+`scrape_post()` serves the callers that hold only a URL: `evaluate_job_post.py` and
+`evals/capture.py`.
+
+LinkedIn's `/jobs/view/` page serves clients without a session either the posting or a
+sign-in page with no description. `public_posting_url()` maps a LinkedIn URL naming a job
+id (`/jobs/view/<id>`, `/jobs/view/<slug>-<id>`, or a `currentJobId` query parameter) to
+LinkedIn's guest job-posting endpoint, which serves the posting. `fetch_page_text()`
+fetches that address when there is one, and the URL itself otherwise.
+
+`scrape_post()` raises `ScrapeError` for a page that cannot be extracted or holds no job
+description. For the latter, the extraction prompt returns an empty description, which
+`validate_post()` rejects.
 
 ## Pre-selection
 
 `jobsearch/preselection.py` sits between discovery and evaluation. Discovery returns
 roughly 100 job ads (4-10 query phrases multiplied by `--max-results`), and evaluating one
-costs a Tavily extract, 3-5 LLM calls and up to 3 routing calls. Pre-selection is the cut
+costs 3-5 LLM calls, up to one office-address search and up to 3 routing calls.
+Pre-selection is the cut
 between the two, made on the data JobSpy already returned:
 
 ```
@@ -222,11 +235,12 @@ DISCOVERY  ──►  PRE-SELECTION  ──►  EVALUATION
 preselect(job_ads, n, rubric, resume, preferences, known_job_openings)
   │
   ├─ stage 1: deterministic, free, no LLM, any L
+  │    drop_incomplete        a blank title, company, location or description, which
+  │                           evaluation cannot score
   │    drop_stale             date_posted older than MAX_AGE_DAYS; a missing date is kept
   │    collapse_duplicates    one job opening = one normalized (company, title); the
-  │                           surviving url is the one likeliest to scrape (own careers
-  │                           page > source board > re-poster), the rest become its
-  │                           "alternates"
+  │                           survivor has a description, then the preferred url source
+  │                           (own careers page > source board > re-poster)
   │    drop_already_evaluated the same job opening already has a saved evaluation
   │    prescore_job_ads       regex-apply the rubric to the untruncated ad; an annotation
   │                           for stage 2, never a filter
@@ -254,9 +268,6 @@ stage returns up to N: exactly N once at least N ads survive stage 1, fewer only
 The module opens no database and reads no files. Rubric, resume, preferences and
 `known_job_openings` are passed in, which is what keeps stage 1 unit-testable offline in
 `tests/unit/test_preselection.py`.
-
-`AGGREGATOR_DOMAINS` lives in `preselection.py` rather than `discovery.py` because this
-module ranks those domains when picking a collapse's survivor.
 
 ### What pre-selection deliberately does not filter
 
@@ -408,12 +419,12 @@ Geocoding and routing use OpenRouteService, a free external API, not an LLM.
 | Stage | Cost |
 |-------|------|
 | Search queries | 1 LLM call, cached until `resume.md` or `job_preferences.md` change |
-| JobSpy search | No API spend. `--no-linkedin-descriptions` drops one HTTP request per LinkedIn result, at the price of pre-selecting those ads on their title alone |
+| JobSpy search | No API spend. One extra HTTP request per LinkedIn result, for its description |
 | Pre-selection stage 1 | Free: dates, url domains and regex, no LLM |
 | Pre-selection stage 2 | Exactly 1 LLM call, whatever L is. `--no-preselect` skips it |
-| Evaluation | Per selected job ad: 1 Tavily extract, 3-5 LLM calls, up to 3 routing calls |
+| Evaluation | Per selected job ad: 3-5 LLM calls, 1 Tavily search and extract when the ad names no street address, up to 3 routing calls |
 
-Listing job ads without `--evaluate` costs one LLM call where it previously cost none.
+Listing job ads without `--evaluate` costs one LLM call, pre-selection stage 2.
 `--no-preselect` is the zero-call listing.
 
 `propose_jobs.py <n>` costs one discovery run plus the evaluation of `3n` job ads, then
