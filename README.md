@@ -41,21 +41,33 @@ search and commute-routing calls; it is currently configured to work with Anthro
 | `ORS_API_KEY` | OpenRouteService geocoding and driving-time routing | Free |
 | `GROQ_API_KEY` | Only `scripts/check_setup.py` for the moment | Free tier available |
 
-2. Edit `data/resume.md` and `data/job_preferences.md` with your own resume and
-   preferences. Both files ship with a fictional sample candidate that runs as-is. Keep the
-   `## Location`, `## Home Address` and `## Scoring Notes` sections of `job_preferences.md`:
-   the pipeline reads them directly.
-
-3. Start the container and check the API keys are wired up:
+2. Start the container and check the API keys are wired up:
    ```
    podman-compose up -d
    podman-compose exec job-search python3 scripts/check_setup.py
    ```
 
-4. Find and present the best-fitting jobs:
+3. Find and present the best-fitting jobs:
    ```
    podman-compose exec job-search python3 propose_jobs.py 3
    ```
+   `data/resume.md` and `data/job_preferences.md` ship with a fictional sample candidate,
+   so this runs before you add your own profile.
+
+4. Replace `data/resume.md` and `data/job_preferences.md` with your own resume and
+   preferences. Keep the `## Location`, `## Home Address` and `## Scoring Notes` sections
+   of `job_preferences.md`: the pipeline reads them directly. Then delete the sample
+   candidate's evaluations, which would otherwise be ranked alongside yours:
+   ```
+   rm data/evaluations.db
+   ```
+
+5. Run the search again on your own profile:
+   ```
+   podman-compose exec job-search python3 propose_jobs.py 3
+   ```
+   The search queries and the scoring rubric are rebuilt from your files on this run.
+   Repeat this command whenever you want new proposals.
 
 ## What to expect
 
