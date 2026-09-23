@@ -121,11 +121,17 @@ call to `storage.update_review(url, ...)`, also with no CLI wrapper yet.
 
 ## Git-invisible files
 
-`.env`, `data/resume.md` and `data/job_preferences.md` are committed as generic templates
-but have the **skip-worktree** bit set. Editing them with real keys, resume or preferences
-will not show up in `git status` or `git diff`, and will not be picked up by `git add -A`.
-To change the template itself, run `git update-index --no-skip-worktree <file>`, commit,
+`.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
+committed as a fictional sample candidate. All three have the **skip-worktree** bit set.
+Editing them with real keys, resume or preferences will not show up in `git status` or
+`git diff`, and will not be picked up by `git add -A`.
+To change the committed version, run `git update-index --no-skip-worktree <file>`, commit,
 then re-apply `git update-index --skip-worktree <file>`.
+
+The sample candidate must keep every section the code parses (`## Location`,
+`## Home Address`, `## Scoring Notes`) filled in, with a geocodable home address and no
+placeholder text. `DefaultDataTest` in `tests/unit/test_units.py` checks this against the
+active files.
 
 `data/compatibility_rubric.json`, `data/search_queries.json`, `data/evaluations.db`,
 `evals/cases.json`, `evals/ads/` and `evals/runs/` are gitignored entirely.

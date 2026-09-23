@@ -38,7 +38,9 @@ search and commute-routing calls; it is currently configured to work with Anthro
 | `GROQ_API_KEY` | Only `scripts/check_setup.py` for the moment | Free tier available |
 
 2. Edit `data/resume.md` and `data/job_preferences.md` with your own resume and
-   preferences. An example is provided in each file.
+   preferences. Both files ship with a fictional sample candidate that runs as-is. Keep the
+   `## Location`, `## Home Address` and `## Scoring Notes` sections of `job_preferences.md`:
+   the pipeline reads them directly.
 
 3. Start the container and check the API keys are wired up:
    ```
