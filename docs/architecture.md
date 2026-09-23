@@ -380,10 +380,18 @@ docs/                   architecture, evals, roadmap
 ## Personalization files stay out of git
 
 `.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
-committed as a fictional sample candidate that runs the full pipeline as-is. All three have
-the **skip-worktree** bit set. Once edited with real keys, resume or preferences,
-those edits do not appear in `git status` or `git diff` and are not picked up by
-`git add -A`, so personal data and API keys cannot be committed by accident.
+committed as a fictional sample candidate that runs the full pipeline as-is.
+
+The **skip-worktree** bit is stored in a checkout's index. A fresh clone and each new
+worktree start without it. Set it on all three files before editing them:
+
+```
+git update-index --skip-worktree .env data/resume.md data/job_preferences.md
+```
+
+With the bit set, edits with real keys, resume or preferences do not appear in `git status`
+or `git diff` and are not picked up by `git add -A`, so personal data and API keys cannot
+be committed by accident.
 
 Changing a committed file requires re-enabling tracking first, for whichever of the three
 files (`.env`, `data/resume.md`, `data/job_preferences.md`) is being changed:

@@ -28,7 +28,11 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 job-search-agent runs inside a container and relies on your own accounts for LLM, web
 search and commute-routing calls; it is currently configured to work with Anthropic, but can be edited to use other providers.
 
-1. Clone the repo and fill in `.env`, which is present as a template.
+1. Clone the repo, stop git from tracking your personal edits, and fill in `.env`, which is
+   present as a template:
+   ```
+   git update-index --skip-worktree .env data/resume.md data/job_preferences.md
+   ```
 
 | Variable | Used for | Notes |
 |----------|----------|-------|

@@ -122,9 +122,11 @@ call to `storage.update_review(url, ...)`, also with no CLI wrapper yet.
 ## Git-invisible files
 
 `.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
-committed as a fictional sample candidate. All three have the **skip-worktree** bit set.
-Editing them with real keys, resume or preferences will not show up in `git status` or
-`git diff`, and will not be picked up by `git add -A`.
+committed as a fictional sample candidate. The **skip-worktree** bit is local to each
+checkout's index: a fresh clone and each new worktree start without it. Set it with
+`git update-index --skip-worktree .env data/resume.md data/job_preferences.md` before
+editing them. With the bit set, edits with real keys, resume or preferences will not show
+up in `git status` or `git diff`, and will not be picked up by `git add -A`.
 To change the committed version, run `git update-index --no-skip-worktree <file>`, commit,
 then re-apply `git update-index --skip-worktree <file>`.
 
