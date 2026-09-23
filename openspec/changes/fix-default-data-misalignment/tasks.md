@@ -22,3 +22,13 @@
   - Run on 2026-09-23 with the main checkout's `.env` in a one-off container: exit 0. Discovery dropped 15 stale, 3 duplicate and 52 not-selected ads, then evaluated 6. Both shortlists rendered 2 jobs each. Top job: Senior Front-End Engineer at Vivid Resourcing, fit 82, commute 15 weighted min (resolved). 3 of 6 commutes were unknown because the office address was not found. Evaluations cited the Scoring Notes consultancy and full-stack rules.
 - [x] 4.2 Delete the generated `data/evaluations.db`, `data/compatibility_rubric.json` and `data/search_queries.json` from this worktree. Verify `git status --short --ignored data/` lists none of them.
 - [x] 4.3 Run the full offline suite: `podman-compose exec job-search python3 -m unittest discover -s tests/unit`. Verify all tests pass.
+
+## 5. Review follow-ups
+
+- [x] 5.1 Run the live e2e suite with the main checkout's `.env` in a one-off container: `python3 -m unittest discover -s tests/e2e`. Verify it passes. 2026-09-23: the evaluation test passed (Canonical "Ubuntu Software Engineer", fit 15/100, remote, 13 criteria, cache-hit re-run 0.4 s). The discovery smoke test was skipped because it is opt-in.
+- [x] 5.2 Rebase the change onto `master` after PR #37 merged. Verify the branch holds only this change's commits and the unit suite passes at each commit.
+- [x] 5.3 Correct the sample resume summary to 9 years of experience, matching work history from 2017. Commit `096d42f`.
+- [x] 5.4 Make `DefaultDataTest` require the resolved target locations to equal the `## Location` entries in order. Verify an empty, partial or reversed result fails. Commit `37ff96e`.
+- [x] 5.5 Document that skip-worktree is set per checkout, and set it in README step 1 before `.env` is filled, in `README.md`, `docs/architecture.md` and `CLAUDE.md` (requirement "Setup protects personal data in a fresh checkout"). Commit `5ae0fe6`.
+- [x] 5.6 Reorder the README setup so the sample runs first, then the user replaces the profile, deletes `data/evaluations.db` and runs `propose_jobs.py` again (requirement "Running the sample does not affect later personal runs"; works around CSG-48). Commit `fb2afc4`.
+- [ ] 5.7 Clone the branch into a new folder, follow README steps 1-5, and verify `git status` stays clean after editing, and that the second run ranks no sample-candidate job.

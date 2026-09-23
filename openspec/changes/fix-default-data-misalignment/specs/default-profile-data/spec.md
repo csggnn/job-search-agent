@@ -57,10 +57,38 @@ placeholders.
 
 ### Requirement: Offline check of the active data files
 The unit test suite SHALL verify, without network access, that the active
-`data/job_preferences.md` yields a home address, at least one target location and non-empty
-scoring notes, and that neither active data file contains placeholder text. The test SHALL
-contain no candidate-specific content.
+`data/job_preferences.md` yields a home address, target locations equal to the
+`## Location` entries in the same order, and non-empty scoring notes, and that neither
+active data file contains placeholder text. The test SHALL contain no candidate-specific
+content.
 
 #### Scenario: Required section removed
 - **WHEN** `## Scoring Notes` is removed from the active preferences file and the unit suite runs
 - **THEN** the default-data test fails and names the missing section
+
+#### Scenario: Resolved locations differ from the Location entries
+- **WHEN** the resolved target locations are empty, omit an entry, or list the entries in a different order
+- **THEN** the default-data test fails
+
+### Requirement: Setup protects personal data in a fresh checkout
+The README setup SHALL instruct the user to set the skip-worktree bit on `.env`,
+`data/resume.md` and `data/job_preferences.md` before any of them is edited. The project
+documentation SHALL state that the bit is stored per checkout, so a fresh clone and each
+new worktree start without it.
+
+#### Scenario: New user fills in .env
+- **WHEN** a user clones the repository and follows the README setup up to filling in `.env`
+- **THEN** `git status` does not list `.env`, `data/resume.md` or `data/job_preferences.md`
+  after they are edited
+
+### Requirement: Running the sample does not affect later personal runs
+The README setup SHALL run the sample candidate before the user adds a personal profile.
+After the profile files are replaced, it SHALL instruct the user to delete the sample
+candidate's evaluations and then run the search again.
+
+#### Scenario: Switching from the sample to a personal profile
+- **WHEN** a user runs `propose_jobs.py` on the sample candidate, replaces both profile
+  files, follows the README's cleanup step and runs `propose_jobs.py` again
+- **THEN** no job evaluated for the sample candidate appears in either shortlist
+- **AND** a posting evaluated for the sample candidate is evaluated again if discovery
+  finds it

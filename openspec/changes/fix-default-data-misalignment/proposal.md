@@ -28,6 +28,9 @@ Observed against the committed files:
 - Add an offline unit test that loads the active `data/` files through `jobsearch.config`
   and asserts every section the code reads resolves to a non-placeholder value.
 - Update `README.md` and `docs/architecture.md`, which describe the files as templates.
+- Reorder the README setup: set the skip-worktree bit before `.env` is filled, run the
+  sample candidate first, then replace the profile, delete the sample's evaluations and run
+  the search again.
 
 ## Capabilities
 

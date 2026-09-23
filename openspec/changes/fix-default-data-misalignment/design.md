@@ -64,6 +64,12 @@ then pass while the active files are broken. The placeholder check matches `(fil
 any bracketed text not followed by a link target, `\[[^\]\n]+\](?!\()`. This covers
 lowercase placeholders such as `[your.email@example.com]`.
 
+**Switching profiles deletes `data/evaluations.db`.**
+Ranking and discovery do not filter saved evaluations by the rubric that scored them
+(CSG-48), so sample-candidate rows would be ranked with personal ones and block their
+re-evaluation. The README tells the user to delete the database after replacing the
+profile. This is a manual workaround. CSG-48 or CSG-37's per-profile database replaces it.
+
 **Live acceptance is a manual run, not an automated test.**
 `propose_jobs.py 2` against live boards is slow, costs API calls and depends on current
 postings. It is run once in the container during apply, with the output recorded in the
