@@ -53,16 +53,24 @@ def fetch_page_text(url):
     return result["results"][0]["raw_content"]
 
 
+def blank_post_fields(post):
+    """ the POST_FIELDS keys of post whose value is missing or not a non-blank string, in
+        POST_FIELDS order
+    """
+    return [field for field in POST_FIELDS
+            if not isinstance(post.get(field), str) or not post[field].strip()]
+
+
 def validate_post(post, source):
     """ raise ScrapeError unless post holds every POST_FIELDS key with a non-blank string
-        value. source is a url or an ad name, and appears in the error message.
+        value. Other keys are allowed and returned unchanged. source is a url or an ad
+        name, and appears in the error message.
     """
     if not isinstance(post, dict):
         raise ScrapeError(f"expected a job posting object from {source}, got {type(post).__name__}")
-    for field in POST_FIELDS:
-        value = post.get(field)
-        if not isinstance(value, str) or not value.strip():
-            raise ScrapeError(f"job posting from {source} is missing a usable {field!r}")
+    blank = blank_post_fields(post)
+    if blank:
+        raise ScrapeError(f"job posting from {source} is missing a usable {blank[0]!r}")
     return post
 
 

@@ -190,15 +190,15 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
         Main fields of each dict:
         - url: the direct apply link if JobSpy resolved one, else the job board's page URL.
           Never None.
-        - title, company: the posting's job title and employer name.
+        - job_title, company: the posting's job title and employer name.
         - location: the posting's location string, or the generic search location when
           JobSpy returned none. None when neither is available.
         - description: the full ad text.
 
-        title, company and description are None when JobSpy returned no value. The other
-        keys (is_remote, date_posted, job_type, job_level, min_amount, max_amount, currency,
-        company_industry, work_from_home_type) carry JobSpy's metadata as plain values,
-        None when missing.
+        job_title, company and description are None when JobSpy returned no value. The
+        other keys (is_remote, date_posted, job_type, job_level, min_amount, max_amount,
+        currency, company_industry, work_from_home_type) carry JobSpy's metadata as plain
+        values, None when missing.
 
         JobSpy fetches each LinkedIn description with one extra HTTP request per result
         (latency and block risk, no API spend).
@@ -224,7 +224,7 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
     job_ads = [
         {
             "url": _best_apply_link(r),
-            "title": _clean(r.get("title")),
+            "job_title": _clean(r.get("title")),
             "company": _clean(r.get("company")),
             "location": _clean(r.get("location")) or location,
             "description": _clean(r.get("description")),
@@ -275,38 +275,24 @@ def _print_job_ads(job_ads):
     """ print newly discovered job ad urls for manual review """
     print(f"\n{len(job_ads)} new job ad(s):\n")
     for c in job_ads:
-        print(f"- {c['title'] or '(untitled)'} at {c['company'] or '(unknown company)'} "
+        print(f"- {c['job_title'] or '(untitled)'} at {c['company'] or '(unknown company)'} "
               f"({c['location'] or 'location unknown'})")
         print(f"  {c['url']}")
         print(f"  matched: {', '.join(c['matched_queries'])}")
 
 
-def _job_ad_post(job_ad):
-    """ the job ad's JobSpy fields as a post (see scrape.POST_FIELDS), or None when any of
-        them is blank
-    """
-    post = {
-        "job_title": job_ad.get("title"),
-        "company": job_ad.get("company"),
-        "location": job_ad.get("location"),
-        "description": job_ad.get("description"),
-    }
-    try:
-        return validate_post(post, job_ad["url"])
-    except ScrapeError:
-        return None
-
-
 def _evaluate_job_ad(job_ad):
     """ evaluate one pre-selected job ad on its JobSpy fields, returning the evaluation, or
-        None when a field is blank. No page is fetched: JobSpy already returned the ad's text.
+        None when a scrape.POST_FIELDS value is blank. The job ad is passed as the post, so
+        no page is fetched.
     """
-    post = _job_ad_post(job_ad)
-    if post is None:
+    try:
+        validate_post(job_ad, job_ad["url"])
+    except ScrapeError:
         print(f"  skipping {job_ad['url']}: JobSpy returned no usable title, company, "
               "location or description")
         return None
-    return evaluate_job(job_ad["url"], post=post)
+    return evaluate_job(job_ad["url"], post=job_ad)
 
 
 def add_discovery_arguments(parser):

@@ -117,8 +117,8 @@ def evaluate_job(url, force=False, post=None):
         returns a saved evaluation instead of re-running the pipeline if one already exists
         for this url and the compatibility rubric hasn't changed since, unless force=True.
 
-        post is the posting's already-extracted fields (see scrape.POST_FIELDS). When given,
-        the url is not scraped and serves as the storage key.
+        post is the posting's already-extracted fields (see scrape.POST_FIELDS); other keys
+        are ignored. When given, the url is not scraped and serves as the storage key.
     """
     rubric = load_or_compile_rubric()
     rubric_hash = storage.rubric_content_hash(rubric)

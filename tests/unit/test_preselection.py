@@ -46,7 +46,7 @@ def make_job_ad(url, title="Widget Inspector", company="Acme", location="Springf
     posted = None if days_ago is None else str(date.today() - timedelta(days=days_ago))
     return {
         "url": url,
-        "title": title,
+        "job_title": title,
         "company": company,
         "location": location,
         "matched_queries": ["widget inspector"],
@@ -420,7 +420,7 @@ class SummarizeJobAdTest(unittest.TestCase):
         self.assertLess(len(line), len(description))
 
     def test_missing_fields_do_not_raise(self):
-        job_ad = {"url": "https://acme.example/1", "title": None, "company": None,
+        job_ad = {"url": "https://acme.example/1", "job_title": None, "company": None,
                      "location": None, "description": None, "prescore": 0,
                      "matched_criteria": []}
         self.assertIsInstance(summarize_job_ad(job_ad, 0), str)
@@ -478,7 +478,7 @@ class SelectBatchTest(unittest.TestCase):
         self.assertIn("RESUME BODY", prompt)
         self.assertIn("PREFERENCES BODY", prompt)
         for job_ad in self.JOB_ADS:
-            self.assertIn(job_ad["title"], prompt)
+            self.assertIn(job_ad["job_title"], prompt)
 
     def test_prompt_states_how_many_to_select(self):
         with patch.object(preselection, "ask_json", return_value=self.REPLY) as ask:

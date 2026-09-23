@@ -48,6 +48,7 @@ from urllib.parse import urlsplit
 
 from jobsearch.llm import ask_json
 from jobsearch.rubric import evaluate_rubric, match_text
+from jobsearch.scrape import blank_post_fields
 
 # stage tags recorded on every dropped job ad, so a listing can report why each one went
 DROP_INCOMPLETE = "incomplete"
@@ -118,7 +119,7 @@ SELECTION_MAX_TOKENS = 2048
 # INPUT - one job ad as discovery produces it, from the JobSpy columns jobspy_search()
 # retains:
 #
-#   {"url": str, "title": str|None, "company": str|None, "location": str|None,
+#   {"url": str, "job_title": str|None, "company": str|None, "location": str|None,
 #    "matched_queries": [str], "description": str|None, "is_remote": bool|None,
 #    "date_posted": str|None, "job_type": str|None, "job_level": str|None,
 #    "min_amount": float|None, "max_amount": float|None, "currency": str|None,
@@ -168,18 +169,13 @@ def _parse_date(value):
         return None
 
 
-# the job ad fields evaluation reads (see scrape.POST_FIELDS)
-EVALUATED_FIELDS = ("title", "company", "location", "description")
-
-
 def drop_incomplete(job_ads):
-    """ drop job ads with a blank EVALUATED_FIELDS value, which evaluation cannot score.
+    """ drop job ads with a blank scrape.POST_FIELDS value, which evaluation cannot score.
         returns (kept, dropped) where dropped holds _dropped() records.
     """
     kept, dropped = [], []
     for job_ad in job_ads:
-        blank = [field for field in EVALUATED_FIELDS
-                 if not isinstance(job_ad.get(field), str) or not job_ad[field].strip()]
+        blank = blank_post_fields(job_ad)
         if blank:
             dropped.append(_dropped(job_ad, DROP_INCOMPLETE, f"no {', '.join(blank)}"))
         else:
@@ -237,7 +233,7 @@ def collapse_duplicates(job_ads):
     """
     groups = {}
     for job_ad in job_ads:
-        groups.setdefault(job_opening_key(job_ad.get("company"), job_ad.get("title")),
+        groups.setdefault(job_opening_key(job_ad.get("company"), job_ad.get("job_title")),
                           []).append(job_ad)
 
     kept, dropped = [], []
@@ -265,7 +261,7 @@ def drop_already_evaluated(job_ads, known_job_openings):
     known = {job_opening_key(company, title) for _, company, title, _ in known_job_openings}
     kept, dropped = [], []
     for job_ad in job_ads:
-        key = job_opening_key(job_ad.get("company"), job_ad.get("title"))
+        key = job_opening_key(job_ad.get("company"), job_ad.get("job_title"))
         if key in known:
             dropped.append(_dropped(job_ad, DROP_EVALUATED,
                                     "this job opening already has a saved evaluation"))
@@ -285,7 +281,7 @@ def prescore_job_ads(job_ads, rubric):
     """
     scored = []
     for job_ad in job_ads:
-        criteria = evaluate_rubric(rubric, match_text(job_ad.get("title"),
+        criteria = evaluate_rubric(rubric, match_text(job_ad.get("job_title"),
                                                       job_ad.get("location"),
                                                       job_ad.get("description")))
         scored.append({
@@ -339,7 +335,7 @@ def summarize_job_ad(job_ad, index):
                        f"{job_ad.get('currency') or ''}".strip())
 
     return "\n".join([
-        f"[{index}] {job_ad.get('title') or '(untitled)'} "
+        f"[{index}] {job_ad.get('job_title') or '(untitled)'} "
         f"at {job_ad.get('company') or '(unknown company)'} "
         f"({job_ad.get('location') or 'location unknown'})",
         f"  {' | '.join(details)}",
@@ -493,7 +489,7 @@ def format_preselection(result):
     stats = result["stats"]
     lines = [f"\n{len(result['selected'])} job ad(s) selected for evaluation:\n"]
     for job_ad in result["selected"]:
-        lines.append(f"- {job_ad.get('title') or '(untitled)'} "
+        lines.append(f"- {job_ad.get('job_title') or '(untitled)'} "
                      f"at {job_ad.get('company') or '(unknown company)'} "
                      f"({job_ad.get('location') or 'location unknown'})")
         lines.append(f"  {job_ad['url']}")
@@ -509,7 +505,7 @@ def format_preselection(result):
         lines.append(f"\n{len(records)} job ad(s) dropped - {stage}:\n")
         for record in records:
             job_ad = record["job_ad"]
-            lines.append(f"- {job_ad.get('title') or '(untitled)'} "
+            lines.append(f"- {job_ad.get('job_title') or '(untitled)'} "
                          f"at {job_ad.get('company') or '(unknown company)'}")
             lines.append(f"  {job_ad['url']}")
             lines.append(f"  {record['reason']}")
