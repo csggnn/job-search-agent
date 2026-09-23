@@ -267,10 +267,11 @@ class DefaultDataTest(unittest.TestCase):
     def test_target_locations_come_from_the_location_section(self):
         section = extract_section(self.preferences, "Location")
         self.assertTrue(section, f"## Location missing or empty in {config.JOB_PREFERENCES_PATH}")
-        locations = _resolve_target_locations(self.resume, self.preferences)
-        for location in locations:
-            self.assertIn(location, section,
-                          f"target location {location!r} not taken from ## Location")
+        bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
+                   if line.strip().startswith("-")]
+        self.assertTrue(bullets, f"## Location has no '-' entries in {config.JOB_PREFERENCES_PATH}")
+        self.assertEqual(_resolve_target_locations(self.resume, self.preferences), bullets,
+                         "target locations differ from the ## Location entries")
 
     def test_scoring_notes_present(self):
         self.assertTrue(extract_section(self.preferences, "Scoring Notes"),
