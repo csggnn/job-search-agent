@@ -106,6 +106,7 @@ In both branches, never create the root as a side effect: do not run `openspec i
    a. **Read the delta spec** to understand the intended changes
 
    b. **Read the main spec** at `<planningHome.root>/openspec/specs/<capability-path>/spec.md` (may not exist yet)
+     Before every main-spec read or write, resolve the real specs root and the target's existing parent. Stop if the target or parent is outside the real specs root, or if a capability-directory symlink escapes the root.
 
       **If it does not exist yet** (a new capability), match what `openspec archive` does:
       only ADDED requirements may be applied - step d creates the spec from them.
