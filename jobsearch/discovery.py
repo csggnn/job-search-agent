@@ -184,12 +184,24 @@ def _best_apply_link(record):
 
 
 def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
-    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning job ad dicts
-        holding the fields pre-selection and evaluation judge an ad on without re-fetching it.
+    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning one job ad dict
+        per result that has a url.
+
+        Main fields of each dict:
+        - url: the direct apply link if JobSpy resolved one, else the job board's page URL.
+          Never None.
+        - title, company: the posting's job title and employer name.
+        - location: the posting's location string, or the generic search location when
+          JobSpy returned none. None when neither is available.
+        - description: the full ad text.
+
+        title, company and description are None when JobSpy returned no value. The other
+        keys (is_remote, date_posted, job_type, job_level, min_amount, max_amount, currency,
+        company_industry, work_from_home_type) carry JobSpy's metadata as plain values,
+        None when missing.
 
         JobSpy fetches each LinkedIn description with one extra HTTP request per result
-        (latency and block risk, no API spend). A job ad JobSpy returns without a location
-        takes the search's location, which the commute step narrows to an office address.
+        (latency and block risk, no API spend).
     """
     country_name = _COUNTRY_NAMES.get(country, "worldwide")
     location = query["location"] if not query["is_remote"] else _COUNTRY_NAMES.get(country)

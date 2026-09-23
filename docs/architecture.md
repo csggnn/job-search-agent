@@ -34,7 +34,9 @@ evaluate_job(url)
   └─ otherwise run the pipeline, then save the result:
        scrape_post              Tavily fetch, then extract title / company / location / description;
                                 a caller holding these fields passes them as post=
-       commute_score            geocode + route the office via OpenRouteService; skipped when remote
+       commute_score            geocode + route the office via OpenRouteService; skipped when remote.
+                                A generic location (city, region, country) is first refined to
+                                an office address via a Tavily search for company + location
        compatibility_score      regex-match the cached rubric, then judge an overall 0-100 score
        summarize_evaluation     one-line "works well / doesn't work" summary
        storage.save_evaluation  upsert into SQLite, keyed by the normalized URL
