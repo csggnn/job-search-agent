@@ -368,8 +368,8 @@ docs/                   architecture, evals, roadmap
 | File | Written by | In git | Notes |
 |------|-----------|--------|-------|
 | `.env` | user | template only | real values are local-only |
-| `data/resume.md` | user | template only | real content is local-only |
-| `data/job_preferences.md` | user | template only | `## Scoring Notes` is passed to the LLM verbatim; `## Home Address` is the commute origin |
+| `data/resume.md` | user | fictional sample only | real content is local-only |
+| `data/job_preferences.md` | user | fictional sample only | `## Location` lists the on-site search locations; `## Home Address` is the commute origin; `## Scoring Notes` is passed to the LLM verbatim |
 | `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume or preferences change |
 | `data/search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
 | `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL plus per-criterion breakdown; real usage only, never eval runs |
@@ -379,17 +379,26 @@ docs/                   architecture, evals, roadmap
 
 ## Personalization files stay out of git
 
-`.env`, `data/resume.md` and `data/job_preferences.md` are committed as generic templates
-but have the **skip-worktree** bit set. Once edited with real keys, resume or preferences,
-those edits do not appear in `git status` or `git diff` and are not picked up by
-`git add -A`, so personal data and API keys cannot be committed by accident.
+`.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
+committed as a fictional sample candidate that runs the full pipeline as-is.
 
-Changing a template itself requires re-enabling tracking first, for whichever of the three
+The **skip-worktree** bit is stored in a checkout's index. A fresh clone and each new
+worktree start without it. Set it on all three files before editing them:
+
+```
+git update-index --skip-worktree .env data/resume.md data/job_preferences.md
+```
+
+With the bit set, edits with real keys, resume or preferences do not appear in `git status`
+or `git diff` and are not picked up by `git add -A`, so personal data and API keys cannot
+be committed by accident.
+
+Changing a committed file requires re-enabling tracking first, for whichever of the three
 files (`.env`, `data/resume.md`, `data/job_preferences.md`) is being changed:
 
 ```
 git update-index --no-skip-worktree <file>
-# edit, commit the template change
+# edit, commit the change
 git update-index --skip-worktree <file>
 ```
 

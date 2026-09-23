@@ -1,0 +1,40 @@
+# Tasks
+
+## 1. Offline guard
+
+- [x] 1.1 Add a `DefaultDataTest` class to `tests/unit/test_units.py` that reads the active files through `jobsearch.config` and asserts: `config.home_address()` returns a value, `discovery._resolve_target_locations()` returns the `## Location` bullets, `extract_section(..., "Scoring Notes")` is non-empty, and neither file matches `(fill in` or `\[[^\]\n]+\](?!\()` (bracketed text not followed by a link target). Each failure message names the section or file. Verify it fails against the current placeholder files: `podman-compose exec job-search python3 -m unittest discover -s tests/unit`
+
+## 2. Sample candidate
+
+- [x] 2.1 Rewrite `data/resume.md` as a fictional mid/senior front-end TypeScript/React engineer in Brussels: fictional name, `example.com` contact details, `- Location: Brussels, Belgium`, skills, languages, summary, two or three roles at fictional employers, education. Verify the placeholder scan finds nothing.
+- [x] 2.2 Rewrite `data/job_preferences.md` to match: filled `Role & Seniority`, `Must-Haves` (hybrid in Brussels or Charleroi, or fully remote), `Disqualifiers`, `Nice-to-Haves`, `## Location` with `- Brussels, Belgium` then `- Charleroi, Belgium`, `## Home Address` with `Rue des Halles 4, 1000 Bruxelles, Belgium`, `## Scoring Notes` with two or three whole-posting judgment rules, and `Compensation & Logistics`. Verify task 1.1's test passes and that `_resolve_target_locations()` returns both entries in that order.
+- [x] 2.3 Confirm the home address geocodes through OpenRouteService from inside the container (a one-off call to the geocoder `jobsearch.commute` uses). Verify it returns a coordinate in Brussels.
+
+## 3. Docs
+
+- [x] 3.1 Update `README.md` "Default usage" and setup step 2 to state the files ship as a runnable sample candidate to replace with your own. Verify no "template"/"example is provided" wording contradicts it.
+- [x] 3.2 Update `docs/architecture.md`: the `data/resume.md` and `data/job_preferences.md` rows in the file table, the "Personalization files stay out of git" section wording, and note `## Location` alongside `## Scoring Notes` and `## Home Address`. Verify with `grep -n "template" docs/architecture.md README.md`.
+- [x] 3.3 Update `CLAUDE.md` "Git-invisible files" if its "generic templates" wording no longer holds. Verify by reading the section.
+
+## 4. Live acceptance
+
+- [x] 4.1 Run `podman-compose exec job-search python3 propose_jobs.py 2` in this worktree. Verify it completes, both shortlists render, and at least one job has a resolved commute. Record the output summary here.
+  - Run on 2026-09-23 with the main checkout's `.env` in a one-off container: exit 0. Discovery dropped 15 stale, 3 duplicate and 52 not-selected ads, then evaluated 6. Both shortlists rendered 2 jobs each. Top job: Senior Front-End Engineer at Vivid Resourcing, fit 82, commute 15 weighted min (resolved). 3 of 6 commutes were unknown because the office address was not found. Evaluations cited the Scoring Notes consultancy and full-stack rules.
+- [x] 4.2 Delete the generated `data/evaluations.db`, `data/compatibility_rubric.json` and `data/search_queries.json` from this worktree. Verify `git status --short --ignored data/` lists none of them.
+- [x] 4.3 Run the full offline suite: `podman-compose exec job-search python3 -m unittest discover -s tests/unit`. Verify all tests pass.
+
+## 5. Review follow-ups
+
+- [x] 5.1 Run the live e2e suite with the main checkout's `.env` in a one-off container: `python3 -m unittest discover -s tests/e2e`. Verify it passes. 2026-09-23: the evaluation test passed (Canonical "Ubuntu Software Engineer", fit 15/100, remote, 13 criteria, cache-hit re-run 0.4 s). The discovery smoke test was skipped because it is opt-in.
+- [x] 5.2 Rebase the change onto `master` after PR #37 merged. Verify the branch holds only this change's commits and the unit suite passes at each commit.
+- [x] 5.3 Correct the sample resume summary to 9 years of experience, matching work history from 2017. Commit `096d42f`.
+- [x] 5.4 Make `DefaultDataTest` require the resolved target locations to equal the `## Location` entries in order. Verify an empty, partial or reversed result fails. Commit `37ff96e`.
+- [x] 5.5 Document that skip-worktree is set per checkout, and set it in README step 1 before `.env` is filled, in `README.md`, `docs/architecture.md` and `CLAUDE.md` (requirement "Setup protects personal data in a fresh checkout"). Commit `5ae0fe6`.
+- [x] 5.6 Reorder the README setup so the sample runs first, then the user replaces the profile, deletes `data/evaluations.db` and runs `propose_jobs.py` again (requirement "Running the sample does not affect later personal runs"; works around CSG-48). Commit `fb2afc4`.
+- [x] 5.7 Clone the branch into a new folder, follow README steps 1-5, and verify `git status` stays clean after editing, and that the second run ranks no sample-candidate job.
+  - Run on 2026-09-23 against `f1975ca`, with keys passed through `--env-file` from the main checkout and `propose_jobs.py 2` in place of the README's `3`.
+  - Steps 1-2: `git status` was empty after editing `.env`. `check_setup.py` reached Tavily, Anthropic and Groq.
+  - Step 3: exit 0, 6 evaluated, both shortlists rendered. Top job: Senior Front-End Engineer at Vivid Resourcing, fit 92, commute 57 weighted min (resolved).
+  - Step 4: a second fictional profile (full-stack TypeScript/Node engineer, Brussels) replaced both files. `git status` stayed empty. `data/evaluations.db` was deleted.
+  - Step 5: exit 0, 6 evaluated, both shortlists rendered. None of run 1's 6 evaluated urls appears in the run 2 output. The query and rubric caches carry the new profile's file hashes.
+  - Discovery found none of run 1's postings again, so re-evaluation was not exercised live. `filter_new_job_ads` passes all 6 run 1 urls as new against the run 2 database.

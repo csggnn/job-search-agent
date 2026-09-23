@@ -8,13 +8,16 @@ query validation, JSON-reply parsing):
     podman-compose exec job-search python3 -m unittest discover -s tests/unit -v
 """
 
+import re
 import unittest
 from unittest import mock
 
 from jobsearch import config, storage
 from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
-from jobsearch.discovery import _evaluate_job_ad, _validate_queries
+from jobsearch.discovery import (
+    _evaluate_job_ad, _resolve_target_locations, _validate_queries,
+)
 from jobsearch.llm import _parse_json_reply
 from jobsearch.scrape import (
     LINKEDIN_GUEST_POSTING_URL, ScrapeError, public_posting_url, validate_post,
@@ -242,6 +245,43 @@ class HomeAddressTest(unittest.TestCase):
         self._with_preferences("## Home Address\n\n## Scoring Notes\nweigh A\n")
         with self.assertRaises(RuntimeError):
             config.home_address()
+
+
+class DefaultDataTest(unittest.TestCase):
+    # the active data/resume.md and data/job_preferences.md must fill every section the
+    # pipeline parses, so a fresh clone runs with only .env filled in
+
+    # "(fill in ...)" template text, or a bracketed token that is not a markdown link's text
+    PLACEHOLDER = re.compile(r"\(fill in|\[[^\]\n]+\](?!\()")
+
+    def setUp(self):
+        self.resume = config.read_resume()
+        self.preferences = config.read_job_preferences()
+
+    def test_home_address_resolves(self):
+        try:
+            config.home_address()
+        except RuntimeError as e:
+            self.fail(f"## Home Address in {config.JOB_PREFERENCES_PATH}: {e}")
+
+    def test_target_locations_come_from_the_location_section(self):
+        section = extract_section(self.preferences, "Location")
+        self.assertTrue(section, f"## Location missing or empty in {config.JOB_PREFERENCES_PATH}")
+        bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
+                   if line.strip().startswith("-")]
+        self.assertTrue(bullets, f"## Location has no '-' entries in {config.JOB_PREFERENCES_PATH}")
+        self.assertEqual(_resolve_target_locations(self.resume, self.preferences), bullets,
+                         "target locations differ from the ## Location entries")
+
+    def test_scoring_notes_present(self):
+        self.assertTrue(extract_section(self.preferences, "Scoring Notes"),
+                        f"## Scoring Notes missing or empty in {config.JOB_PREFERENCES_PATH}")
+
+    def test_no_placeholder_text(self):
+        for path, text in ((config.RESUME_PATH, self.resume),
+                           (config.JOB_PREFERENCES_PATH, self.preferences)):
+            match = self.PLACEHOLDER.search(text)
+            self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
 
 
 class ValidateQueriesTest(unittest.TestCase):
