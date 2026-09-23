@@ -31,4 +31,10 @@
 - [x] 5.4 Make `DefaultDataTest` require the resolved target locations to equal the `## Location` entries in order. Verify an empty, partial or reversed result fails. Commit `37ff96e`.
 - [x] 5.5 Document that skip-worktree is set per checkout, and set it in README step 1 before `.env` is filled, in `README.md`, `docs/architecture.md` and `CLAUDE.md` (requirement "Setup protects personal data in a fresh checkout"). Commit `5ae0fe6`.
 - [x] 5.6 Reorder the README setup so the sample runs first, then the user replaces the profile, deletes `data/evaluations.db` and runs `propose_jobs.py` again (requirement "Running the sample does not affect later personal runs"; works around CSG-48). Commit `fb2afc4`.
-- [ ] 5.7 Clone the branch into a new folder, follow README steps 1-5, and verify `git status` stays clean after editing, and that the second run ranks no sample-candidate job.
+- [x] 5.7 Clone the branch into a new folder, follow README steps 1-5, and verify `git status` stays clean after editing, and that the second run ranks no sample-candidate job.
+  - Run on 2026-09-23 against `f1975ca`, with keys passed through `--env-file` from the main checkout and `propose_jobs.py 2` in place of the README's `3`.
+  - Steps 1-2: `git status` was empty after editing `.env`. `check_setup.py` reached Tavily, Anthropic and Groq.
+  - Step 3: exit 0, 6 evaluated, both shortlists rendered. Top job: Senior Front-End Engineer at Vivid Resourcing, fit 92, commute 57 weighted min (resolved).
+  - Step 4: a second fictional profile (full-stack TypeScript/Node engineer, Brussels) replaced both files. `git status` stayed empty. `data/evaluations.db` was deleted.
+  - Step 5: exit 0, 6 evaluated, both shortlists rendered. None of run 1's 6 evaluated urls appears in the run 2 output. The query and rubric caches carry the new profile's file hashes.
+  - Discovery found none of run 1's postings again, so re-evaluation was not exercised live. `filter_new_job_ads` passes all 6 run 1 urls as new against the run 2 database.
