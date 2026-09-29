@@ -38,9 +38,8 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 
 ## 6. Worktrees
 
-- [ ] 6.1 In `~/.claude/commands/start-task.md` (outside the repo), replace the skip-worktree section with the design's two copy commands.
-- [ ] 6.2 Scenarios "New worktree without copied data" (profile-selection) and "A new worktree holds no keys or personal data" (personal-data-protection): create a worktree without copying, list its `.env` and `profiles/personal/`, run the unit suite, and record the active profile.
-- [ ] 6.3 Scenario "Worktree with copied personal data": copy `.env` and `profiles/personal/` into a worktree, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
+- [ ] 6.1 Scenarios "New worktree without copied data" (profile-selection) and "A new worktree holds no keys or personal data" (personal-data-protection): create a worktree without copying, list its `.env` and `profiles/personal/`, run the unit suite, and record the active profile.
+- [ ] 6.2 Scenario "Worktree with copied personal data": copy `.env` and `profiles/personal/` into a worktree, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
 
 ## 7. Docs
 

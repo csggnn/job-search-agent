@@ -2,13 +2,10 @@
 
 ## Context
 
-See proposal.md for the problem. Two facts shape the decisions:
-
-- Every data path in `jobsearch/` derives from `config.DATA_DIR`. `storage`, `rubric` and
-  `discovery` join their file names onto it. Outside `jobsearch/`, `evals/dataset.py` and
-  `tests/e2e/test_e2e_pipeline.py` hold their own data paths.
-- Worktrees are created by `~/.claude/commands/start-task.md`, outside the repo. It copies
-  `.env` into the new worktree and sets the skip-worktree bits.
+See proposal.md for the problem. One fact shapes the decisions: every data path in
+`jobsearch/` derives from `config.DATA_DIR`. `storage`, `rubric` and `discovery` join their
+file names onto it. Outside `jobsearch/`, `evals/dataset.py` and
+`tests/e2e/test_e2e_pipeline.py` hold their own data paths.
 
 ## Goals / Non-Goals
 
@@ -95,8 +92,10 @@ cp -r ../../profiles/personal profiles/
 The code does not detect worktrees. Writes in a worktree land in its copy and do not reach
 the main checkout. Running the second command again refreshes the copy.
 
-`start-task` runs both commands in the new worktree, and its skip-worktree section is
-removed.
+Without the first command, the worktree has no keys. Its container starts and the unit
+suite passes. A command that calls an API fails because its key is not set. `load_dotenv()`
+searches upward from inside the container, where `/workspace` is the worktree root, so it
+does not find the main checkout's `.env`. The README developer section gives both commands.
 
 Alternatives considered:
 - Worktree code runs in the main checkout's container, which sees `.trees/`, so every
@@ -190,8 +189,8 @@ subprocess with the same environment. In a worktree it writes to the worktree's 
   `profiles/personal/`.
 - [Copying the database while a pipeline command writes produces a torn copy] → Documented.
   Commands are started by hand.
-- [`start-task` is outside the repo] → Worktrees made without it start with no `.env` and the
-  sample profile. The two copy commands are documented.
+- [A developer forgets to copy `.env` into a new worktree] → API calls fail because the
+  key is not set. The README developer section gives the copy commands.
 
 During migration only. These apply to branches created before this change, checked out in
 the main checkout, until they are merged or rebased onto `master`:

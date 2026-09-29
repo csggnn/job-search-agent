@@ -21,7 +21,7 @@ NOT stage them.
 - **AND** `git add -A` stages none of them
 
 #### Scenario: A new worktree holds no keys or personal data
-- **WHEN** a worktree is created
+- **WHEN** a worktree is created with `git worktree add` and nothing is copied into it
 - **THEN** it contains no `.env` and no personal profile files
 
 ### Requirement: Keys are configured from a committed template
