@@ -153,9 +153,11 @@ only `cp` and `rm`.
 - `backup <folder>`: copies the current checkout's `profiles/personal/` and `.env` into
   `<folder>`. `<folder>` must not exist or must already be a backup, identified by a
   `.job-search-agent-backup` marker file. Existing backup contents are replaced.
-- `restore <folder>`: requires the marker. It removes the current checkout's
-  `profiles/personal/` and `.env`, then copies the backup's. After a restore both equal
-  the backup.
+- `restore <folder>`: requires the marker. It copies the backup's `profiles/personal/` and
+  `.env` to staging paths inside the checkout (`profiles/.personal.restore`,
+  `.env.restore`). When both copies succeed, it removes the current files and renames the
+  staged ones into place. On a failed copy it removes the staged paths and leaves the current
+  files as they were. After a restore both equal the backup.
 
 The marker stops `backup` from overwriting an unrelated directory and `restore` from
 reading one. Default-profile state is outside backup scope: it is regenerated from
@@ -206,11 +208,12 @@ the main checkout, until they are merged or rebased onto `master`:
 The merge removes `.env` from the index. Git deletes a file from the working tree when an
 incoming commit removes it, so the keys are copied aside first.
 
-In the main checkout, before pulling the change:
+In the main checkout, in one shell session, before pulling the change:
 
 ```
 mkdir -p profiles/personal/evals
-cp .env /tmp/job-search-agent.env
+keys_dir=$(mktemp -d)
+cp .env "$keys_dir/.env"
 cp data/resume.md data/job_preferences.md data/evaluations.db profiles/personal/
 mv evals/cases.json evals/ads evals/runs profiles/personal/evals/
 git update-index --no-skip-worktree .env data/resume.md data/job_preferences.md
@@ -220,12 +223,14 @@ git checkout -- .env data/resume.md data/job_preferences.md
 Then pull `master`, and:
 
 ```
-mv /tmp/job-search-agent.env .env
+mv "$keys_dir/.env" .env
+rmdir "$keys_dir"
 printf 'profiles/personal/\n.env\n' >> .git/info/exclude
 rm -rf data
 ```
 
-After the merge, `data/` holds only generated files: the sample files are tracked under
+`mktemp -d` creates a directory readable only by its owner, so the keys are not exposed to
+other users while the pull runs. After the merge, `data/` holds only generated files: the sample files are tracked under
 `profiles/default/`. The rubric and query caches are rebuilt on the first personal run.
 
 In each existing worktree: clear the skip-worktree bits, merge `master`, then run the two

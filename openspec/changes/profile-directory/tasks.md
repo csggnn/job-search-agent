@@ -34,7 +34,7 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 ## 5. Backup and restore
 
 - [ ] 5.1 Write `scripts/profile.sh` with `backup <folder>` and `restore <folder>` as in the design. It resolves the checkout from its own location and uses only `cp` and `rm`.
-- [ ] 5.2 Add `tests/unit/test_profile_sh.py`. Each test copies the script into a temporary checkout-like tree and runs it with `bash`. One test per scenario (personal-profile-backup): `test_backup_to_a_new_folder`, `test_target_folder_holds_other_files`, `test_target_folder_holds_an_earlier_backup`, `test_restore_after_data_loss`, `test_restore_over_newer_data`, `test_folder_is_not_a_backup`.
+- [ ] 5.2 Add `tests/unit/test_profile_sh.py`. Each test copies the script into a temporary checkout-like tree and runs it with `bash`. One test per scenario (personal-profile-backup): `test_backup_to_a_new_folder`, `test_target_folder_holds_other_files`, `test_target_folder_holds_an_earlier_backup`, `test_restore_after_data_loss`, `test_restore_over_newer_data`, `test_folder_is_not_a_backup`, `test_copy_fails_during_restore`. The last one puts a failing `cp` first on `PATH`, since the container runs as root and file permissions cannot make a copy fail.
 
 ## 6. Worktrees
 

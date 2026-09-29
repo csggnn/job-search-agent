@@ -46,13 +46,19 @@ personal profile with the backup's. After a restore, both SHALL equal the backup
   `scripts/profile.sh restore <folder>`
 - **THEN** those files are removed
 
-### Requirement: Restore reads only a backup
-Restore SHALL fail when `<folder>` does not hold a backup, and SHALL leave the checkout
-unchanged.
+### Requirement: A failed restore leaves the checkout unchanged
+Restore SHALL fail when `<folder>` does not hold a backup. Restore SHALL copy the backup into
+the checkout before it removes the current `.env` and personal profile. A restore that
+fails, including a failed copy, SHALL leave `.env` and the personal profile unchanged.
 
 #### Scenario: Folder is not a backup
 - **WHEN** a user runs `scripts/profile.sh restore <folder>` on a folder that holds no backup
 - **THEN** the command fails with an error naming `<folder>`
+- **AND** `.env` and the personal profile are unchanged
+
+#### Scenario: Copy fails during restore
+- **WHEN** copying the backup fails during `scripts/profile.sh restore <folder>`
+- **THEN** the command fails
 - **AND** `.env` and the personal profile are unchanged
 
 ### Requirement: The README documents backup and its limits
