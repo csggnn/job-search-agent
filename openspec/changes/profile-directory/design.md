@@ -97,34 +97,33 @@ suite passes. A command that calls an API fails because its key is not set. `loa
 searches upward from inside the container, where `/workspace` is the worktree root, so it
 does not find the main checkout's `.env`. The README developer section gives both commands.
 
-Alternatives considered:
-- Worktree code runs in the main checkout's container, which sees `.trees/`, so every
-  worktree reads the main checkout's data. Rejected: every command needs `-w`, a branch
-  that changes `Dockerfile` or `docker-compose.yml` runs in the old image, and worktree
-  runs write to the real database.
-- A host environment variable naming a shared data folder, used as the bind-mount source.
-  Rejected: state held in the shell changes behavior per terminal and is not visible in
-  the repo.
-- A git `post-checkout` hook, which also runs on `git worktree add`. Rejected: hooks are
-  not installed by a clone and need `git config core.hooksPath`, an extra setup step.
+Alternative considered: a git `post-checkout` hook that copies the data, which also runs
+on `git worktree add`. Rejected: hooks are not installed by a clone and need
+`git config core.hooksPath`, an extra setup step.
 
 **Isolated runs on personal data use a worktree copy.**
+Two outcomes in proposal.md drive this decision: a developer works on several branches at
+once, in the main checkout or in git worktrees, and a developer can run on personal data
+without changing the real data. Personal data is gitignored, so a worktree has it only
+after a step brings it in. A copy is that step, and it also isolates the worktree's runs
+from the real data. One mechanism serves both outcomes and needs no code.
+
 A developer who tests changes against personal data creates a worktree and copies
-`profiles/personal/` into it. The code has one isolation mechanism, and the main checkout
-always runs on the real data. The README developer section describes the workflow: create
-the worktree, run the two copy commands, run the pipeline. It states that evaluations,
-rubric and query caches, eval runs and input edits made in a worktree stay in its copy and
-do not reach the main checkout.
+`profiles/personal/` into it. In the main checkout, the personal profile is the real data.
+The README developer section describes the workflow: create the worktree, run the two copy
+commands, run the pipeline. It states that evaluations, rubric and query caches, eval runs
+and input edits made in a worktree stay in its copy and do not reach the main checkout.
 
 Alternatives considered:
-- A third profile folder, filled by copying and selected with `JOBSEARCH_PROFILE`.
-  Rejected: a second isolation mechanism, and a forgotten variable writes to real data.
-- A flag that makes `config` copy the personal profile on first use. Rejected: copy and
-  reset logic in Python, and the run's behavior depends on a variable, not on files.
-- A read-only run. Rejected: every write site needs a guard, and code that saves results
-  cannot be tested.
-- `backup` before a test and `restore` after. It works with the existing script, but
-  `restore` also discards real runs made in between, so it is not the documented workflow.
+- Every checkout mounts one shared folder of real personal data. Rejected: the problem of
+  sharing the data moves to sharing the data folder's location across checkouts.
+- Worktree code runs in the main checkout's container, which sees `.trees/`. Rejected: a
+  branch that changes `Dockerfile` or `docker-compose.yml` runs in the old image, the run
+  depends on the main checkout's current branch and image, and runs write to the real
+  database.
+
+`backup` before a test and `restore` after also isolates a test in any checkout. `restore`
+discards real runs made between the two commands.
 
 **Unit tests read the committed sample.**
 `DefaultDataTest` reads `profiles/default/` whichever profile is active. `config` exposes

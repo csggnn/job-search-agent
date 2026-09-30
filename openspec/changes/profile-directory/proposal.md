@@ -20,7 +20,7 @@ This approach, which targets protecting personal data, increases risks and compl
 - Switching or merging branches after a personal profile job search run does not result in conflicts
 - A user's personal information (keys, preferences, database) is never tracked in git, but instrumentation is provided for the user to back up this personal data to a target folder and restore it.
 - A developer can choose to run the pipeline on personal data without changing the real personal database or generated state.
-- A worktree starts with no keys and no personal profile data. Either can be copied in from the main checkout. Runs in a worktree do not affect the main checkout's data.
+- A developer can work on several branches at once, in the main checkout or in git worktrees.
 - Eval sets are treated as profile data. Separate eval sets exist for the default user and for the personal user, personal user eval data is not tracked on git.
 
 ## Capabilities
