@@ -12,3 +12,6 @@ Select one:
 
 ## Complexity
 <!-- Where this PR introduces the most complexity and which requirement makes it necessary. -->
+
+---
+Reviewers: start the review summary from the [PR review template](https://github.com/csggnn/job-search-agent/blob/master/.github/pr_review_template.md).
