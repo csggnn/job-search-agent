@@ -32,6 +32,8 @@ Setting `JOBSEARCH_PROFILE=default` SHALL select the default profile whether or 
 files exist. Setting `JOBSEARCH_PROFILE=personal` SHALL select the personal profile, and SHALL
 fail with an error naming the missing file unless both personal files exist. Any other
 non-empty value SHALL fail with an error listing the accepted values.
+Setting `JOBSEARCH_PROFILE=auto` or leaving it unset SHALL select the profile as when no
+profile is forced.
 
 #### Scenario: Forcing the default profile
 - **WHEN** personal files exist and the user runs the pipeline with `JOBSEARCH_PROFILE=default`
