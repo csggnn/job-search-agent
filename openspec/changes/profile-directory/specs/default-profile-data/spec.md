@@ -4,11 +4,12 @@
 
 ### Requirement: A fresh clone runs the pipeline on the sample data
 On a fresh clone, `propose_jobs.py` SHALL complete discovery, evaluation and ranking on the
-committed sample resume and job preferences when the only local change is a `.env` holding
-API keys.
+committed sample resume and job preferences when the only local setup is
+`~/.config/job-search-agent/.env` holding API keys.
 
 #### Scenario: Fresh clone proposes jobs
-- **WHEN** a user clones the repository, creates `.env` with API keys and runs `propose_jobs.py 2`
+- **WHEN** a user clones the repository, creates `~/.config/job-search-agent/.env` with API
+  keys and runs `propose_jobs.py 2`
 - **THEN** the run completes without raising
 - **AND** both shortlists render with at least one proposed job
 - **AND** at least one proposed job has a resolved commute rather than unknown

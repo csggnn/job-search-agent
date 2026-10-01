@@ -15,7 +15,7 @@ This approach, which targets protecting personal data and making it easy for an 
 
 - The notion of `profile` is introduced. A `profile` collects all data related to a user: preferences, data, generated files and databases.
 - At least two separate profiles, default and personal, exist. Switching profile is one single action, simple, clear and well documented. Software runs on a profile can only affect that profile (the database, all intermediate files such as `compatibility_rubric.json`)
-- `.env`, holding personal keys is untracked and gitignored. An example file and clear instructions can be provided to fill it up, but the configuration must be such that a user can not accidentally share API keys.
+- `.env`, holding personal keys is stored in a location which is not prone to be accidentally shared. The software provides clear instructions on how to fill it up.
 - Working with personal data requires no git index manipulation by the developer.
 - Switching or merging branches after a personal profile job search run does not result in conflicts
 - A user's personal information (keys, preferences, database) is never tracked in git, but instrumentation is provided for the user to back up this personal data to a target folder and restore it.

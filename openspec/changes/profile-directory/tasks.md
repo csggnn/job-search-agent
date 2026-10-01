@@ -8,8 +8,8 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 
 ## 1. Keys
 
-- [ ] 1.1 Commit `.env.example` holding the key names of the current `.env` template with no values. Remove `.env` from the index (`git rm --cached .env`) and add it to `.gitignore`. Scenario "Fresh clone" (personal-data-protection): verified in 8.2.
-- [ ] 1.2 Remove `env_file` from `docker-compose.yml`. Verify `podman-compose up -d` starts in a checkout without `.env`, and that an edited `.env` applies to the next command without recreating the container. Record the result.
+- [ ] 1.1 Commit `.env.example` holding the key names of the current `.env` template with no values. Remove `.env` from the index (`git rm --cached .env`). Scenario "Fresh clone" (personal-data-protection): verified in 8.2.
+- [ ] 1.2 In `docker-compose.yml`, remove `env_file` and mount `${HOME}/.config/job-search-agent` read-only at `/config`. Make `config.py` call `load_dotenv("/config/.env")`, which does nothing when the file is absent. Verify that `podman-compose up -d` starts when the directory exists without `.env`, that it fails with `statfs ...: no such file or directory` when the directory is missing, that an edited `.env` applies to the next command without recreating the container, and that writing `/config/.env` from inside the container fails because the mount is read-only. Record the results. Scenario "Key directory is missing" (personal-data-protection): the recorded failure, and the README text from 7.1.
 - [ ] 1.3 Add `config.API_KEYS` listing every key name the pipeline can read, including `ANTHROPIC_API_KEY` and `GROQ_API_KEY`. Add `test_env_example_names_every_api_key`, which fails naming each missing entry. Scenario "A key is missing from the template": verify by removing one key from `.env.example`, running the suite and recording the failure message, then restoring it.
 - [ ] 1.4 Make `scripts/check_setup.py` read key names from `config.API_KEYS` and take its keys through `config`.
 
@@ -38,13 +38,14 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 
 ## 6. Worktrees
 
-- [ ] 6.1 Scenarios "New worktree without copied data" (profile-selection) and "A new worktree holds no keys or personal data" (personal-data-protection): create a worktree without copying, list its `.env` and `profiles/personal/`, run the unit suite, and record the active profile.
-- [ ] 6.2 Scenario "Worktree with copied personal data": copy `.env` and `profiles/personal/` into a worktree, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
+- [ ] 6.1 Scenarios "New worktree without copied data" (profile-selection) and "A new worktree holds no personal data" (personal-data-protection): create a worktree without copying, list its `profiles/personal/`, run the unit suite, and record the active profile.
+- [ ] 6.2 Scenario "Worktree with copied personal data": copy `profiles/personal/` into a worktree, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
+- [ ] 6.3 Scenario "A worktree uses the shared keys" (personal-data-protection): in a worktree with nothing copied, evaluate one URL with `JOBSEARCH_PROFILE=default` and record that the API calls succeed.
 
 ## 7. Docs
 
-- [ ] 7.1 Rewrite the `README.md` setup: `.env` created from `.env.example`, the sample run first, then the personal profile with no cleanup step, no `git update-index`. Add a section on the personal profile covering its files, backup, restore, the `git clean -x` warning and the warning about backing up during a running command. Add a developer section on worktrees covering the two copy commands and the statement that changes to a worktree's data stay in its copy. Apply the first-mention link rule. Scenarios "README setup", "First mention of a committed file", "First mention of .env", "First mention of a personal file", "Developer looks for a safe test setup", "User looks for how to protect personal data": verify on the pushed branch on GitHub by clicking each first-mention link, and record the result per scenario.
-- [ ] 7.2 Update `CLAUDE.md`: replace "Git-invisible files" with the profile layout and the untracked `.env`, name the `git clean -x` risk, and update the paths in the evals rules (`data/evaluations.db`, `evals/ads/`).
+- [ ] 7.1 Rewrite the `README.md` setup: `mkdir -p ~/.config/job-search-agent`, `.env` created there from `.env.example`, the `statfs ...: no such file or directory` error and its fix, the sample run first, then the personal profile with no cleanup step, no `git update-index`. Add a section on the personal profile covering its files, backup, restore, the `git clean -x` warning and the warning about backing up during a running command. Add a developer section on worktrees covering the copy command (`cp -r ../../profiles/personal profiles/`) and the statement that changes to a worktree's data stay in its copy. Apply the first-mention link rule. Scenarios "README setup", "First mention of a committed file", "First mention of .env", "First mention of a personal file", "Developer looks for a safe test setup", "User looks for how to protect personal data": verify on the pushed branch on GitHub by clicking each first-mention link, and record the result per scenario.
+- [ ] 7.2 Update `CLAUDE.md`: replace "Git-invisible files" with the profile layout and keys in `~/.config/job-search-agent/.env`, name the `git clean -x` risk, and update the paths in the evals rules (`data/evaluations.db`, `evals/ads/`).
 - [ ] 7.3 Update `docs/architecture.md`, `docs/evals.md` and `docs/roadmap.md`, and the docstrings in `evals/__init__.py`, `evals/draft.py`, `jobsearch/preselection.py` and `tests/e2e/test_e2e_pipeline.py`. Verify `grep -rn "skip-worktree\|data/resume\|data/job_preferences\|data/evaluations\|evals/cases\|evals/ads" --include=*.md --include=*.py . | grep -v openspec` returns nothing.
 
 ## 8. Acceptance
@@ -57,7 +58,8 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
   - Scenario "Personal run leaves the default profile unchanged": record the row counts of both databases.
   - Scenario "Returning to the default profile": run `propose_jobs.py` with `JOBSEARCH_PROFILE=default` and record that only sample jobs appear.
   - Scenario "After setup and a personal run": record `git status --short` and `git add -A --dry-run`.
-  - Scenarios "Switching branches after a personal run" and "Merging after a personal run": create a branch with one commit, switch to it, switch back, merge it, and record that no step conflicts and `.env` and the personal files are unchanged (checksums).
+  - Scenario "Cleaning a checkout keeps the keys": record the checksum of `~/.config/job-search-agent/.env`, run `git clean -x -f -d` in the clone, and record that the checksum is unchanged.
+  - Scenarios "Switching branches after a personal run" and "Merging after a personal run": create a branch with one commit, switch to it, switch back, merge it, and record that no step conflicts and `~/.config/job-search-agent/.env` and the personal files are unchanged (checksums).
 - [ ] 8.3 Evals: in the main checkout after migration, run `evals/run_evals.py --criteria-only` on the personal profile and record that it scores the personal cases. Run it with `JOBSEARCH_PROFILE=default` and record the "no cases to run" exit.
 - [ ] 8.4 Run the live e2e suite with keys available. Verify it passes.
 - [ ] 8.5 Run an automated review of the diff (`/code-review`) and resolve or record each finding.
@@ -69,4 +71,4 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 ## 10. Migration (after merge, main checkout)
 
 - [ ] 10.1 Run the design's Migration Plan in the main checkout. Verify `propose_jobs.py` uses the personal profile and its shortlist matches one taken before migration.
-- [ ] 10.2 In each existing worktree: clear the skip-worktree bits, merge `master`, run the two copy commands. Rebase open branches onto `master`.
+- [ ] 10.2 In each existing worktree: clear the skip-worktree bits, run `git checkout -- .env data/resume.md data/job_preferences.md` (the worktree's copies duplicate the main checkout's data), merge `master`, run `rm -rf data`, then `cp -r ../../profiles/personal profiles/` if the worktree runs on personal data. Rebase open branches onto `master`.

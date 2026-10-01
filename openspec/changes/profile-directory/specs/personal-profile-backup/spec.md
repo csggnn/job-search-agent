@@ -8,9 +8,9 @@ them to a folder chosen by the user, and a restore puts them back into a checkou
 ## ADDED Requirements
 
 ### Requirement: Backup copies keys and the personal profile to a folder
-`scripts/profile.sh backup <folder>` SHALL copy the current checkout's `.env` and every file
-of its personal profile (resume, job preferences, generated state and eval set) into
-`<folder>`. The default profile's generated state SHALL NOT be copied.
+`scripts/profile.sh backup <folder>` SHALL copy `~/.config/job-search-agent/.env` and every
+file of the current checkout's personal profile (resume, job preferences, generated state
+and eval set) into `<folder>`. The default profile's generated state SHALL NOT be copied.
 
 #### Scenario: Backup to a new folder
 - **WHEN** a user runs `scripts/profile.sh backup <folder>` and `<folder>` does not exist
@@ -32,11 +32,11 @@ Writing to an earlier backup SHALL replace its contents.
 - **THEN** `<folder>` holds only the new backup's files
 
 ### Requirement: Restore replaces keys and the personal profile with a backup
-`scripts/profile.sh restore <folder>` SHALL replace the current checkout's `.env` and
-personal profile with the backup's. After a restore, both SHALL equal the backup.
+`scripts/profile.sh restore <folder>` SHALL replace `~/.config/job-search-agent/.env` and
+the current checkout's personal profile with the backup's. After a restore, both SHALL equal the backup.
 
 #### Scenario: Restore after data loss
-- **WHEN** a checkout has lost `.env` and the personal profile and the user runs
+- **WHEN** `.env` and the checkout's personal profile are lost and the user runs
   `scripts/profile.sh restore <folder>` on a backup
 - **THEN** `.env` and the personal profile equal the backup
 - **AND** the next pipeline run uses the personal profile
@@ -47,8 +47,8 @@ personal profile with the backup's. After a restore, both SHALL equal the backup
 - **THEN** those files are removed
 
 ### Requirement: A failed restore leaves the checkout unchanged
-Restore SHALL fail when `<folder>` does not hold a backup. Restore SHALL copy the backup into
-the checkout before it removes the current `.env` and personal profile. A restore that
+Restore SHALL fail when `<folder>` does not hold a backup. Restore SHALL copy the backup next to
+its targets before it removes the current `.env` and personal profile. A restore that
 fails, including a failed copy, SHALL leave `.env` and the personal profile unchanged.
 
 #### Scenario: Folder is not a backup
@@ -63,8 +63,8 @@ fails, including a failed copy, SHALL leave `.env` and the personal profile unch
 
 ### Requirement: The README documents backup and its limits
 The README SHALL describe backup and restore. It SHALL state that `git clean -x` deletes
-`.env` and the personal profile, and that a backup taken while a pipeline command runs may
-hold an inconsistent database.
+the personal profile, and that a backup taken while a pipeline command runs may hold an
+inconsistent database.
 
 #### Scenario: User looks for how to protect personal data
 - **WHEN** a user reads the README section on the personal profile

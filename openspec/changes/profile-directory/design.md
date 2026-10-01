@@ -37,13 +37,12 @@ and the eval set.
 **Goals:**
 
 - A "default" profile and a "personal" profile exist and are self-contained: a run never reads or writes another profile's files.
-- Each checkout is self-contained: runs read and write only files inside that checkout.
+- A run writes only inside its checkout. It reads keys from `~/.config/job-search-agent/.env`.
 - Default behavior follows from which files exist. No environment variable is required;
   `JOBSEARCH_PROFILE` is an optional override.
 
 **Non-Goals:**
 - More than two profiles, or a profile at an arbitrary path.
-- Personal data outside the checkout.
 - Re-scoring stale rows within one profile (CSG-48, second half).
 - Committing a default eval set. `profiles/default/evals/` stays gitignored for the time being.
 
@@ -52,8 +51,9 @@ and the eval set.
 **Two profile directories**
 
 ```
+~/.config/job-search-agent/
+  .env                  keys, shared by every checkout and both profiles
 <checkout>/
-  .env                  keys, gitignored, shared by both profiles
   profiles/
     default/                 profile "default"
       resume.md             committed
@@ -96,32 +96,27 @@ The error on a half-filled `profiles/personal/` is raised when a path is used, n
 
 Alternative considered: per-file fallback from `profiles/personal/` to `profiles/default/`. Rejected: a personal resume combined with sample preferences is a candidate nobody intends, and its evaluations would land in the personal database.
 
-**Keys stay in `.env`, gitignored.**
-`.env.example` is committed. The container sees `.env` through the checkout mount, and the
-existing `load_dotenv()` in `config.py` reads it. `docker-compose.yml` drops `env_file`,
-which loads the same file a second time at container creation. Without it, the container
-starts when `.env` is absent, and an edited `.env` applies to the next command. CI sets
-keys as environment variables, and `load_dotenv()` does nothing when `.env` is absent.
+**Keys live in `~/.config/job-search-agent/.env`, mounted read-only.**
+Every checkout and worktree reads the same `.env`. The container mounts the directory
+read-only, so the code cannot change keys. CI sets keys as environment variables. podman
+4.9.3 refuses to start a container whose bind-mount source is missing, so the setup step
+that creates `.env` also creates the directory.
 
-**A worktree starts with no keys and no personal data.**
-`.env` and `profiles/personal/` are gitignored, so `git worktree add` does not create them.
-Profile resolution then selects `profiles/default/`. Unit tests run without either file.
-Copying the main checkout's `.env` enables sample runs. Copying `profiles/personal/` as
-well selects the personal profile on a copy of the main checkout's data. From a worktree
-at `.trees/<name>/`:
+Alternative considered: `.env` gitignored in the checkout. Rejected: `git clean -x` deletes
+it, copying or archiving the checkout includes it, and each worktree needs its own copy.
+
+**A worktree starts with no personal data.**
+`profiles/personal/` is gitignored, so `git worktree add` does not create it. Profile
+resolution then selects `profiles/default/`. Unit tests run without it. Copying the main
+checkout's `profiles/personal/` selects the personal profile on a copy of the main
+checkout's data. From a worktree at `.trees/<name>/`:
 
 ```
-cp ../../.env .
 cp -r ../../profiles/personal profiles/
 ```
 
 The code does not detect worktrees. Writes in a worktree land in its copy and do not reach
-the main checkout. Running the second command again refreshes the copy.
-
-Without the first command, the worktree has no keys. Its container starts and the unit
-suite passes. A command that calls an API fails because its key is not set. `load_dotenv()`
-searches upward from inside the container, where `/workspace` is the worktree root, so it
-does not find the main checkout's `.env`. The README developer section gives both commands.
+the main checkout. Running the command again refreshes the copy.
 
 Alternative considered: a git `post-checkout` hook that copies the data, which also runs
 on `git worktree add`. Rejected: hooks are not installed by a clone and need
@@ -136,8 +131,8 @@ from the real data. One mechanism serves both outcomes and needs no code.
 
 A developer who tests changes against personal data creates a worktree and copies
 `profiles/personal/` into it. In the main checkout, the personal profile is the real data.
-The README developer section describes the workflow: create the worktree, run the two copy
-commands, run the pipeline. It states that evaluations, rubric and query caches, eval runs
+The README developer section describes the workflow: create the worktree, run the copy
+command, run the pipeline. It states that evaluations, rubric and query caches, eval runs
 and input edits made in a worktree stay in its copy and do not reach the main checkout.
 
 Alternatives considered:
@@ -174,14 +169,16 @@ keys the SDKs read themselves.
 It runs on the host because the backup folder is outside the container's mount. It needs
 only `cp` and `rm`.
 
-- `backup <folder>`: copies the current checkout's `profiles/personal/` and `.env` into
-  `<folder>`. `<folder>` must not exist or must already be a backup, identified by a
-  `.job-search-agent-backup` marker file. Existing backup contents are replaced.
+- `backup <folder>`: copies the current checkout's `profiles/personal/` and
+  `~/.config/job-search-agent/.env` into `<folder>`. `<folder>` must not exist or must
+  already be a backup, identified by a `.job-search-agent-backup` marker file. Existing
+  backup contents are replaced.
 - `restore <folder>`: requires the marker. It copies the backup's `profiles/personal/` and
-  `.env` to staging paths inside the checkout (`profiles/.personal.restore`,
-  `.env.restore`). When both copies succeed, it removes the current files and renames the
-  staged ones into place. On a failed copy it removes the staged paths and leaves the current
-  files as they were. After a restore both equal the backup.
+  `.env` to staging paths next to their targets (`profiles/.personal.restore`,
+  `~/.config/job-search-agent/.env.restore`). When both copies succeed, it removes the
+  current files and renames the staged ones into place. On a failed copy it removes the
+  staged paths and leaves the current files as they were. After a restore both equal the
+  backup.
 
 The marker stops `backup` from overwriting an unrelated directory and `restore` from
 reading one. Default-profile state is outside backup scope: it is regenerated from
@@ -205,8 +202,8 @@ subprocess with the same environment. In a worktree it writes to the worktree's 
 
 ## Risks / Trade-offs
 
-- [`git clean -x` in the main checkout deletes `profiles/personal/` and `.env`] → `backup`
-  exists for this. README and CLAUDE.md name the risk.
+- [`git clean -x` in the main checkout deletes `profiles/personal/`] → `backup` exists for
+  this. README and CLAUDE.md name the risk.
 - [A worktree's copy goes stale as the main checkout gains rows] → Copying
   `profiles/personal/` again replaces it.
 - [Edits to `profiles/personal/` made in a worktree do not reach the main checkout] → This
@@ -214,30 +211,31 @@ subprocess with the same environment. In a worktree it writes to the worktree's 
   `profiles/personal/`.
 - [Copying the database while a pipeline command writes produces a torn copy] → Documented.
   Commands are started by hand.
-- [A developer forgets to copy `.env` into a new worktree] → API calls fail because the
-  key is not set. The README developer section gives the copy commands.
+- [`~/.config/job-search-agent/` is missing, and `podman-compose up` fails with
+  `statfs ...: no such file or directory`] → The `.env` setup step creates it. The README
+  names the error and its fix.
 
 During migration only. These apply to branches created before this change, checked out in
 the main checkout, until they are merged or rebased onto `master`:
 
-- [The branch's `.gitignore` does not list `profiles/personal/` and `.env`, so both show as
-  untracked and `git add -A` stages them] → The migration adds both to
-  `.git/info/exclude`, which applies on every branch.
-- [The branch tracks `.env`. Checking it out refuses to overwrite the untracked `.env`, and
-  a forced checkout replaces the keys with the template] → Merge or rebase such branches
-  onto `master` before checking them out.
+- [The branch's `.gitignore` does not list `profiles/personal/`, so it shows as untracked
+  and `git add -A` stages it] → The migration adds it to `.git/info/exclude`, which
+  applies on every branch.
+- [The branch tracks `.env` and its code reads `<checkout>/.env`, which holds only the
+  template] → API calls fail on that branch. Merge or rebase such branches onto `master`
+  before running them.
 
 ## Migration Plan
 
 The merge removes `.env` from the index. Git deletes a file from the working tree when an
-incoming commit removes it, so the keys are copied aside first.
+incoming commit removes it, so the keys move to `~/.config/job-search-agent/` first.
 
-In the main checkout, in one shell session, before pulling the change:
+In the main checkout, before pulling the change:
 
 ```
-mkdir -p profiles/personal/evals
-keys_dir=$(mktemp -d)
-cp .env "$keys_dir/.env"
+mkdir -p ~/.config/job-search-agent profiles/personal/evals
+cp .env ~/.config/job-search-agent/.env
+chmod 600 ~/.config/job-search-agent/.env
 cp data/resume.md data/job_preferences.md data/evaluations.db profiles/personal/
 mv evals/cases.json evals/ads evals/runs profiles/personal/evals/
 git update-index --no-skip-worktree .env data/resume.md data/job_preferences.md
@@ -247,21 +245,20 @@ git checkout -- .env data/resume.md data/job_preferences.md
 Then pull `master`, and:
 
 ```
-mv "$keys_dir/.env" .env
-rmdir "$keys_dir"
-printf 'profiles/personal/\n.env\n' >> .git/info/exclude
+printf 'profiles/personal/\n' >> .git/info/exclude
 rm -rf data
 ```
 
-`mktemp -d` creates a directory readable only by its owner, so the keys are not exposed to
-other users while the pull runs. After the merge, `data/` holds only generated files: the sample files are tracked under
+After the merge, `data/` holds only generated files: the sample files are tracked under
 `profiles/default/`. The rubric and query caches are rebuilt on the first personal run.
 
-In each existing worktree: clear the skip-worktree bits, merge `master`, then run the two
-copy commands.
+In each existing worktree: clear the skip-worktree bits, discard the worktree's copies with
+`git checkout -- .env data/resume.md data/job_preferences.md`, merge `master`, remove
+`data/`, and copy `profiles/personal/` from the main checkout if the worktree runs on
+personal data. Evaluations saved in a worktree's `data/evaluations.db` are discarded.
 
-Rollback: revert the merge, copy `profiles/personal/` files back to `data/`, and set the
-skip-worktree bits again.
+Rollback: revert the merge, copy `profiles/personal/` files back to `data/`, copy
+`~/.config/job-search-agent/.env` back to `.env`, and set the skip-worktree bits again.
 
 ## Open Questions
 
