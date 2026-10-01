@@ -138,3 +138,49 @@ The personal-profile part runs after the migration (10.1).
 `/code-review medium` on the uncommitted diff: no correctness findings. One cleanup: the
 unused `config._default_profile_requested` was removed. Unit suite after the fix:
 `Ran 190 tests ... OK`.
+
+## 7.1 README on the pushed branch
+
+Checked on GitHub, branch `feat/csg-37-profile-dir-implementation` at `92ef739`, by clicking
+each link in Chrome:
+
+| Scenario | Result |
+|---|---|
+| First mention of a committed file | `profiles/default/job_preferences.md` (Setup step 3) shows the full path and opens `blob/.../profiles/default/job_preferences.md`, which holds `Rue des Halles 4`. `profiles/default/resume.md` links to its file. |
+| First mention of .env | Setup step 1 shows `~/.config/job-search-agent/.env` and opens `blob/.../.env.example`, which names `ANTHROPIC_API_KEY`, `TAVILY_API_KEY`, `GROQ_API_KEY`, `ORS_API_KEY`. |
+| First mention of a personal file | `profiles/personal/job_preferences.md` (Default usage) shows the full path and opens `README.md#your-personal-profile`; the "Your personal profile" heading lands at the top of the view. |
+| README setup | No step runs `git update-index` (`grep -c update-index README.md`: 0). |
+| User looks for how to protect personal data | "Your personal profile" gives the backup and restore commands, the `git clean -x` warning and the warning about copying during a run. |
+| Developer looks for a safe test setup | "Developer notes" describes `--scratch` (a scratch copy lasts one command), `scripts/profile.sh reset-default`, the worktree copy command `cp -r ../../profiles/personal profiles/`, and that worktree changes do not reach the main checkout. |
+
+## 8.2 Fresh-clone run
+
+`git clone --branch feat/csg-37-profile-dir-implementation` (at `92ef739`) into a new folder;
+the clone holds `.env.example` and no `.env`. README setup followed in order, except
+`cp .env.example ~/.config/job-search-agent/.env`, skipped because it would overwrite the
+existing key file; the existing `~/.config/job-search-agent/.env` stands in for it.
+
+- Step 2, `check_setup.py --default-profile`: profile and keys OK, Tavily, Anthropic and
+  Groq calls answered.
+- Step 3, `propose_jobs.py 3 --default-profile`: exit 0, 9 ads evaluated, both shortlists
+  hold 3 jobs. Scenario "Fresh clone proposes jobs": partial. No shortlisted job has a
+  resolved commute. Commute routing worked for 1 of the 9 ads (BDO, Zaventem, 25.1 min);
+  the other 8 postings, mostly recruiter ads, gave no office address.
+- Step 4: `profiles/personal/` created from the sample files; `check_setup.py` reports the
+  personal profile complete.
+- Step 5, `propose_jobs.py 3`: exit 0, `profile: personal`, 9 ads evaluated, both shortlists
+  hold 3 jobs. The default `evaluations.db` sha256 is unchanged.
+- Scenario "Switching from the sample to a personal profile": the personal database started
+  empty; 7 of its 9 URLs were also in the default database and were evaluated again.
+- Scenario "Returning to the default profile": `propose_jobs.py 3 --default-profile
+  --no-discover` ranks 9 evaluations, the default database's rows only.
+- Scenario "After setup and a personal run": `git status --short` and `git add -A --dry-run`
+  print nothing.
+- Scenario "Switching branches after a personal run": `git switch master` and back succeed;
+  the personal files' sha256 and the key file are unchanged.
+- Scenario "Merging after a personal run": `git merge origin/master` reports "Already up to
+  date", so no merge content was exercised.
+- Scenario "Cleaning a checkout keeps the keys": `git clean -x -f -d` removed
+  `profiles/personal/`; `~/.config/job-search-agent/.env` sha256 unchanged.
+
+The clone and its container were removed afterwards.
