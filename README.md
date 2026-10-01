@@ -45,13 +45,6 @@ search and commute-routing calls; it is currently configured to work with Anthro
 | `ORS_API_KEY` | OpenRouteService geocoding and driving-time routing | Free |
 | `GROQ_API_KEY` | Only `scripts/check_setup.py` for the moment | Free tier available |
 
-   A command that reads a key missing from the file fails with:
-   ```
-   RuntimeError: required environment variable 'TAVILY_API_KEY' is not set: add it to ~/.config/job-search-agent/.env
-   ```
-   Add the key to `~/.config/job-search-agent/.env`. The next command reads it without a
-   container restart.
-
 2. Start the container and check the setup:
    ```
    podman-compose up -d

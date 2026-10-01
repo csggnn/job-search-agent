@@ -39,7 +39,6 @@ it, and the pipeline SHALL NOT write it.
   a command that reads that key
 - **THEN** the command fails with an error naming the key and `~/.config/job-search-agent/.env`
 - **AND** `scripts/check_setup.py` names each missing key
-- **AND** the README names the error and the command that creates `.env`
 
 ### Requirement: Keys are configured from a committed template
 The repository SHALL commit `.env.example`, listing every API key the pipeline reads, with

@@ -167,7 +167,7 @@ evaluations and user-tracked fields that cannot be regenerated.
   Commands are started by hand.
 - [`~/.config/job-search-agent/.env` is missing, and the container starts without keys] →
   The first command that reads a key fails naming the key and the file.
-  `scripts/check_setup.py` lists every missing key. The README names the error and its fix.
+  `scripts/check_setup.py` lists every missing key.
 
 During migration only. These apply to branches created before this change, checked out in
 the main checkout, until they are merged or rebased onto `master`:
