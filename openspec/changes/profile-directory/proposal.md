@@ -14,20 +14,19 @@ This approach, which targets protecting personal data and making it easy for an 
 ## What Changes
 
 - The notion of `profile` is introduced. A `profile` collects all data related to a user: preferences, data, generated files and databases.
-- At least two separate profiles, default and personal, exist. Switching profile is one single action, simple, clear and well documented. Software runs on a profile can only affect that profile (the database, all intermediate files such as `compatibility_rubric.json`)
+- At least two separate profiles, default and personal, exist. Runs use the personal profile of the workspace. A run on the default profile is requested explicitly in the command. Software runs on a profile can only affect that profile.
 - `.env`, holding personal keys is stored in a location which is not prone to be accidentally shared. The software provides clear instructions on how to fill it up.
 - Working with personal data requires no git index manipulation by the developer.
 - Switching or merging branches after a personal profile job search run does not result in conflicts
-- A user's personal information (keys, preferences, database) is never tracked in git, but instrumentation is provided for the user to back up this personal data to a target folder and restore it.
-- A developer can choose to run the pipeline on personal data without changing the real personal database or generated state.
-- A developer can work on several branches at once, in the main checkout or in git worktrees.
-- Eval sets are treated as profile data. Separate eval sets exist for the default user and for the personal user, personal user eval data is not tracked on git.
+- A user's personal information (keys, preferences, database) is never tracked in git. The README documents how to back up the personal profile to a target folder and restore it.
+- A user can choose to run the pipeline on any profile, in a mode which does not change the real personal database or generated state.
+- A user can reset the generated state of the default profile.
+- Eval sets are treated as profile data. Separate eval sets exist for the default user and for the personal user.
 
 ## Capabilities
 
 ### New Capabilities
-- profile-selection: a user can choose whether to run on the default or on the personal profile, the two profiles work on separate intermediate files and databases. A worktree runs on the default profile unless personal profile data is copied into it. A worktree with copied personal data is one way in which a developer runs on personal data without changing the real data. The documentation describes this workflow and states that changes to a worktree's data do not reach the main checkout. Setup verification reports a personal profile with a missing or malformed section before a run. The README gives the full path of each profile file and `.env` at its first mention, linked to the file, to `.env.example` for `.env`, or to the README section on the personal profile for a personal file.
-- personal-profile-backup: personal data can be backed up to and restored from a target folder 
+- profile-selection: Runs use the personal profile of the workspace. A run on the `default` profile is requested explicitly in the command, so a fresh clone runs the sample with no personal data. Without a personal profile and without that request, a run fails with an error that names both options. Clear instructions are provided on how to create the personal profile. The two profiles work on separate intermediate files and databases. Setup verification reports missing or malformed section in a profile before a run.
 - personal-data-protection: API keys and personal profile data are never tracked by git, and no ordinary `git add` stages them. Working with personal data requires no git index manipulation. Switching or merging branches causes no conflicts from personal data.
 
 ### Modified Capabilities

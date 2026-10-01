@@ -3,13 +3,13 @@
 ## MODIFIED Requirements
 
 ### Requirement: A fresh clone runs the pipeline on the sample data
-On a fresh clone, `propose_jobs.py` SHALL complete discovery, evaluation and ranking on the
-committed sample resume and job preferences when the only local setup is
+On a fresh clone, `propose_jobs.py --default-profile` SHALL complete discovery, evaluation
+and ranking on the committed sample resume and job preferences when the only local setup is
 `~/.config/job-search-agent/.env` holding API keys.
 
 #### Scenario: Fresh clone proposes jobs
 - **WHEN** a user clones the repository, creates `~/.config/job-search-agent/.env` with API
-  keys and runs `propose_jobs.py 2`
+  keys and runs `propose_jobs.py --default-profile 2`
 - **THEN** the run completes without raising
 - **AND** both shortlists render with at least one proposed job
 - **AND** at least one proposed job has a resolved commute rather than unknown
@@ -56,8 +56,8 @@ The README setup SHALL run the sample candidate before the user adds a personal 
 Adding the personal profile SHALL require no cleanup of the sample candidate's evaluations.
 
 #### Scenario: Switching from the sample to a personal profile
-- **WHEN** a user runs `propose_jobs.py` on the sample candidate, adds a personal resume
-  and job preferences, and runs `propose_jobs.py` again
+- **WHEN** a user runs `propose_jobs.py --default-profile`, adds a personal resume and job
+  preferences, and runs `propose_jobs.py` without the flag
 - **THEN** no job evaluated for the sample candidate appears in either shortlist
 - **AND** a posting evaluated for the sample candidate is evaluated again if discovery
   finds it

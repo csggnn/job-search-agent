@@ -20,10 +20,6 @@ them.
   set, is listed
 - **AND** `git add -A` stages none of them
 
-#### Scenario: A new worktree holds no personal data
-- **WHEN** a worktree is created with `git worktree add` and nothing is copied into it
-- **THEN** it contains no personal profile files
-
 ### Requirement: Keys are read from one file outside every checkout
 The pipeline SHALL read API keys from `~/.config/job-search-agent/.env`. Every checkout and
 worktree SHALL read the same file. Git operations in a checkout SHALL NOT change or delete
@@ -31,7 +27,7 @@ it, and the pipeline SHALL NOT write it.
 
 #### Scenario: A worktree uses the shared keys
 - **WHEN** a worktree is created, nothing is copied into it, and the user runs the pipeline
-  there with `JOBSEARCH_PROFILE=default`
+  there with `--default-profile`
 - **THEN** API calls use the keys in `~/.config/job-search-agent/.env`
 
 #### Scenario: Cleaning a checkout keeps the keys
@@ -64,6 +60,24 @@ other command that changes git's index flags. The README SHALL contain no such c
 #### Scenario: README setup
 - **WHEN** a user follows the README from clone to a first personal run
 - **THEN** no step runs `git update-index`
+
+### Requirement: The README documents backing up the personal profile
+The README section on the personal profile SHALL give a command that copies the personal
+profile to a target folder, and a command that restores it. The restore command SHALL leave
+the current personal profile unchanged when the copy fails, and SHALL remove files that the
+backup does not hold. The section SHALL state that `git clean -x` deletes the personal
+profile, and that a copy taken while a pipeline command runs may hold an inconsistent
+database.
+
+#### Scenario: User looks for how to protect personal data
+- **WHEN** a user reads the README section on the personal profile
+- **THEN** it gives the backup and restore commands
+- **AND** it warns about `git clean -x` and about copying during a running command
+
+#### Scenario: Restore over newer data
+- **WHEN** the personal profile holds files that the backup does not and the user runs the
+  README restore command
+- **THEN** the personal profile equals the backup
 
 ### Requirement: Branch operations do not conflict over personal data
 Switching or merging branches SHALL NOT conflict over keys or personal profile data, and

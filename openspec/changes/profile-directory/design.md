@@ -38,8 +38,9 @@ and the eval set.
 
 - A "default" profile and a "personal" profile exist and are self-contained: a run never reads or writes another profile's files.
 - A run writes only inside its checkout. It reads keys from `~/.config/job-search-agent/.env`.
-- Default behavior follows from which files exist. No environment variable is required;
-  `JOBSEARCH_PROFILE` is an optional override.
+- The profile a run uses is visible: a run without `--default-profile` uses
+  `profiles/personal/` of its checkout and fails when that profile is incomplete. A run with
+  `--default-profile` uses `profiles/default/`.
 
 **Non-Goals:**
 - More than two profiles, or a profile at an arbitrary path.
@@ -68,33 +69,35 @@ and the eval set.
   evals/                eval code only
 ```
 
-Both profiles use the same file names under their own directory. Code reads one
-`PROFILE_DIR` and never branches on the profile name after resolution.
+Both profiles use the same file names under their own directory. Code reads one profile
+directory and never branches on the profile name after resolution.
 
-Alternative considered: a profile directory in the home directory (`~/.job-search-agent`),
-bind-mounted into the container. Rejected: it adds a directory outside the project, and
-podman 4.9.3 refuses to start a container whose bind-mount source is missing
-(`statfs ...: no such file or directory`), so a fresh clone would fail `podman-compose up`.
+**A run uses the personal profile unless `--default-profile` is given.**
+A run with `--default-profile` uses `profiles/default/`. Without it, a run uses
+`profiles/personal/` and fails when `resume.md` or `job_preferences.md` is missing there,
+naming the missing file and `--default-profile`. Every entry point accepts the flag. Python
+callers with no command line use the personal profile unless they select the default
+profile first.
 
-**Resolution in `config.py`, once, at import.**
+Alternative considered: a configuration file that selects the profile. Rejected: the
+profile would depend on a file outside the command and outside the checkout.
 
-```
-JOBSEARCH_PROFILE == "default"                    -> profiles/default
-JOBSEARCH_PROFILE == "personal"                   -> profiles/personal,  error unless complete
-JOBSEARCH_PROFILE == "auto" or unset:                       
-    profiles/personal has resume.md and job_preferences.md -> profiles/personal
-    profiles/personal has neither                          -> profiles/default
-    profiles/personal has one                              -> error naming the missing file
-JOBSEARCH_PROFILE set to anything else            -> error
+Alternative considered: selecting the default profile when `profiles/personal/` is empty.
+Rejected: a run on personal data that is missing would silently run on the sample.
 
-```
+Alternative considered: per-file fallback from `profiles/personal/` to `profiles/default/`.
+Rejected: a personal resume combined with sample preferences is a candidate nobody intends,
+and its evaluations would land in the personal database.
 
-`config` exposes `PROFILE_DIR` and `PROFILE_NAME`. `DATA_DIR` is removed, and its three
-users switch to `PROFILE_DIR`. `EVALS_DATA_DIR = PROFILE_DIR/evals`.
+**`--scratch` runs on a temporary copy of the profile.**
+With `--scratch`, a run copies the selected profile directory to a temporary directory and
+uses the copy. The copy is deleted when the command exits. All writes (database, rubric and
+query caches, eval runs) land in the copy. It combines with `--default-profile`. A scratch
+copy lasts one command: a second command does not see the first one's writes.
 
-The error on a half-filled `profiles/personal/` is raised when a path is used, not at import. Unit tests do not use the personal profile so they are unaffected. 
-
-Alternative considered: per-file fallback from `profiles/personal/` to `profiles/default/`. Rejected: a personal resume combined with sample preferences is a candidate nobody intends, and its evaluations would land in the personal database.
+Alternative considered: opening the database read-only and skipping cache writes.
+Rejected: every write site would need a branch, and `evaluate_job` reads back the row it
+saves.
 
 **Keys live in `~/.config/job-search-agent/.env`, mounted read-only.**
 Every checkout and worktree reads the same `.env`. The container mounts the directory
@@ -106,104 +109,54 @@ Alternative considered: `.env` gitignored in the checkout. Rejected: `git clean 
 it, copying or archiving the checkout includes it, and each worktree needs its own copy.
 
 **A worktree starts with no personal data.**
-`profiles/personal/` is gitignored, so `git worktree add` does not create it. Profile
-resolution then selects `profiles/default/`. Unit tests run without it. Copying the main
-checkout's `profiles/personal/` selects the personal profile on a copy of the main
-checkout's data. From a worktree at `.trees/<name>/`:
-
-```
-cp -r ../../profiles/personal profiles/
-```
-
-The code does not detect worktrees. Writes in a worktree land in its copy and do not reach
-the main checkout. Running the command again refreshes the copy.
+`profiles/personal/` is gitignored, so `git worktree add` does not create it. A run without
+`--default-profile` fails. Copying the main checkout's `profiles/personal/` makes the
+worktree run on that copy. Writes in a worktree land in its copy and do not reach the main
+checkout.
 
 Alternative considered: a git `post-checkout` hook that copies the data, which also runs
 on `git worktree add`. Rejected: hooks are not installed by a clone and need
 `git config core.hooksPath`, an extra setup step.
 
-**Isolated runs on personal data use a worktree copy.**
-Two outcomes in proposal.md drive this decision: a developer works on several branches at
-once, in the main checkout or in git worktrees, and a developer can run on personal data
-without changing the real data. Personal data is gitignored, so a worktree has it only
-after a step brings it in. A copy is that step, and it also isolates the worktree's runs
-from the real data. One mechanism serves both outcomes and needs no code.
-
-A developer who tests changes against personal data creates a worktree and copies
-`profiles/personal/` into it. In the main checkout, the personal profile is the real data.
-The README developer section describes the workflow: create the worktree, run the copy
-command, run the pipeline. It states that evaluations, rubric and query caches, eval runs
-and input edits made in a worktree stay in its copy and do not reach the main checkout.
-
-Alternatives considered:
-- Every checkout mounts one shared folder of real personal data. Rejected: the problem of
-  sharing the data moves to sharing the data folder's location across checkouts.
-- Worktree code runs in the main checkout's container, which sees `.trees/`. Rejected: a
-  branch that changes `Dockerfile` or `docker-compose.yml` runs in the old image, the run
-  depends on the main checkout's current branch and image, and runs write to the real
-  database.
-
-`backup` before a test and `restore` after also isolates a test in any checkout. `restore`
-discards real runs made between the two commands.
-
-**Unit tests read the committed sample.**
-`DefaultDataTest` reads `profiles/default/` whichever profile is active. `config` exposes
-`DEFAULT_PROFILE_DIR`, and the section helpers the test calls accept the preferences text,
-so the test does not go through the active profile. `scripts/check_setup.py` checks the
-personal profile's sections when the personal profile is active.
-
-**`config.API_KEYS` names every API key the pipeline can read.**
-The Anthropic and Groq SDKs read `ANTHROPIC_API_KEY` and `GROQ_API_KEY` from the environment
-themselves, so no call in the repo names them. `config.API_KEYS` lists all key names in one
-place. A unit test checks that `.env.example` names each entry, and fails naming the entries
-it lacks. `check_setup.py` reads the same list.
-
-The list names keys. It does not state which are required. Requiredness is checked where a
-key is used (`config.require_env`) and by `check_setup.py`. A later rule such as "at least
-one LLM key" changes only those checks: the list, the template and the test stay as they are.
+**`.env.example` is checked against one list of key names.**
+The Anthropic and Groq SDKs read their keys from the environment, so no call in the repo
+names them. `config.API_KEYS` lists every key name. A unit test fails when `.env.example`
+lacks one, and `check_setup.py` reads the same list. The list does not state which keys are
+required: that is checked where a key is used.
 
 Alternative considered: scanning the code for `require_env` calls. Rejected: it misses the
 keys the SDKs read themselves.
 
-**`scripts/profile.sh`, a bash script run on the host.**
-It runs on the host because the backup folder is outside the container's mount. It needs
-only `cp` and `rm`.
+**The personal profile is backed up with documented folder copies.**
+The personal profile is one directory, so the README gives a `cp -r` command for backup and
+a restore command that copies into the checkout first and replaces `profiles/personal/`
+only when the copy succeeds. The database is copied as a file, which is consistent when no
+pipeline command writes during the copy. The host has no guaranteed `sqlite3` binary for an
+online backup. Keys are not backed up: nothing in a checkout or a git operation deletes
+`~/.config/job-search-agent/.env`.
 
-- `backup <folder>`: copies the current checkout's `profiles/personal/` and
-  `~/.config/job-search-agent/.env` into `<folder>`. `<folder>` must not exist or must
-  already be a backup, identified by a `.job-search-agent-backup` marker file. Existing
-  backup contents are replaced.
-- `restore <folder>`: requires the marker. It copies the backup's `profiles/personal/` and
-  `.env` to staging paths next to their targets (`profiles/.personal.restore`,
-  `~/.config/job-search-agent/.env.restore`). When both copies succeed, it removes the
-  current files and renames the staged ones into place. On a failed copy it removes the
-  staged paths and leaves the current files as they were. After a restore both equal the
-  backup.
+Alternative considered: `backup` and `restore` commands in a script, with a marker file
+that identifies a backup folder. Rejected: the script and its tests add maintenance for
+behavior that two shell commands provide. `cp -r` into an existing folder nests the copy
+and does not overwrite it.
 
-The marker stops `backup` from overwriting an unrelated directory and `restore` from
-reading one. Default-profile state is outside backup scope: it is regenerated from
-committed inputs.
+**`scripts/profile.sh reset-default` clears the default profile's generated state.**
+It removes the default profile's database, rubric and search queries, and keeps its inputs
+and eval set. It runs on the host or in the container. The e2e test and the README use the
+same command, so both clear the same files.
 
-**The database is copied as a file.**
-The rollback journal keeps a committed database in one file. The copy is consistent when
-no pipeline command writes during it. The docs state this. The host has no guaranteed
-`sqlite3` binary for an online backup.
-
-**Evals follow the profile through `evals/dataset.py`.**
-`EVALS_DIR` becomes `config.EVALS_DATA_DIR`. `capture.py`, `draft.py` and `run_evals.py`
-need no path changes. `run_evals.py` then scores each profile's cases against that
-profile's rubric. With the eval set left in `evals/`, running evals under
-`JOBSEARCH_PROFILE=default` would score personal labels against the sample rubric, and
-every label would sort to `stale_label`.
-
-**The e2e test goes through `config`.**
-It reads `config.PROFILE_DIR` for the database and `config` for keys, and runs its
-subprocess with the same environment. In a worktree it writes to the worktree's copy.
+Reset applies to the default profile only. A reset of personal data would delete
+evaluations and user-tracked fields that cannot be regenerated.
 
 ## Risks / Trade-offs
 
-- [`git clean -x` in the main checkout deletes `profiles/personal/`] → `backup` exists for
-  this. README and CLAUDE.md name the risk.
+- [`git clean -x` in the main checkout deletes `profiles/personal/`] → The README gives
+  the backup command. README and CLAUDE.md name the risk.
+- [A developer runs without `--default-profile` or `--scratch` in a checkout that holds the
+  real personal profile, and test results land in it] → Test runs use `--scratch` or a
+  worktree with a copy. The README developer section states it.
+- [Running the e2e tests clears the checkout's default-profile state] → The default
+  profile's state is regenerated from committed inputs. The e2e test docstring states it.
 - [A worktree's copy goes stale as the main checkout gains rows] → Copying
   `profiles/personal/` again replaces it.
 - [Edits to `profiles/personal/` made in a worktree do not reach the main checkout] → This
