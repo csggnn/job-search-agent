@@ -41,7 +41,7 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 ## 6. Worktrees
 
 - [x] 6.1 Scenario "New worktree without copied data" (profile-selection): create a worktree without copying, run the unit suite, and record that a run without `--default-profile` fails naming `--default-profile`.
-- [ ] 6.2 Scenario "Worktree with copied personal data": from the worktree, run `cp -r ../../profiles/personal profiles/`, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
+- [x] 6.2 Scenario "Worktree with copied personal data": from the worktree, run `cp -r ../../profiles/personal profiles/`, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
 - [x] 6.3 Scenario "A worktree uses the shared keys" (personal-data-protection): in a worktree with nothing copied, evaluate one URL with `--default-profile` and record that the API calls succeed.
 
 ## 7. Docs
@@ -74,4 +74,4 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 ## 10. Migration (after merge, main checkout)
 
 - [x] 10.1 Run the design's Migration Plan in the main checkout. Verify `propose_jobs.py` uses the personal profile and its shortlist matches one taken before migration.
-- [ ] 10.2 In each existing worktree: clear the skip-worktree bits, run `git checkout -- .env data/resume.md data/job_preferences.md` (the worktree's copies duplicate the main checkout's data), merge `master`, run `rm -rf data`, then `cp -r ../../profiles/personal profiles/` if the worktree runs on personal data. Rebase open branches onto `master`.
+- [x] 10.2 In each existing worktree: clear the skip-worktree bits, run `git checkout -- .env data/resume.md data/job_preferences.md` (the worktree's copies duplicate the main checkout's data), merge `master`, run `rm -rf data`, then `cp -r ../../profiles/personal profiles/` if the worktree runs on personal data. Rebase open branches onto `master`.

@@ -211,3 +211,31 @@ The personal `compatibility_rubric.json` and `search_queries.json` were rebuilt 
 personal run, because the plan copies neither file. Both are LLM output sampled at the default
 temperature: two `compile_queries()` calls on the default profile shared 4 of 12 distinct
 queries.
+
+## 6.2 Worktree with copied personal data
+
+Worktree `.trees/csg-37-migration-test` at `2ec4181`, with the main checkout's
+`profiles/personal/` copied in. `evaluate_job_post.py https://canonical.com/careers/6707824`
+ran there; `propose_jobs.py 3 --no-discover` in the worktree then reports
+`profile: personal (/workspace/profiles/personal)` and `95 evaluated`.
+
+| `profiles/personal/evaluations.db` | Modified | Rows |
+|---|---|---|
+| main checkout | 16:10:29, unchanged since before the copy | 94 |
+| worktree copy | 16:36:15 | 95 |
+
+`propose_jobs.py 3 --no-discover` in the main checkout reports `94 evaluated`.
+
+## 10.2 Existing worktrees
+
+State of every checkout listed by `git worktree list` after the migration. The worktrees
+`csg-15-markdown-wrap-width` and `csg-50-sdd-pr-review-templates` were removed.
+
+| Checkout | Skip-worktree bits | `data/` | `.env` | `profiles/personal/` |
+|---|---|---|---|---|
+| main checkout | 0 | absent | absent | present |
+| `.trees/csg-37-migration-test` | 0 | absent | absent | present |
+| `.trees/csg-37-profile-directory` | 0 | absent | absent | absent |
+
+The main checkout and `.trees/csg-37-migration-test` are on local branches at `2ec4181`.
+`.trees/csg-37-profile-directory` held an empty `data/` directory, removed with `rmdir`.
