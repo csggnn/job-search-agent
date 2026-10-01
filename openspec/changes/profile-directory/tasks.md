@@ -69,7 +69,7 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 
 ## 9. Scenario coverage
 
-- [ ] 9.1 Write the implementation PR description as a table with one row per scenario in the three delta specs: scenario, verifying test or task, result. Verify every scenario has a row and no row is empty.
+- [x] 9.1 Write the implementation PR description as a table with one row per scenario in the three delta specs: scenario, verifying test or task, result. Verify every scenario has a row and no row is empty.
 
 ## 10. Migration (after merge, main checkout)
 
