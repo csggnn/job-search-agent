@@ -2,19 +2,19 @@
 
 ## Why
 
-Personal data lives in files committed as templates and hidden with the skip-worktree bit:
-`.env`, `data/resume.md` and `data/job_preferences.md`. Tracked as CSG-37.
-This approach, which targets protecting personal data, increases risks and complexity and needs to be revised:
-- Real API keys sit in a tracked file. One `git update-index --no-skip-worktree`, fresh
-  clone or `git add -A` in the wrong checkout commits them. This must be prevented.
-- `git status` reports the files as clean while a merge aborts because personal data files differ.
+Personal data currently lives in files committed as templates and hidden with the skip-worktree bit:
+`.env`, `data/resume.md` and `data/job_preferences.md`.
+This approach, which targets protecting personal data and making it easy for an new user to edit them, increases risks and complexity and needs to be revised:
+- Real API keys sit in a tracked file. One `git update-index --no-skip-worktree` or `git add -A` in the wrong checkout commits them. This must be prevented.
+- `git status` reports the files as clean, but switching branches or mergeing aborts because personal data files differ.
 - The skip-worktree mechanism itself is not a commonly used git feature, a developer requires additional context, this increases the complexity of the software project.
-- Sample candidate configuration and personal candidate configuration share one set of paths and one database. A developer needs to work on both. Job search runs with these two configurations will result in an incoherent job search database. This issue has been met also in (CSG-48).
-- There is no clear shared practice on how to test with sample and personal profile without compromising the database and without the risk of losing or leaking personal data
+- Sample candidate configuration and personal candidate configuration share one set of paths and one database. A developer needs to work on both. alternating runs with these two configurations results in a job database with mixed jobs.
+- There is no clear shared practice on how to test with the default and personal profiles without compromising the database and without the risk of losing or leaking personal data
 
 ## What Changes
 
-- At least two separate Sample and Personal profiles exist. Switching profile is one single action, simple, clear and well documented. Software runs on a profile can only affect that profile (the database, all intermediate files such as `compatibility_rubric.json`)
+- The notion of `profile` is introduced. A `profile` collects all data related to a user: preferences, data, generated files and databases.
+- At least two separate profiles, default and personal, exist. Switching profile is one single action, simple, clear and well documented. Software runs on a profile can only affect that profile (the database, all intermediate files such as `compatibility_rubric.json`)
 - `.env`, holding personal keys is untracked and gitignored. An example file and clear instructions can be provided to fill it up, but the configuration must be such that a user can not accidentally share API keys.
 - Working with personal data requires no git index manipulation by the developer.
 - Switching or merging branches after a personal profile job search run does not result in conflicts
@@ -26,7 +26,7 @@ This approach, which targets protecting personal data, increases risks and compl
 ## Capabilities
 
 ### New Capabilities
-- profile-selection: a user can choose whether to run on the default or on the personal profile, the two profiles work on separate intermediate files and databases. A worktree runs on the sample profile unless personal profile data is copied into it. A worktree with copied personal data is one way in which a developer runs on personal data without changing the real data. The documentation describes this workflow and states that changes to a worktree's data do not reach the main checkout. Setup verification reports a personal profile with a missing or malformed section before a run. The README gives the full path of each profile file and `.env` at its first mention, linked to the file, to `.env.example` for `.env`, or to the README section on the personal profile for a personal file.
+- profile-selection: a user can choose whether to run on the default or on the personal profile, the two profiles work on separate intermediate files and databases. A worktree runs on the default profile unless personal profile data is copied into it. A worktree with copied personal data is one way in which a developer runs on personal data without changing the real data. The documentation describes this workflow and states that changes to a worktree's data do not reach the main checkout. Setup verification reports a personal profile with a missing or malformed section before a run. The README gives the full path of each profile file and `.env` at its first mention, linked to the file, to `.env.example` for `.env`, or to the README section on the personal profile for a personal file.
 - personal-profile-backup: personal data can be backed up to and restored from a target folder 
 - personal-data-protection: API keys and personal profile data are never tracked by git, and no ordinary `git add` stages them. Working with personal data requires no git index manipulation. Switching or merging branches causes no conflicts from personal data.
 

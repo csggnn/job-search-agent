@@ -2,15 +2,41 @@
 
 ## Context
 
-See proposal.md for the problem. One fact shapes the decisions: every data path in
-`jobsearch/` derives from `config.DATA_DIR`. `storage`, `rubric` and `discovery` join their
-file names onto it. Outside `jobsearch/`, `evals/dataset.py` and
-`tests/e2e/test_e2e_pipeline.py` hold their own data paths.
+Before this change, a checkout holds one candidate's files:
+
+```
+<checkout>/
+  .env                  tracked template; real keys hidden by skip-worktree
+  data/
+    resume.md           tracked sample; real content hidden by skip-worktree
+    job_preferences.md  tracked sample; real content hidden by skip-worktree
+    evaluations.db      gitignored
+    compatibility_rubric.json, search_queries.json   gitignored
+  evals/
+    *.py                eval code
+    cases.json, ads/, runs/   gitignored
+```
+
+This layout causes three problems:
+- Real keys and personal data sit in tracked files. Git ignores their content only while
+  the skip-worktree bit is set, and a fresh clone or worktree starts without it.
+- The sample and the real candidate share one set of paths. Running the sample means
+  overwriting the real `resume.md` and `job_preferences.md`, and both candidates'
+  evaluations, rubric and queries end up in one database and one set of generated files.
+- The eval set has one location for both candidates, mixed with the eval code.
+
+proposal.md lists the full set of problems.
+
+This change introduces profiles. 
+A profile is the set of files associated to a candidate:
+`resume.md`, `job_preferences.md`, the database, the generated rubric and search queries,
+and the eval set.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- One Python choke point decides every profile path.
+
+- A "default" profile and a "personal" profile exist and are self-contained: a run never reads or writes another profile's files.
 - Each checkout is self-contained: runs read and write only files inside that checkout.
 - Default behavior follows from which files exist. No environment variable is required;
   `JOBSEARCH_PROFILE` is an optional override.
