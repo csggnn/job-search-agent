@@ -33,10 +33,11 @@ search and commute-routing calls; it is currently configured to work with Anthro
    [`~/.config/job-search-agent/.env`](.env.example). Create it from the template:
    ```
    mkdir -p ~/.config/job-search-agent
-   cp .env.example ~/.config/job-search-agent/.env
+   [ -e ~/.config/job-search-agent/.env ] || cp .env.example ~/.config/job-search-agent/.env
    chmod 600 ~/.config/job-search-agent/.env
    ```
-   Every checkout and worktree reads this file. The container mounts it read-only.
+   Every checkout and worktree reads this file. The container mounts it read-only. When the
+   file already exists, the copy is skipped: edit the existing file to add or change keys.
 
 | Variable | Used for | Notes |
 |----------|----------|-------|
