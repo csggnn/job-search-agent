@@ -37,7 +37,8 @@ and the eval set.
 **Goals:**
 
 - A "default" profile and a "personal" profile exist and are self-contained: a run never reads or writes another profile's files.
-- A run writes only inside its checkout. It reads keys from `~/.config/job-search-agent/.env`.
+- A run writes only inside its checkout, except a `--scratch` copy, which lives in a
+  temporary directory removed at exit. It reads keys from `~/.config/job-search-agent/.env`.
 - The profile a run uses is visible: a run without `--default-profile` uses
   `profiles/personal/` of its checkout and fails when that profile is incomplete. A run with
   `--default-profile` uses `profiles/default/`.
