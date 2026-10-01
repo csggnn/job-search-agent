@@ -64,11 +64,6 @@ _MIGRATIONS = [
 APPLICATION_STATUSES = {"new", "applied", "discarded"}
 
 
-def db_path():
-    """ the active profile's evaluations database """
-    return os.path.join(config.profile_dir(), "evaluations.db")
-
-
 def _migrate_schema(conn):
     """ add any columns from _MIGRATIONS that are missing from an existing evaluations table """
     existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(evaluations)")}
@@ -77,9 +72,11 @@ def _migrate_schema(conn):
             conn.execute(ddl)
 
 
-def _get_connection():
-    """ open a connection to the evaluations DB, creating/migrating the schema if needed """
-    path = db_path()
+def _get_connection(profile):
+    """ open a connection to the evaluations DB of `profile`, creating/migrating the schema if
+        needed
+    """
+    path = profile.evaluations_db_path
     os.makedirs(os.path.dirname(path), exist_ok=True)
     conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -112,12 +109,13 @@ def rubric_content_hash(rubric):
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-def list_evaluated_urls():
+def list_evaluated_urls(profile=None):
     """ return [(url, normalized_url), ...] for every saved evaluation - the original url last
         passed to save_evaluation() plus its normalized form, for callers that need to diff
         against another set of urls (e.g. cases.json) using the same normalization.
     """
-    conn = _get_connection()
+    profile = profile or config.resolve_profile()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute("SELECT url, normalized_url FROM evaluations").fetchall()
     finally:
@@ -125,13 +123,14 @@ def list_evaluated_urls():
     return rows
 
 
-def list_evaluated_job_openings():
+def list_evaluated_job_openings(profile=None):
     """ return [(normalized_url, company, job_title, application_status), ...] for every saved
         evaluation - the job-opening identity fields, for callers that dedupe on the opening
         rather than on the url it was found under (jobsearch.preselection). Read-only, no
         schema of its own: list_evaluated_urls() returns urls only.
     """
-    conn = _get_connection()
+    profile = profile or config.resolve_profile()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute(
             "SELECT normalized_url, company, job_title, application_status FROM evaluations"
@@ -147,14 +146,15 @@ _LIST_COLUMNS = (
 )
 
 
-def list_evaluations():
+def list_evaluations(profile=None):
     """ return every saved evaluation as a dict of _LIST_COLUMNS, most recently evaluated
         first. The fields ranking needs (compatibility_score, commute_score,
         application_status) plus the identity and display fields, without the rationale and
         per-criterion detail. For jobsearch.ranking, which scores rows regardless of how
         they were evaluated.
     """
-    conn = _get_connection()
+    profile = profile or config.resolve_profile()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute(
             f"SELECT {', '.join(_LIST_COLUMNS)} FROM evaluations ORDER BY evaluated_at DESC"
@@ -171,11 +171,12 @@ _EVALUATION_COLUMNS = (
 )
 
 
-def get_evaluation(url):
+def get_evaluation(url, profile=None):
     """ return the full saved evaluation row for url as a dict, or None if never evaluated.
         includes both pipeline-derived fields and user-tracked fields (reviewed, notes, etc).
     """
-    conn = _get_connection()
+    profile = profile or config.resolve_profile()
+    conn = _get_connection(profile)
     try:
         row = conn.execute(
             f"SELECT {', '.join(_EVALUATION_COLUMNS)} FROM evaluations WHERE normalized_url = ?",
@@ -192,11 +193,12 @@ def get_evaluation(url):
 _CRITERION_COLUMNS = ("name", "type", "weight", "matched", "score", "rationale")
 
 
-def get_evaluation_criteria(url):
+def get_evaluation_criteria(url, profile=None):
     """ return the list of evaluation_criteria rows (name, type, weight, matched, score,
         rationale) for url's saved evaluation, or [] if never evaluated.
     """
-    conn = _get_connection()
+    profile = profile or config.resolve_profile()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute(
             f"SELECT {', '.join(_CRITERION_COLUMNS)} FROM evaluation_criteria "
@@ -209,17 +211,18 @@ def get_evaluation_criteria(url):
     return [dict(zip(_CRITERION_COLUMNS, row)) for row in rows]
 
 
-def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
+def save_evaluation(url, rubric_hash, job, commute, compatibility, overview, profile=None):
     """ upsert the pipeline-derived fields of the evaluation for url: updates the existing row
         if one exists for this normalized_url (preserving user-tracked fields like reviewed/
         notes/application_status), else inserts a fresh row with their defaults. Always
         replaces evaluation_criteria for the row, since those are fully derived.
     """
+    profile = profile or config.resolve_profile()
     normalized = normalize_url(url)
     evaluated_at = datetime.now(timezone.utc).isoformat()
     is_remote = 1 if commute["address"] == config.FULLY_REMOTE else 0
 
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         existing = conn.execute(
             "SELECT id FROM evaluations WHERE normalized_url = ?", (normalized,)
@@ -276,11 +279,13 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
         conn.close()
 
 
-def update_review(url, reviewed=None, application_status=None, status_reason=None, notes=None):
+def update_review(url, reviewed=None, application_status=None, status_reason=None, notes=None,
+                  profile=None):
     """ partial update of the user-tracked fields for an existing evaluation; None = leave
         unchanged. Raises ValueError if the url has never been evaluated, or if
         application_status isn't one of APPLICATION_STATUSES.
     """
+    profile = profile or config.resolve_profile()
     if application_status is not None and application_status not in APPLICATION_STATUSES:
         raise ValueError(f"application_status must be one of {APPLICATION_STATUSES}, got {application_status!r}")
 
@@ -295,7 +300,7 @@ def update_review(url, reviewed=None, application_status=None, status_reason=Non
     if not updates:
         return
 
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         existing = conn.execute(
             "SELECT id FROM evaluations WHERE normalized_url = ?", (normalized,)

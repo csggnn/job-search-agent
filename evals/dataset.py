@@ -3,7 +3,7 @@ Read/write layer for the eval set: cases.json (ground truth) and the ads it refe
 (stored job-posting inputs).
 
 Every function that reads or writes a file takes the eval directory as its first argument:
-the active profile's evals/ directory, from jobsearch.config.evals_data_dir().
+a profile's evals/ directory, jobsearch.config.Profile.evals_dir.
 
 A case references its ad by filename rather than deriving it from the case name, so a
 rename leaves the reference intact. A case with a null "ad" has no captured inputs;

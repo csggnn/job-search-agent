@@ -155,13 +155,15 @@ def geocode_address(address):
     return features[0]["geometry"]["coordinates"]
 
 
-def commute_route(address, profile="driving-car"):
-    """ return (duration_minutes, distance_km) from the candidate's home address to address """
-    origin = geocode_address(config.home_address())
+def commute_route(profile, address, ors_profile="driving-car"):
+    """ return (duration_minutes, distance_km) from the home address of `profile` to address.
+        ors_profile is the OpenRouteService routing profile.
+    """
+    origin = geocode_address(profile.home_address())
     destination = geocode_address(address)
 
     response = requests.get(
-        f"{ORS_BASE_URL}/v2/directions/{profile}",
+        f"{ORS_BASE_URL}/v2/directions/{ors_profile}",
         params={
             "api_key": config.require_env("ORS_API_KEY"),
             "start": f"{origin[0]},{origin[1]}",
@@ -174,14 +176,10 @@ def commute_route(address, profile="driving-car"):
     return segment["duration"] / 60, segment["distance"] / 1000
 
 
-def commute_time(address, profile="driving-car"):
-    """ return commute time in minutes """
-    duration, _ = commute_route(address, profile)
-    return duration
-
-
-def commute_score(company, location, description, debug=False):
-    """commute_score is the commute time for companies requiring 3 or 4 days from office.
+def commute_score(profile, company, location, description, debug=False):
+    """commute_score is the commute time from the home address of `profile` for companies
+       requiring 3 or 4 days from office. The home address is read only when a
+       route is computed.
        for fully in office, multiply by 1.5
        for <3 days on office, commute score is commute_time * days-on-office / 3.
        fully remote jobs have no commute, so their score is 0.
@@ -202,7 +200,7 @@ def commute_score(company, location, description, debug=False):
         return {"score": None, "days_on_office": days_on_office, "address": None,
                 "raw_minutes": None, "distance_km": None}
 
-    time, distance = commute_route(address)
+    time, distance = commute_route(profile, address)
 
     if days_on_office >= 5:
         score = time * 1.5

@@ -27,9 +27,10 @@ def main():
                              "(same check evaluate_job() uses); otherwise force a fresh build")
     config.add_profile_argument(parser)
     args = parser.parse_args()
-    config.apply_profile_args(args)
+    profile = config.profile_from_args(args)
 
-    rubric = load_or_compile_rubric() if args.if_changed else compile_rubric()
+    rubric = (load_or_compile_rubric(profile=profile) if args.if_changed
+              else compile_rubric(profile=profile))
 
     print(f"criteria: {len(rubric['criteria'])}")
     for c in rubric["criteria"]:

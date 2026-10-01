@@ -49,10 +49,10 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
     return response.choices[0].message.content
 
 
-def check_profile():
-    """ print the active profile's missing job_preferences.md sections. returns True if none """
-    path = config.job_preferences_path()
-    missing = config.missing_preference_sections(config.read_job_preferences())
+def check_profile(profile):
+    """ print the job_preferences.md sections missing from `profile`. returns True if none """
+    path = profile.job_preferences_path
+    missing = config.missing_preference_sections(profile.read_job_preferences())
     for heading in missing:
         print(f"MISSING: '## {heading}' is missing or empty in {path}")
     if not missing:
@@ -74,10 +74,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     config.add_profile_argument(parser)
     args = parser.parse_args()
-    config.apply_profile_args(args)
+    profile = config.profile_from_args(args)
 
     print("=== Setup ===")
-    profile_ok = check_profile()
+    profile_ok = check_profile(profile)
     keys_ok = check_keys()
     if not (profile_ok and keys_ok):
         sys.exit(1)

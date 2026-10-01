@@ -43,8 +43,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from jobsearch import config
 
-config.use_default_profile()
-DB_PATH = Path(config.profile_dir()) / "evaluations.db"
+DB_PATH = config.Profile("default", config.DEFAULT_PROFILE_DIR).evaluations_db_path
 
 # env keys the pipeline needs to run for real; GROQ_API_KEY is only used by check_setup.py
 REQUIRED_ENV = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ORS_API_KEY")

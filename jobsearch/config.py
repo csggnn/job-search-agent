@@ -6,9 +6,10 @@ cross-cutting constants, and environment access.
 A profile is one candidate's directory: resume.md, job_preferences.md, the generated
 database, rubric and search queries, and the eval set. profiles/default/ holds the
 committed sample candidate. profiles/personal/ holds the user's own candidate and is
-gitignored. A run uses the personal profile unless --default-profile is given. The profile
-is resolved on first path use, never at import time, so importing jobsearch does not depend
-on the importing process's arguments.
+gitignored. A run uses the personal profile unless --default-profile is given. An entry
+point resolves the profile with profile_from_args() and passes its directory to every
+function that reads or writes profile data. No module holds the active profile, and nothing
+is resolved at import time.
 
 API keys are loaded from /config/.env, the container mount of ~/.config/job-search-agent/.
 Environment variables are read lazily (never at import time), so the rest of the package
@@ -17,6 +18,7 @@ Kept free of any candidate-specific content.
 """
 
 import atexit
+import dataclasses
 import hashlib
 import os
 import re
@@ -42,69 +44,95 @@ RESUME_FILE = "resume.md"
 JOB_PREFERENCES_FILE = "job_preferences.md"
 
 
+@dataclasses.dataclass(frozen=True)
+class Profile:
+    """ the profile a run uses: its name ("default" or "personal") and the directory holding
+        its files, which is a temporary copy under --scratch. Every path inside a profile is
+        derived here.
+    """
+    name: str
+    directory: str
+
+    @property
+    def resume_path(self):
+        return os.path.join(self.directory, RESUME_FILE)
+
+    @property
+    def job_preferences_path(self):
+        return os.path.join(self.directory, JOB_PREFERENCES_FILE)
+
+    @property
+    def evaluations_db_path(self):
+        return os.path.join(self.directory, "evaluations.db")
+
+    @property
+    def rubric_path(self):
+        return os.path.join(self.directory, "compatibility_rubric.json")
+
+    @property
+    def search_queries_path(self):
+        return os.path.join(self.directory, "search_queries.json")
+
+    @property
+    def evals_dir(self):
+        """ the eval set: cases.json, ads/ and runs/ """
+        return os.path.join(self.directory, "evals")
+
+    @property
+    def runs_dir(self):
+        """ one snapshot per evals/run_evals.py run """
+        return os.path.join(self.evals_dir, "runs")
+
+    def read_resume(self):
+        """ the resume/CV as markdown text """
+        with open(self.resume_path) as f:
+            return f.read()
+
+    def read_job_preferences(self):
+        """ the job preferences as markdown text """
+        with open(self.job_preferences_path) as f:
+            return f.read()
+
+    def home_address(self):
+        """ home_address() of job_preferences.md, naming the file on error """
+        return home_address(self.read_job_preferences(), self.job_preferences_path)
+
+    def input_hashes(self):
+        """ content hashes of resume.md and job_preferences.md. The rubric and search query
+            caches store them and are stale when they differ.
+        """
+        return {"resume_hash": file_hash(self.resume_path),
+                "preferences_hash": file_hash(self.job_preferences_path)}
+
+    def inputs_changed_since(self, cache):
+        """ True if resume.md/job_preferences.md differ from the content `cache` was built from """
+        return any(cache.get(key) != value for key, value in self.input_hashes().items())
+
+
 class ProfileError(RuntimeError):
     """ the requested profile cannot be used """
 
 
-def resolve_profile(checkout_root, default_profile):
-    """ return (name, directory) of the profile a run in `checkout_root` uses.
+def resolve_profile(default_profile=False, checkout_root=CHECKOUT_ROOT):
+    """ return the Profile a run in `checkout_root` uses: profiles/personal/ unless
+        default_profile is True, which selects profiles/default/.
 
-        default_profile=True selects profiles/default/. Otherwise the result is
-        profiles/personal/, and ProfileError is raised naming each of its resume.md and
+        ProfileError is raised for the personal profile naming each of its resume.md and
         job_preferences.md that is missing, and --default-profile.
     """
     profiles = os.path.join(checkout_root, "profiles")
     if default_profile:
-        return "default", os.path.join(profiles, "default")
-    directory = os.path.join(profiles, "personal")
-    missing = [os.path.join(directory, name) for name in (RESUME_FILE, JOB_PREFERENCES_FILE)
-               if not os.path.isfile(os.path.join(directory, name))]
+        return Profile("default", os.path.join(profiles, "default"))
+    profile = Profile("personal", os.path.join(profiles, "personal"))
+    missing = [path for path in (profile.resume_path, profile.job_preferences_path)
+               if not os.path.isfile(path)]
     if missing:
         raise ProfileError(
             "the personal profile is incomplete, missing: " + ", ".join(missing) + ". "
             "Create the missing file(s), or run with --default-profile to use the sample "
             "candidate in " + os.path.join(profiles, "default")
         )
-    return "personal", directory
-
-
-_profile = None  # (name, directory) once resolved
-
-
-def _active_profile():
-    global _profile
-    if _profile is None:
-        _profile = resolve_profile(CHECKOUT_ROOT, False)
-    return _profile
-
-
-def profile_dir():
-    """ directory of the active profile, or of its scratch copy under --scratch """
-    return _active_profile()[1]
-
-
-def profile_name():
-    """ name of the active profile: "default" or "personal" """
-    return _active_profile()[0]
-
-
-def use_default_profile():
-    """ select the default profile, for Python callers with no command line """
-    global _profile
-    _profile = resolve_profile(CHECKOUT_ROOT, True)
-
-
-def evals_data_dir():
-    """ the active profile's eval set directory: cases.json, ads/ and runs/ """
-    return os.path.join(profile_dir(), "evals")
-
-
-def resume_path():
-    return os.path.join(profile_dir(), RESUME_FILE)
-
-
-def job_preferences_path():
-    return os.path.join(profile_dir(), JOB_PREFERENCES_FILE)
+    return profile
 
 
 def add_profile_argument(parser):
@@ -117,21 +145,20 @@ def add_profile_argument(parser):
                              "command exits; the profile's files are not changed")
 
 
-def apply_profile_args(args):
-    """ resolve the profile selected by parsed --default-profile/--scratch arguments, and
-        print it to stderr. Exits with the ProfileError message if the profile cannot be used.
+def profile_from_args(args, checkout_root=CHECKOUT_ROOT):
+    """ return the Profile selected by parsed --default-profile/--scratch arguments, and
+        print it to stderr. Under --scratch, the directory is a temporary copy removed at
+        interpreter exit. Exits with the ProfileError message if the profile cannot be used.
     """
-    global _profile
     try:
-        name, directory = resolve_profile(CHECKOUT_ROOT, args.default_profile)
+        profile = resolve_profile(args.default_profile, checkout_root)
     except ProfileError as e:
         sys.exit(f"error: {e}")
     if args.scratch:
-        _profile = (name, _scratch_copy(directory))
-        print(f"profile: {name} (scratch copy of {directory})", file=sys.stderr)
-    else:
-        _profile = (name, directory)
-        print(f"profile: {name} ({directory})", file=sys.stderr)
+        print(f"profile: {profile.name} (scratch copy of {profile.directory})", file=sys.stderr)
+        return Profile(profile.name, _scratch_copy(profile.directory))
+    print(f"profile: {profile.name} ({profile.directory})", file=sys.stderr)
+    return profile
 
 
 def _scratch_copy(directory):
@@ -168,16 +195,12 @@ def require_env(name):
                            f"{KEYS_FILE}")
 
 
-def home_address(preferences=None):
-    """ the candidate's home address, from the "## Home Address" section of
-        job_preferences.md, which commute times are measured from. `preferences` is the
-        job_preferences.md text, read from the active profile when None. Raises if the
-        section is absent or still holds the "(fill in ...)" template placeholder.
+def home_address(preferences, source=JOB_PREFERENCES_FILE):
+    """ the candidate's home address, from the "## Home Address" section of the
+        job_preferences.md text `preferences`, which commute times are measured from.
+        Raises naming `source` if the section is absent or still holds the "(fill in ...)"
+        template placeholder.
     """
-    source = "job_preferences.md"
-    if preferences is None:
-        source = job_preferences_path()
-        preferences = read_job_preferences()
     section = extract_section(preferences, "Home Address")
     address = _first_content_line(section) if section else None
     if not address:
@@ -189,18 +212,6 @@ def home_address(preferences=None):
 
 
 # --- personalization files ---
-def read_resume():
-    """ return the candidate's resume/CV as markdown text """
-    with open(resume_path()) as f:
-        return f.read()
-
-
-def read_job_preferences():
-    """ return the candidate's job preferences as markdown text """
-    with open(job_preferences_path()) as f:
-        return f.read()
-
-
 def file_hash(path):
     """ sha256 hex digest of a file's contents, used to detect resume/preferences changes """
     with open(path, "rb") as f:

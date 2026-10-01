@@ -30,7 +30,7 @@ from jobsearch.commute import commute_score
 from jobsearch import config
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.evaluation import compatibility_score
-from jobsearch.rubric import evaluate_rubric, load_rubric, match_text, rubric_is_stale
+from jobsearch.rubric import evaluate_rubric, load_rubric, match_text
 
 
 def draft_criteria(rubric, post, previous=None):
@@ -52,8 +52,8 @@ def draft_criteria(rubric, post, previous=None):
     return criteria, filled
 
 
-def draft_expected(post, rubric, previous=None):
-    """ pre-fill a case's "expected" block from its ad's post.
+def draft_expected(profile, post, rubric, previous=None):
+    """ pre-fill a case's "expected" block from its ad's post, for `profile`.
 
         issues one commute_score() call, supplying days_on_office, address_contains and
         commute_score, and one compatibility_score() call. The criteria labels use regex
@@ -68,7 +68,7 @@ def draft_expected(post, rubric, previous=None):
     expected["criteria"] = criteria
     filled.extend(criteria_filled)
 
-    commute = commute_score(post["company"], post["location"], post["description"])
+    commute = commute_score(profile, post["company"], post["location"], post["description"])
     if "days_on_office" in previous:
         expected["days_on_office"] = previous["days_on_office"]
     else:
@@ -129,13 +129,13 @@ def _note_for(case, filled):
     return (f"Drafted {today}: {len(filled)} pre-filled value(s), not reviewed.{hint}")
 
 
-def _draft_case(evals_dir, case, rubric, force):
+def _draft_case(profile, case, rubric, force):
     """ draft one case in place; returns the list of pre-filled keys """
-    post = dataset.case_post(evals_dir, case)
+    post = dataset.case_post(profile.evals_dir, case)
     # usable_expected() omits values outside EXPECTED_TYPES, so a [lo, hi] range from the
     # previous case format is refilled rather than carried forward
     previous = None if force else dataset.usable_expected(case.get("expected"))
-    expected, filled = draft_expected(post, rubric, previous=previous)
+    expected, filled = draft_expected(profile, post, rubric, previous=previous)
     case["expected"] = expected
     if filled:
         # the case holds pre-filled values, so its reviewed state no longer applies
@@ -153,16 +153,16 @@ def main():
                         help="re-draft from scratch, discarding human labels")
     config.add_profile_argument(parser)
     args = parser.parse_args()
-    config.apply_profile_args(args)
-    evals_dir = config.evals_data_dir()
+    profile = config.profile_from_args(args)
+    evals_dir = profile.evals_dir
 
     if not args.target and not args.all:
         parser.error("give a case NAME, a url, or --all")
 
-    rubric = load_rubric()
+    rubric = load_rubric(profile=profile)
     if rubric is None:
         sys.exit("no compiled rubric - build one with: python scripts/recompile_rubric.py")
-    if rubric_is_stale(rubric):
+    if profile.inputs_changed_since(rubric):
         print("WARNING: the rubric is stale (resume.md/job_preferences.md changed since it was "
               "compiled).\n         Drafting against the old rubric; recompile first with "
               "scripts/recompile_rubric.py\n")
@@ -195,7 +195,7 @@ def main():
     for case in targets:
         print(f"Drafting {case['name']} ...")
         try:
-            filled = _draft_case(evals_dir, case, rubric, args.force)
+            filled = _draft_case(profile, case, rubric, args.force)
         except Exception as e:
             print(f"  FAILED: {type(e).__name__}: {e}")
             continue

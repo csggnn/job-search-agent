@@ -47,10 +47,13 @@ stay accurate, not aspirational.
 **Every dropped ad is reported with the stage that dropped it**, whether listing or
 evaluating.
 
-**Profile paths are resolved on use, never at import.** Every path to profile data comes
-from `config.profile_dir()` or a function built on it. Every entry point calls
-`config.add_profile_argument(parser)` and `config.apply_profile_args(args)` before any
-profile path is used. Code never branches on the profile name.
+**The profile is an argument, never module state.** Every entry point calls
+`config.add_profile_argument(parser)` and `config.profile_from_args(args)`, and passes the
+returned `config.Profile` to the functions it calls. Every public `jobsearch` function that
+reads or writes profile data takes `profile=None` as its last argument; `None` resolves the
+personal profile in that call, as a command run without `--default-profile` does. `evals/dataset.py` takes only
+`profile.evals_dir`. Every path inside a profile is derived in `config.Profile`. No module
+holds the active profile. Code never branches on the profile name.
 
 **`jobsearch/preselection.py` opens no database and reads no files.** Rubric, resume,
 preferences and `known_job_openings` are passed in. This is what keeps stage 1
@@ -74,7 +77,7 @@ description). `evals/draft.py` must match `evals/run_evals.py` here, or drafted 
 disagree with the scored ones.
 
 **Callers that must not trigger a live agentic recompile** use `load_rubric()` plus
-`rubric_is_stale()` directly, not `load_or_compile_rubric()`. `evals/run_evals.py` resolves
+`profile.inputs_changed_since()` directly, not `load_or_compile_rubric()`. `evals/run_evals.py` resolves
 one rubric per run; a mid-run recompile would score different cases against different
 rubrics.
 
@@ -130,7 +133,7 @@ podman-compose exec job-search python3 evals/run_evals.py --compare
 
 Ad-hoc querying of saved evaluations has no dedicated script; use `sqlite3` directly
 against a profile's `evaluations.db`. Marking a job reviewed, applied or discarded is a direct
-call to `storage.update_review(url, ...)`, also with no CLI wrapper yet.
+call to `storage.update_review(profile, url, ...)`, also with no CLI wrapper yet.
 
 ## Profiles and keys
 

@@ -7,7 +7,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 
 | Module | Concern |
 |--------|---------|
-| `jobsearch/config.py` | Profile resolution (`profile_dir`, `--default-profile`, `--scratch`) and the paths built on it, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
+| `jobsearch/config.py` | Profile resolution (`profile_from_args`, `--default-profile`, `--scratch`), the `Profile` class that derives every path inside a profile and reads its files, `file_hash`, `extract_section`, the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
 | `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
@@ -27,7 +27,7 @@ path.
 `jobsearch/evaluation.py:evaluate_job`:
 
 ```
-evaluate_job(url)
+evaluate_job(profile, url)
   │
   ├─ URL already evaluated and rubric unchanged?  ──►  return the saved evaluation
   │
@@ -176,11 +176,11 @@ preferences file.
 ### Pinning a rubric
 
 `load_or_compile_rubric()` is composed from `load_rubric()` (returns the cached rubric or
-`None`, never compiles) and `rubric_is_stale(rubric)`. Callers that must not trigger a live
+`None`, never compiles) and `profile.inputs_changed_since(rubric)`. Callers that must not trigger a live
 agentic recompile use those two directly. `evals/run_evals.py` resolves one rubric per run
 and warns when it is stale, because a mid-run recompile would score different cases against
-different rubrics. `compatibility_score(..., rubric=)` takes that pinned rubric and
-defaults to the cached one when omitted.
+different rubrics. `compatibility_score(..., rubric)` takes the rubric as a required
+argument.
 
 ## Discovery
 
@@ -357,7 +357,7 @@ these use raw SQL and one Python call:
 | List the top-ranked saved jobs | `propose_jobs.py 5 --no-discover` (ranks the saved evaluations on the combined score without searching or evaluating) |
 | Show everything saved for one job | `sqlite3 profiles/personal/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs | `sqlite3 profiles/personal/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
-| Mark a job reviewed, applied or discarded | `storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
+| Mark a job reviewed, applied or discarded | `storage.update_review(profile, url, reviewed=True, application_status="applied", notes="...")` |
 
 ## Files on disk
 
@@ -406,13 +406,27 @@ profiles/
 `--default-profile` it returns `profiles/default/`. Without it, it returns
 `profiles/personal/`, or raises `ProfileError` naming each missing `resume.md` or
 `job_preferences.md` and `--default-profile`. There is no fallback from one profile to the
-other. Every path to profile data is computed from `config.profile_dir()` on use; the
-profile is resolved on first use, never at import. Entry points resolve it in
-`config.apply_profile_args(args)`. Python callers with no command line call
-`config.use_default_profile()` to select the default profile.
+other.
 
-`--scratch` copies the selected profile to a temporary directory, and `profile_dir()`
-returns the copy. The copy is removed at interpreter exit, so every write of the command
+Entry points call `config.profile_from_args(args)`, which returns a `config.Profile`, and
+pass it down. `Profile` holds the name and directory and derives every path inside the
+profile: `resume_path`, `job_preferences_path`, `evaluations_db_path`, `rubric_path`,
+`search_queries_path`, `evals_dir` and `runs_dir`. It also reads the resume, the
+preferences and the home address. Every public function that reads or writes profile data
+takes `profile=None` as its last argument: the `storage` database functions, the `rubric`
+and `discovery` cache functions, `evaluate_job` and `discover_jobs`. `None` resolves the
+personal profile in that call, so Python callers get the same default as the commands, and
+selecting the default profile takes an explicit `config.resolve_profile(default_profile=True)`.
+Commute scoring takes a required `Profile` and reads its home address only when it computes
+a route. `evals/dataset.py` takes `profile.evals_dir` only.
+No module holds the active profile, and nothing is resolved at import.
+
+The rubric and search query caches store `profile.input_hashes()`, the content hashes of
+`resume.md` and `job_preferences.md`. `profile.inputs_changed_since(cache)` compares them with the
+current files.
+
+`--scratch` copies the selected profile to a temporary directory, and `profile_from_args`
+returns the copy's directory. The copy is removed at interpreter exit, so every write of the command
 (database, rubric and query caches, eval runs) is discarded.
 
 `scripts/profile.sh reset-default` deletes the default profile's `evaluations.db`,

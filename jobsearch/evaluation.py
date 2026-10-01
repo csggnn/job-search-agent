@@ -10,7 +10,7 @@ jobsearch.rubric; content acquisition lives in jobsearch.scrape.
 
 import json
 
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.commute import commute_score
 from jobsearch.llm import ask_json
@@ -18,13 +18,10 @@ from jobsearch.rubric import load_or_compile_rubric, evaluate_rubric, match_text
 from jobsearch.scrape import scrape_post
 
 
-def compatibility_score(job_title, company, location, description, rubric=None):
-    """ score 0-100 how well a job posting matches the candidate, using the cached rubric.
+def compatibility_score(job_title, company, location, description, rubric):
+    """ score 0-100 how well a job posting matches the candidate, using `rubric`.
         returns {"compatibility_score": int, "rationale": str, "criteria": [...evaluated rubric criteria]}
-
-        If no rubric is provided, the cached rubric will be checked for staleness and recompiled if needed.
     """
-    rubric = load_or_compile_rubric() if rubric is None else rubric
     evaluated_criteria = evaluate_rubric(rubric, match_text(job_title, location, description))
     scoring_guidance = rubric.get("scoring_guidance")
     guidance_block = f"\nAdditional scoring guidance from the candidate:\n{scoring_guidance}\n" if scoring_guidance else ""
@@ -112,30 +109,33 @@ def _print_evaluation(evaluation, cached):
         print("Notes:", evaluation["notes"])
 
 
-def evaluate_job(url, force=False, post=None):
-    """ scrape a job posting and produce a full evaluation: commute, compatibility, overview.
+def evaluate_job(url, force=False, post=None, profile=None):
+    """ scrape a job posting and produce a full evaluation for `profile`: commute,
+        compatibility, overview.
         returns a saved evaluation instead of re-running the pipeline if one already exists
         for this url and the compatibility rubric hasn't changed since, unless force=True.
 
         post is the posting's already-extracted fields (see scrape.POST_FIELDS); other keys
         are ignored. When given, the url is not scraped and serves as the storage key.
     """
-    rubric = load_or_compile_rubric()
+    profile = profile or config.resolve_profile()
+    rubric = load_or_compile_rubric(profile=profile)
     rubric_hash = storage.rubric_content_hash(rubric)
 
     if not force:
-        existing = storage.get_evaluation(url)
+        existing = storage.get_evaluation(url, profile=profile)
         if existing is not None and existing["rubric_hash"] == rubric_hash:
             _print_evaluation(existing, cached=True)
             return existing
 
     job = post if post is not None else scrape_post(url)
-    commute = commute_score(job["company"], job["location"], job["description"])
+    commute = commute_score(profile, job["company"], job["location"], job["description"])
     compatibility = compatibility_score(job["job_title"], job["company"], job["location"],
                                         job["description"], rubric=rubric)
     overview = summarize_evaluation(job, commute, compatibility)
 
-    storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview)
-    result = storage.get_evaluation(url)
+    storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview,
+                            profile=profile)
+    result = storage.get_evaluation(url, profile=profile)
     _print_evaluation(result, cached=False)
     return result

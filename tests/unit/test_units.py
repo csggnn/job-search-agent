@@ -8,7 +8,6 @@ query validation, JSON-reply parsing):
     podman-compose exec job-search python3 -m unittest discover -s tests/unit -v
 """
 
-import os
 import re
 import unittest
 from unittest import mock
@@ -247,13 +246,11 @@ class DefaultDataTest(unittest.TestCase):
     PLACEHOLDER = re.compile(r"\(fill in|\[[^\]\n]+\](?!\()")
 
     def setUp(self):
-        self.resume_path = os.path.join(config.DEFAULT_PROFILE_DIR, config.RESUME_FILE)
-        self.preferences_path = os.path.join(config.DEFAULT_PROFILE_DIR,
-                                             config.JOB_PREFERENCES_FILE)
-        with open(self.resume_path) as f:
-            self.resume = f.read()
-        with open(self.preferences_path) as f:
-            self.preferences = f.read()
+        sample = config.Profile("default", config.DEFAULT_PROFILE_DIR)
+        self.resume_path = sample.resume_path
+        self.preferences_path = sample.job_preferences_path
+        self.resume = sample.read_resume()
+        self.preferences = sample.read_job_preferences()
 
     def test_home_address_resolves(self):
         try:
@@ -315,14 +312,15 @@ class EvaluateJobAdTest(unittest.TestCase):
 
     @mock.patch("jobsearch.discovery.evaluate_job", return_value={"url": "saved"})
     def test_complete_job_ad_is_evaluated_as_its_own_post(self, evaluate_job):
-        self.assertEqual(_evaluate_job_ad(self.JOB_AD), {"url": "saved"})
-        evaluate_job.assert_called_once_with(self.JOB_AD["url"], post=self.JOB_AD)
+        self.assertEqual(_evaluate_job_ad("profile", self.JOB_AD), {"url": "saved"})
+        evaluate_job.assert_called_once_with(self.JOB_AD["url"], post=self.JOB_AD,
+                                             profile="profile")
 
     @mock.patch("jobsearch.discovery.evaluate_job")
     def test_job_ad_without_description_is_skipped_unevaluated(self, evaluate_job):
         # a LinkedIn ad whose description fetch failed
         with mock.patch("builtins.print"):
-            self.assertIsNone(_evaluate_job_ad({**self.JOB_AD, "description": None}))
+            self.assertIsNone(_evaluate_job_ad("profile", {**self.JOB_AD, "description": None}))
         evaluate_job.assert_not_called()
 
 

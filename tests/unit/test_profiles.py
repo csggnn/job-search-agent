@@ -1,11 +1,12 @@
 """
 Offline tests for profile selection, --scratch copies, the .env.example template and the
 job_preferences.md section check. Each test builds a checkout-like tree in a temporary
-directory and points jobsearch.config at it.
+directory and passes its path to jobsearch.config.
 
     podman-compose exec job-search python3 -m unittest discover -s tests/unit -v
 """
 
+import argparse
 import hashlib
 import os
 import re
@@ -15,7 +16,9 @@ import sys
 import tempfile
 import unittest
 
-from jobsearch import config, storage
+from unittest import mock
+
+from jobsearch import commute, config, storage
 
 REPO_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -40,24 +43,23 @@ def _databases(root):
             if f == "evaluations.db"]
 
 
+def _args(default=False, scratch=False):
+    """ parsed --default-profile/--scratch arguments """
+    return argparse.Namespace(default_profile=default, scratch=scratch)
+
+
 class _CheckoutTestCase(unittest.TestCase):
-    """ a temporary checkout holding the default profile's inputs and no personal profile.
-        config's checkout root and active profile are restored after each test.
-    """
+    """ a temporary checkout holding the default profile's inputs and no personal profile """
 
     def setUp(self):
-        self._saved = (config.CHECKOUT_ROOT, config._profile)
         self._tmp = tempfile.TemporaryDirectory()
         self.root = self._tmp.name
         self.default_dir = os.path.join(self.root, "profiles", "default")
         self.personal_dir = os.path.join(self.root, "profiles", "personal")
         _write(os.path.join(self.default_dir, "resume.md"), "# Sample\n")
         _write(os.path.join(self.default_dir, "job_preferences.md"), PREFERENCES)
-        config.CHECKOUT_ROOT = self.root
-        config._profile = None
 
     def tearDown(self):
-        config.CHECKOUT_ROOT, config._profile = self._saved
         self._tmp.cleanup()
 
     def add_personal(self, resume=True, preferences=True):
@@ -70,11 +72,12 @@ class _CheckoutTestCase(unittest.TestCase):
 class ProfileSelectionTest(_CheckoutTestCase):
 
     def test_fresh_clone_runs_the_default_profile(self):
-        self.assertEqual(config.resolve_profile(self.root, True), ("default", self.default_dir))
+        self.assertEqual(config.resolve_profile(True, self.root),
+                         config.Profile("default", self.default_dir))
 
     def test_fresh_clone_without_the_flag(self):
         with self.assertRaises(config.ProfileError) as ctx:
-            config.resolve_profile(self.root, False)
+            config.resolve_profile(False, self.root)
         message = str(ctx.exception)
         self.assertIn(os.path.join(self.personal_dir, "resume.md"), message)
         self.assertIn(os.path.join(self.personal_dir, "job_preferences.md"), message)
@@ -82,37 +85,58 @@ class ProfileSelectionTest(_CheckoutTestCase):
 
     def test_personal_files_select_the_personal_profile(self):
         self.add_personal()
-        self.assertEqual(config.resolve_profile(self.root, False),
-                         ("personal", self.personal_dir))
+        self.assertEqual(config.resolve_profile(False, self.root),
+                         config.Profile("personal", self.personal_dir))
 
     def test_one_personal_file_is_missing(self):
         self.add_personal(preferences=False)
         with self.assertRaises(config.ProfileError) as ctx:
-            config.resolve_profile(self.root, False)
+            config.resolve_profile(False, self.root)
         message = str(ctx.exception)
         self.assertIn(os.path.join(self.personal_dir, "job_preferences.md"), message)
         self.assertNotIn(os.path.join(self.personal_dir, "resume.md"), message)
         self.assertIn("--default-profile", message)
 
+    def test_python_callers_get_the_personal_profile_by_default(self):
+        self.add_personal()
+        self.assertEqual(config.resolve_profile(checkout_root=self.root),
+                         config.Profile("personal", self.personal_dir))
+
     def test_requesting_the_default_profile(self):
         self.add_personal()
-        self.assertEqual(config.resolve_profile(self.root, True), ("default", self.default_dir))
+        self.assertEqual(config.resolve_profile(True, self.root),
+                         config.Profile("default", self.default_dir))
 
-    def test_paths_resolve_under_the_active_profile(self):
-        config.use_default_profile()
-        self.assertEqual(config.profile_name(), "default")
-        self.assertEqual(config.resume_path(), os.path.join(self.default_dir, "resume.md"))
-        self.assertEqual(config.evals_data_dir(), os.path.join(self.default_dir, "evals"))
-        self.assertEqual(storage.db_path(), os.path.join(self.default_dir, "evaluations.db"))
+    def test_profile_from_args_selects_the_requested_profile(self):
+        self.add_personal()
+        with mock.patch("sys.stderr"):
+            self.assertEqual(config.profile_from_args(_args(default=True), self.root),
+                             config.Profile("default", self.default_dir))
+            self.assertEqual(config.profile_from_args(_args(), self.root),
+                             config.Profile("personal", self.personal_dir))
+
+    def test_paths_are_built_from_the_profile_directory(self):
+        profile = config.Profile("default", self.default_dir)
+        self.assertEqual(profile.resume_path, os.path.join(self.default_dir, "resume.md"))
+        self.assertEqual(profile.evaluations_db_path,
+                         os.path.join(self.default_dir, "evaluations.db"))
+        self.assertEqual(profile.runs_dir, os.path.join(self.default_dir, "evals", "runs"))
+
+    def test_inputs_changed_since_a_cache(self):
+        profile = config.Profile("default", self.default_dir)
+        cache = {**profile.input_hashes(), "queries": []}
+        self.assertFalse(profile.inputs_changed_since(cache))
+        _write(profile.job_preferences_path, PREFERENCES + "\n## Other\nedited\n")
+        self.assertTrue(profile.inputs_changed_since(cache))
 
     def test_incomplete_personal_profile_writes_no_database(self):
         for resume in (False, True):
             with self.subTest(personal_resume=resume):
                 if resume:
                     self.add_personal(preferences=False)
-                config._profile = None
-                with self.assertRaises(config.ProfileError):
-                    storage._get_connection()
+                with self.assertRaises(SystemExit) as ctx:
+                    config.profile_from_args(_args(), self.root)
+                self.assertIn("--default-profile", str(ctx.exception))
                 self.assertEqual(_databases(self.root), [])
 
 
@@ -124,11 +148,10 @@ class ScratchTest(_CheckoutTestCase):
     SCRIPT = (
         "import argparse, sys\n"
         "from jobsearch import config, storage\n"
-        "config.CHECKOUT_ROOT = sys.argv[1]\n"
-        "config.apply_profile_args(argparse.Namespace(default_profile=sys.argv[2] == 'default',"
-        " scratch=True))\n"
-        "conn = storage._get_connection()\n"
-        "print(config.profile_dir())\n"
+        "profile = config.profile_from_args(argparse.Namespace("
+        "default_profile=sys.argv[2] == 'default', scratch=True), sys.argv[1])\n"
+        "conn = storage._get_connection(profile)\n"
+        "print(profile.directory)\n"
         "print(conn.execute('SELECT COUNT(*) FROM evaluations').fetchone()[0])\n"
         "conn.execute(\"INSERT INTO evaluations (url, normalized_url, is_remote,"
         " compatibility_score, rubric_hash, evaluated_at) VALUES ('u', 'u', 0, 50, 'h', 't')\")\n"
@@ -143,8 +166,7 @@ class ScratchTest(_CheckoutTestCase):
 
     def _seed_database(self, profile_dir):
         storage_path = os.path.join(profile_dir, "evaluations.db")
-        config._profile = ("seed", profile_dir)
-        storage._get_connection().close()
+        storage._get_connection(config.Profile("seed", profile_dir)).close()
         conn = sqlite3.connect(storage_path)
         conn.execute("INSERT INTO evaluations (url, normalized_url, is_remote, "
                      "compatibility_score, rubric_hash, evaluated_at) "
@@ -182,6 +204,34 @@ class ScratchTest(_CheckoutTestCase):
         _, second = self._scratch_run("personal")
         self.assertEqual((first, second), (0, 0))
         self.assertEqual(_databases(self.root), [])
+
+
+class CommuteHomeAddressTest(unittest.TestCase):
+    """ commute scoring reads the home address only when it computes a route """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.profile = config.Profile("personal", self._tmp.name)
+        _write(self.profile.job_preferences_path, "## Location\n- Metropolis\n")
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _score(self, days, address):
+        with mock.patch.object(commute, "figure_days_on_office", return_value=days), \
+             mock.patch.object(commute, "figure_address", return_value=address):
+            return commute.commute_score(self.profile, "Acme", "Metropolis", "text")
+
+    def test_remote_job_without_a_home_address(self):
+        self.assertEqual(self._score(0, None)["score"], 0)
+
+    def test_unresolved_office_without_a_home_address(self):
+        self.assertIsNone(self._score(3, None)["score"])
+
+    def test_routed_job_without_a_home_address(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            self._score(3, "1 Main St, Metropolis")
+        self.assertIn(self.profile.job_preferences_path, str(ctx.exception))
 
 
 class EnvExampleTest(unittest.TestCase):

@@ -26,9 +26,10 @@ def main():
     add_discovery_arguments(parser)
     config.add_profile_argument(parser)
     args = parser.parse_args()
-    config.apply_profile_args(args)
-    discover_jobs(evaluate=args.evaluate, limit=args.limit, max_results_per_query=args.max_results,
-                  force_queries=args.force, preselect_job_ads=not args.no_preselect, debug=args.debug)
+    profile = config.profile_from_args(args)
+    discover_jobs(evaluate=args.evaluate, limit=args.limit,
+                  max_results_per_query=args.max_results, force_queries=args.force,
+                  preselect_job_ads=not args.no_preselect, debug=args.debug, profile=profile)
 
 
 if __name__ == "__main__":

@@ -173,8 +173,8 @@ def main():
                         help="rebuild post(s) from saved raw text; no NAME means all")
     config.add_profile_argument(parser)
     args = parser.parse_args()
-    config.apply_profile_args(args)
-    evals_dir = config.evals_data_dir()
+    profile = config.profile_from_args(args)
+    evals_dir = profile.evals_dir
 
     cases = dataset.load_cases(evals_dir)
 

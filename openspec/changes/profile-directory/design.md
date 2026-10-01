@@ -76,9 +76,7 @@ directory and never branches on the profile name after resolution.
 **A run uses the personal profile unless `--default-profile` is given.**
 A run with `--default-profile` uses `profiles/default/`. Without it, a run uses
 `profiles/personal/` and fails when `resume.md` or `job_preferences.md` is missing there,
-naming the missing file and `--default-profile`. Every entry point accepts the flag. Python
-callers with no command line use the personal profile unless they select the default
-profile first.
+naming the missing file and `--default-profile`. Every entry point accepts the flag.
 
 Alternative considered: a configuration file that selects the profile. Rejected: the
 profile would depend on a file outside the command and outside the checkout.
@@ -90,9 +88,23 @@ Alternative considered: per-file fallback from `profiles/personal/` to `profiles
 Rejected: a personal resume combined with sample preferences is a candidate nobody intends,
 and its evaluations would land in the personal database.
 
+**The profile directory is passed as an argument.**
+The entry point resolves the profile once with `config.profile_from_args(args)`, which
+returns a `Profile`: the profile's name and directory, and every path inside it, derived
+from the directory. Every public function that reads or writes profile data takes
+`profile=None` as its last argument. `None` resolves the personal profile in that call, so a
+Python caller gets the same default as a command, and the default profile is selected
+explicitly in both. No module holds the active profile.
+
+Alternative considered: a module-level active profile in `config.py`, set by the entry
+point and read through `config.profile_dir()`. Rejected: every function that reads profile
+data gains an input its signature does not show, correctness depends on the entry point
+selecting the profile before any path is read, and tests must save and restore the module
+state.
+
 **`--scratch` runs on a temporary copy of the profile.**
-With `--scratch`, a run copies the selected profile directory to a temporary directory and
-uses the copy. The copy is deleted when the command exits. All writes (database, rubric and
+With `--scratch`, `config.profile_from_args(args)` copies the selected profile directory to
+a temporary directory and returns the copy's directory. The copy is deleted when the command exits. All writes (database, rubric and
 query caches, eval runs) land in the copy. It combines with `--default-profile`. A scratch
 copy lasts one command: a second command does not see the first one's writes.
 

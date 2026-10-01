@@ -18,10 +18,7 @@ from jobspy import scrape_jobs
 from jobspy.model import Country
 
 from jobsearch import config, storage
-from jobsearch.config import (
-    read_resume, read_job_preferences, file_hash, extract_section,
-    resume_path, job_preferences_path, profile_dir,
-)
+from jobsearch.config import extract_section
 from jobsearch.llm import ask_json
 from jobsearch.evaluation import evaluate_job
 from jobsearch.preselection import preselect, format_preselection, DEFAULT_N
@@ -33,11 +30,6 @@ DEFAULT_MAX_RESULTS = 10
 DEFAULT_SITES = ["indeed", "linkedin"]
 _COUNTRY_CODE_RE = re.compile(r"^[a-z]{2}$")
 _COUNTRY_NAMES = {c.value[1]: c.value[0] for c in Country}  # alpha-2 -> JobSpy country name
-
-
-def queries_path():
-    """ the active profile's search_queries.json """
-    return os.path.join(profile_dir(), "search_queries.json")
 
 
 def _resolve_target_locations(resume, preferences):
@@ -64,7 +56,7 @@ def _resolve_target_locations(resume, preferences):
     if match and not match.group(1).strip().startswith("["):
         return [match.group(1).strip()]
 
-    return [config.home_address()]
+    return [config.home_address(preferences)]
 
 
 def draft_queries(resume, preferences, target_locations):
@@ -118,10 +110,11 @@ def _validate_queries(queries, target_locations):
     return valid
 
 
-def compile_queries():
-    """ (re)build the search query set from resume.md + job_preferences.md """
-    resume = read_resume()
-    preferences = read_job_preferences()
+def compile_queries(profile=None):
+    """ (re)build the search query set of `profile` from its resume.md + job_preferences.md """
+    profile = profile or config.resolve_profile()
+    resume = profile.read_resume()
+    preferences = profile.read_job_preferences()
     target_locations = _resolve_target_locations(resume, preferences)
 
     draft = draft_queries(resume, preferences, target_locations)
@@ -136,29 +129,26 @@ def compile_queries():
         primary_country = primary_country.lower()
 
     cache = {
-        "resume_hash": file_hash(resume_path()),
-        "preferences_hash": file_hash(job_preferences_path()),
+        **profile.input_hashes(),
         "primary_country": primary_country,
         "queries": queries,
     }
-    with open(queries_path(), "w") as f:
+    with open(profile.search_queries_path, "w") as f:
         json.dump(cache, f, indent=2)
     return cache
 
 
-def load_or_compile_queries():
+def load_or_compile_queries(profile=None):
     """ return the cached query set if resume.md/job_preferences.md haven't changed, else
         recompile
     """
-    if os.path.exists(queries_path()):
-        with open(queries_path()) as f:
+    profile = profile or config.resolve_profile()
+    if os.path.exists(profile.search_queries_path):
+        with open(profile.search_queries_path) as f:
             cached = json.load(f)
-        if (
-            cached.get("resume_hash") == file_hash(resume_path())
-            and cached.get("preferences_hash") == file_hash(job_preferences_path())
-        ):
+        if not profile.inputs_changed_since(cached):
             return cached
-    return compile_queries()
+    return compile_queries(profile=profile)
 
 
 def _clean(value):
@@ -269,9 +259,10 @@ def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=Fal
     return list(aggregated.values())
 
 
-def filter_new_job_ads(job_ads):
-    """ drop job ads already present in storage.py's evaluations DB (by normalized url) """
-    known = {normalized for _, normalized in storage.list_evaluated_urls()}
+def filter_new_job_ads(job_ads, profile=None):
+    """ drop job ads already present in the evaluations DB of `profile` (by normalized url) """
+    profile = profile or config.resolve_profile()
+    known = {normalized for _, normalized in storage.list_evaluated_urls(profile=profile)}
     return [c for c in job_ads if storage.normalize_url(c["url"]) not in known]
 
 
@@ -285,7 +276,7 @@ def _print_job_ads(job_ads):
         print(f"  matched: {', '.join(c['matched_queries'])}")
 
 
-def _evaluate_job_ad(job_ad):
+def _evaluate_job_ad(profile, job_ad):
     """ evaluate one pre-selected job ad on its JobSpy fields, returning the evaluation, or
         None when a scrape.POST_FIELDS value is blank. The job ad is passed as the post, so
         no page is fetched.
@@ -296,7 +287,7 @@ def _evaluate_job_ad(job_ad):
         print(f"  skipping {job_ad['url']}: JobSpy returned no usable title, company, "
               "location or description")
         return None
-    return evaluate_job(job_ad["url"], post=job_ad)
+    return evaluate_job(job_ad["url"], post=job_ad, profile=profile)
 
 
 def add_discovery_arguments(parser):
@@ -311,26 +302,29 @@ def add_discovery_arguments(parser):
     parser.add_argument("--debug", action="store_true", help="print intermediate search details")
 
 
-def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_RESULTS,
-                   force_queries=False, preselect_job_ads=True, debug=False):
-    """ full discovery pipeline: compile/reuse search queries, search the job boards, dedupe
-        within-run and against storage, pre-select the job ads worth evaluating, then either
-        list them or run evaluate_job() on them.
+def discover_jobs(evaluate=False, limit=None,
+                  max_results_per_query=DEFAULT_MAX_RESULTS, force_queries=False,
+                  preselect_job_ads=True, debug=False, profile=None):
+    """ full discovery pipeline for `profile`: compile/reuse search queries, search the job
+        boards, dedupe within-run and against storage, pre-select the job ads worth
+        evaluating, then either list them or run evaluate_job() on them.
 
         limit is pre-selection's N - the number of job ads handed to evaluation - not a
         truncation of the tail. preselect_job_ads=False restores the pre-selection-free
         behaviour (evaluate the first `limit` job ads in discovery order), so the two are
         comparable on one job ad set.
     """
-    cache = compile_queries() if force_queries else load_or_compile_queries()
+    profile = profile or config.resolve_profile()
+    cache = (compile_queries(profile=profile) if force_queries
+             else load_or_compile_queries(profile=profile))
 
     # resolved before discovery so a recompile cannot land partway through a run:
     # evaluate_job() loads the rubric per job, and prescoring against one rubric while
     # scoring against another makes the two stages disagree
-    rubric = load_or_compile_rubric() if preselect_job_ads else None
+    rubric = load_or_compile_rubric(profile=profile) if preselect_job_ads else None
 
     job_ads = discover_job_ads(cache, max_results_per_query, debug)
-    new_job_ads = filter_new_job_ads(job_ads)
+    new_job_ads = filter_new_job_ads(job_ads, profile=profile)
 
     if not new_job_ads:
         print("No new job ads found.")
@@ -341,9 +335,9 @@ def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_
             new_job_ads,
             n=limit or DEFAULT_N,
             rubric=rubric,
-            resume=read_resume(),
-            preferences=read_job_preferences(),
-            known_job_openings=storage.list_evaluated_job_openings(),
+            resume=profile.read_resume(),
+            preferences=profile.read_job_preferences(),
+            known_job_openings=storage.list_evaluated_job_openings(profile=profile),
         )
         print(format_preselection(result))
         to_run = result["selected"]
@@ -358,7 +352,7 @@ def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_
     results = []
     for job_ad in to_run:
         try:
-            evaluation = _evaluate_job_ad(job_ad)
+            evaluation = _evaluate_job_ad(profile, job_ad)
         except Exception as e:
             print(f"  skipping {job_ad['url']}: {e}")
             continue
