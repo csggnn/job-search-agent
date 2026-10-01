@@ -3,7 +3,7 @@ services:
     build: .
     volumes:
       - .:/workspace
-    env_file:
-      - .env
+      # API keys: config.py loads /config/.env. Read-only, so the pipeline cannot change them.
+      - ${HOME}/.config/job-search-agent:/config:ro
     environment:
       - PYTHONUNBUFFERED=1

@@ -39,7 +39,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # tests/e2e/<file> -> repo root
 DB_PATH = REPO_ROOT / "data" / "evaluations.db"
-ENV_PATH = REPO_ROOT / ".env"
+ENV_PATH = Path("/config/.env")  # ~/.config/job-search-agent/.env, mounted
 
 # env keys the pipeline needs to run for real; GROQ_API_KEY is only used by check_setup.py
 REQUIRED_ENV = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ORS_API_KEY")
