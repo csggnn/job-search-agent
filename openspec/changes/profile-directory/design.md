@@ -154,7 +154,7 @@ that identifies a backup folder. Rejected: the script and its tests add maintena
 behavior that two shell commands provide. `cp -r` into an existing folder nests the copy
 and does not overwrite it.
 
-**`scripts/profile.sh reset-default` clears the default profile's generated state.**
+**`scripts/reset_default_profile.sh` clears the default profile's generated state.**
 It removes the default profile's database, rubric and search queries, and keeps its inputs
 and eval set. It runs on the host or in the container. The e2e test and the README use the
 same command, so both clear the same files.
@@ -239,5 +239,5 @@ from `profiles/personal/` back to `data/`, move `cases.json`, `ads/` and `runs/`
 
 ## Open Questions
 
-- Should `.git/info/exclude` entries be written by `scripts/profile.sh` instead of by hand?
+- Should `.git/info/exclude` entries be written by a script instead of by hand?
   This changes only the migration and README steps.

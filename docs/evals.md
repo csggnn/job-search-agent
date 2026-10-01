@@ -10,12 +10,12 @@ without credentials.
 
 - **`tests/unit/`** offline unit tests for the deterministic helpers (URL normalization,
   rubric hashing and application, section extraction, query validation, JSON parsing) and
-  for pre-selection, whose one LLM call is patched out, and for profile selection, `--scratch` and
-  `scripts/profile.sh` against temporary directories. No LLM, network or API keys
-  required.
+  for pre-selection, whose one LLM call is patched out, and for profile selection,
+  `--scratch` and `scripts/reset_default_profile.sh` against temporary directories. No LLM,
+  network or API keys required.
 - **`tests/e2e/`** a live end-to-end smoke test that drives the pipeline through the CLI
   entrypoint with `--default-profile` and inspects the saved SQLite row. Requires API keys.
-  Its setup runs `scripts/profile.sh reset-default`, which deletes the checkout's
+  Its setup runs `scripts/reset_default_profile.sh`, which deletes the checkout's
   default-profile database, rubric and search queries. Set `TARGET_URL` near the top of
   `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
 

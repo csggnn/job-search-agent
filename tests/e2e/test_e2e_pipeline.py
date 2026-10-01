@@ -11,7 +11,7 @@ The test drives the pipeline through two seams:
 From the project it imports only jobsearch.config, to locate the default profile and to
 load the API keys from ~/.config/job-search-agent/.env.
 
-Setup runs `scripts/profile.sh reset-default`, which deletes the checkout's default-profile
+Setup runs `scripts/reset_default_profile.sh`, which deletes the checkout's default-profile
 database, compiled rubric and search queries. The run regenerates them from the committed
 sample resume and job preferences.
 
@@ -86,7 +86,7 @@ class PipelineEndToEndTest(unittest.TestCase):
                 "the top of this file"
             )
         cls.url = TARGET_URL
-        subprocess.run(["bash", str(REPO_ROOT / "scripts" / "profile.sh"), "reset-default"],
+        subprocess.run(["bash", str(REPO_ROOT / "scripts" / "reset_default_profile.sh")],
                        check=True, capture_output=True)
 
     def _run_evaluate(self, args):

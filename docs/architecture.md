@@ -369,7 +369,7 @@ jobsearch/              the package: scrape, commute, rubric, evaluation, discov
                         pre-selection, ranking, storage, LLM wrapper, config
 evals/                  the eval harness code
 tests/                  unit/ (offline) and e2e/ (live, needs keys)
-scripts/                check_setup.py, recompile_rubric.py, profile.sh
+scripts/                check_setup.py, recompile_rubric.py, reset_default_profile.sh
 profiles/default/       the sample candidate, its generated caches and eval set
 profiles/personal/      the user's candidate, its generated caches and eval set
 docs/                   architecture, evals, roadmap
@@ -429,7 +429,7 @@ current files.
 returns a `Profile` on the copy. The copy is removed at interpreter exit, so every write of the command
 (database, rubric and query caches, eval runs) is discarded.
 
-`scripts/profile.sh reset-default` deletes the default profile's `evaluations.db`,
+`scripts/reset_default_profile.sh` deletes the default profile's `evaluations.db`,
 `compatibility_rubric.json` and `search_queries.json`. It keeps the inputs and `evals/`, and
 does not touch the personal profile.
 

@@ -51,9 +51,10 @@ evaluating.
 `config.add_profile_argument(parser)` and `config.profile_from_args(args)`, and passes the
 returned `config.Profile` to the functions it calls. Every public `jobsearch` function that
 reads or writes profile data takes `profile=None` as its last argument; `None` resolves the
-personal profile in that call, as a command run without `--default-profile` does. `evals/dataset.py` takes only
-`profile.evals_dir`. Every path inside a profile is derived in `config.Profile`. No module
-holds the active profile. Code never branches on the profile name.
+personal profile in that call, as a command run without `--default-profile` does.
+`evals/dataset.py` takes only `profile.evals_dir`. Every path inside a profile is derived in
+`config.Profile`. No module holds the active profile. Code never branches on the profile
+name.
 
 **`jobsearch/preselection.py` opens no database and reads no files.** Rubric, resume,
 preferences and `known_job_openings` are passed in. This is what keeps stage 1
@@ -77,9 +78,9 @@ description). `evals/draft.py` must match `evals/run_evals.py` here, or drafted 
 disagree with the scored ones.
 
 **Callers that must not trigger a live agentic recompile** use `load_rubric()` plus
-`profile.inputs_changed_since()` directly, not `load_or_compile_rubric()`. `evals/run_evals.py` resolves
-one rubric per run; a mid-run recompile would score different cases against different
-rubrics.
+`profile.inputs_changed_since()` directly, not `load_or_compile_rubric()`.
+`evals/run_evals.py` resolves one rubric per run; a mid-run recompile would score different
+cases against different rubrics.
 
 **Schema upgrades go through `_MIGRATIONS`** (`PRAGMA table_info` plus conditional
 `ALTER TABLE ADD COLUMN`). Never destructive; existing rows survive. User-tracked fields
@@ -104,7 +105,7 @@ podman-compose exec job-search python3 evaluate_job_post.py <job-url>
 podman-compose exec job-search python3 evaluate_job_post.py <job-url> --force
 podman-compose exec job-search python3 discover_jobs.py [--evaluate] [--limit N] [--no-preselect]
 podman-compose exec job-search python3 scripts/check_setup.py
-scripts/profile.sh reset-default   # host or container
+scripts/reset_default_profile.sh   # host or container
 ```
 
 Every entry point runs on `profiles/personal/` unless given `--default-profile`, which

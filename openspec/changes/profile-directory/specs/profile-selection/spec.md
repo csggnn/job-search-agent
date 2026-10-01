@@ -88,20 +88,20 @@ leave the profile's files unchanged. The copy SHALL be removed when the command 
 - **THEN** the second evaluation is computed, not returned from the cache
 
 ### Requirement: The default profile's generated state can be reset
-`scripts/profile.sh reset-default` SHALL remove the default profile's evaluations database,
+`scripts/reset_default_profile.sh` SHALL remove the default profile's evaluations database,
 compiled rubric and search queries. It SHALL keep the default resume, job preferences and
 eval set, and SHALL leave the personal profile unchanged.
 
 #### Scenario: Reset the default profile
 - **WHEN** the default profile has a database, rubric and search queries and the user runs
-  `scripts/profile.sh reset-default`
+  `scripts/reset_default_profile.sh`
 - **THEN** none of the three files exists
 - **AND** the default resume, job preferences and eval set are unchanged
 - **AND** the personal profile is unchanged
 
 #### Scenario: Run after a reset
 - **WHEN** the user evaluates a URL with `--default-profile`, runs
-  `scripts/profile.sh reset-default`, and evaluates the URL again with `--default-profile`
+  `scripts/reset_default_profile.sh`, and evaluates the URL again with `--default-profile`
 - **THEN** the second evaluation is computed, not returned from the cache
 
 ### Requirement: A worktree uses its own copy of personal data
@@ -121,13 +121,13 @@ NOT change the main checkout's data.
 - **AND** the main checkout's personal database is unchanged
 
 ### Requirement: The README documents runs that leave real data unchanged
-The README developer section SHALL describe `--scratch`, `scripts/profile.sh reset-default`
+The README developer section SHALL describe `--scratch`, `scripts/reset_default_profile.sh`
 and running on a copy of the personal profile in a worktree. It SHALL state that a scratch
 copy lasts one command, and that changes to a worktree's data stay in its copy.
 
 #### Scenario: Developer looks for a safe test setup
 - **WHEN** a developer reads the README developer section
-- **THEN** it describes `--scratch` and `scripts/profile.sh reset-default`
+- **THEN** it describes `--scratch` and `scripts/reset_default_profile.sh`
 - **AND** it gives the command that copies the personal profile into a worktree
 - **AND** it states that changes to the worktree's data do not reach the main checkout
 

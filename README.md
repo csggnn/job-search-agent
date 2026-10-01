@@ -192,7 +192,7 @@ personal profile writes to that profile. Three setups leave it unchanged:
   ```
   podman-compose exec job-search python3 evaluate_job_post.py <url> --scratch
   ```
-- `scripts/profile.sh reset-default` deletes the default profile's `evaluations.db`,
+- `scripts/reset_default_profile.sh` deletes the default profile's `evaluations.db`,
   `compatibility_rubric.json` and `search_queries.json`, and keeps its resume, preferences
   and eval set. It runs on the host or in the container. The e2e tests run it in setup.
 - A new git worktree has no personal profile. From a worktree under `.trees/`, copy the
