@@ -62,7 +62,7 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
   - Scenario "After setup and a personal run": record `git status --short` and `git add -A --dry-run`.
   - Scenario "Cleaning a checkout keeps the keys": record the checksum of `~/.config/job-search-agent/.env`, run `git clean -x -f -d` in the clone, and record that the checksum is unchanged.
   - Scenarios "Switching branches after a personal run" and "Merging after a personal run": create a branch with one commit, switch to it, switch back, merge it, and record that no step conflicts and `~/.config/job-search-agent/.env` and the personal files are unchanged (checksums).
-- [ ] 8.3 Evals: in the main checkout after migration, run `evals/run_evals.py --criteria-only` on the personal profile and record that it scores the personal cases. Run it with `--default-profile` and record the "no cases to run" exit.
+- [x] 8.3 Evals: in the main checkout after migration, run `evals/run_evals.py --criteria-only` on the personal profile and record that it scores the personal cases. Run it with `--default-profile` and record the "no cases to run" exit.
 - [x] 8.4 Run the live e2e suite with keys available. Verify it passes.
   - Scenario "Run after a reset": evaluate one URL with `--default-profile`, run `scripts/profile.sh reset-default`, evaluate it again with `--default-profile`, and record that the second output has no `(cached from ...)` suffix.
 - [x] 8.5 Run an automated review of the diff (`/code-review`) and resolve or record each finding.
@@ -73,5 +73,5 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 
 ## 10. Migration (after merge, main checkout)
 
-- [ ] 10.1 Run the design's Migration Plan in the main checkout. Verify `propose_jobs.py` uses the personal profile and its shortlist matches one taken before migration.
+- [x] 10.1 Run the design's Migration Plan in the main checkout. Verify `propose_jobs.py` uses the personal profile and its shortlist matches one taken before migration.
 - [ ] 10.2 In each existing worktree: clear the skip-worktree bits, run `git checkout -- .env data/resume.md data/job_preferences.md` (the worktree's copies duplicate the main checkout's data), merge `master`, run `rm -rf data`, then `cp -r ../../profiles/personal profiles/` if the worktree runs on personal data. Rebase open branches onto `master`.

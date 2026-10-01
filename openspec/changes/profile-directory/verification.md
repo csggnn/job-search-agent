@@ -131,7 +131,18 @@ Unit suite: `Ran 190 tests ... OK`.
 
 `evals/run_evals.py --criteria-only --default-profile`, exit 1:
 `no cases to run in the default profile (/workspace/profiles/default/evals) - add one with: python evals/capture.py <url>`.
-The personal-profile part runs after the migration (10.1).
+
+## 8.3 (personal profile part)
+
+Main checkout after migration, `evals/run_evals.py --criteria-only`: `profile: personal
+(/workspace/profiles/personal)`, `Scored 7/7 case(s)`, snapshot saved to
+`/workspace/profiles/personal/evals/runs/2026-10-01T14-14-21Z.json`. Criteria accuracy 0.946,
+precision 0.9, recall 0.818 over 56 labels.
+
+The migration rebuilt the personal rubric: the plan does not copy
+`compatibility_rubric.json`. 6 criteria of the new rubric carry names the cases do not
+label, and 4 case labels name criteria the new rubric lacks. Each case reports both lists;
+those labels are excluded from accuracy, as `dataset.py` specifies.
 
 ## 8.5 Automated review
 
@@ -184,3 +195,19 @@ existing key file; the existing `~/.config/job-search-agent/.env` stands in for 
   `profiles/personal/`; `~/.config/job-search-agent/.env` sha256 unchanged.
 
 The clone and its container were removed afterwards.
+
+## 10.1 Migration in the main checkout
+
+The design's Migration Plan was run in the main checkout, switching to a local branch at
+`origin/feat/csg-37-profile-dir-implementation` in place of pulling `master`. No
+pre-migration shortlist was taken; the check reads the migrated database directly.
+
+`propose_jobs.py 10 --no-discover`: `profile: personal (/workspace/profiles/personal)`,
+`10 job(s) proposed out of 94 evaluated`. The 94 rows are the pre-migration evaluations plus
+those added by the first personal run after migration. The shortlist holds jobs evaluated
+before the migration, with their commute scores.
+
+The personal `compatibility_rubric.json` and `search_queries.json` were rebuilt on the first
+personal run, because the plan copies neither file. Both are LLM output sampled at the default
+temperature: two `compile_queries()` calls on the default profile shared 4 of 12 distinct
+queries.
