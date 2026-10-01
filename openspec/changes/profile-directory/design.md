@@ -101,9 +101,10 @@ saves.
 
 **Keys live in `~/.config/job-search-agent/.env`, mounted read-only.**
 Every checkout and worktree reads the same `.env`. The container mounts the directory
-read-only, so the code cannot change keys. CI sets keys as environment variables. podman
-4.9.3 refuses to start a container whose bind-mount source is missing, so the setup step
-that creates `.env` also creates the directory.
+read-only, so the code cannot change keys. CI sets keys as environment variables.
+podman-compose 1.0.6 creates a missing bind-mount source as an empty directory, so the
+container starts without keys. A command that reads a missing key fails with an error naming
+the key and `~/.config/job-search-agent/.env`.
 
 Alternative considered: `.env` gitignored in the checkout. Rejected: `git clean -x` deletes
 it, copying or archiving the checkout includes it, and each worktree needs its own copy.
@@ -164,9 +165,9 @@ evaluations and user-tracked fields that cannot be regenerated.
   `profiles/personal/`.
 - [Copying the database while a pipeline command writes produces a torn copy] → Documented.
   Commands are started by hand.
-- [`~/.config/job-search-agent/` is missing, and `podman-compose up` fails with
-  `statfs ...: no such file or directory`] → The `.env` setup step creates it. The README
-  names the error and its fix.
+- [`~/.config/job-search-agent/.env` is missing, and the container starts without keys] →
+  The first command that reads a key fails naming the key and the file.
+  `scripts/check_setup.py` lists every missing key. The README names the error and its fix.
 
 During migration only. These apply to branches created before this change, checked out in
 the main checkout, until they are merged or rebased onto `master`:
