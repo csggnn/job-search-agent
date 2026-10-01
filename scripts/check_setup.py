@@ -1,10 +1,12 @@
 """
-Environment smoke-check (not a unit test): reports API keys missing from the environment,
-then confirms the API keys and aisuite/Tavily wiring work by running a Tavily search and sending the same context
+Environment smoke-check (not a unit test): reports API keys missing from the environment
+and job_preferences.md sections missing from the active profile, then confirms the API
+keys and aisuite/Tavily wiring work by running a Tavily search and sending the same context
 to Anthropic and Groq.
-Run with: python scripts/check_setup.py
+Run with: python scripts/check_setup.py [--default-profile]
 """
 
+import argparse
 import os
 import sys
 
@@ -47,6 +49,17 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
     return response.choices[0].message.content
 
 
+def check_profile():
+    """ print the active profile's missing job_preferences.md sections. returns True if none """
+    path = config.job_preferences_path()
+    missing = config.missing_preference_sections(config.read_job_preferences())
+    for heading in missing:
+        print(f"MISSING: '## {heading}' is missing or empty in {path}")
+    if not missing:
+        print(f"OK: {path} fills every section the pipeline reads")
+    return not missing
+
+
 def check_keys():
     """ print the API keys missing from the environment. returns True if none """
     missing = [name for name in config.API_KEYS if not config.get_env(name)]
@@ -58,8 +71,15 @@ def check_keys():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    config.add_profile_argument(parser)
+    args = parser.parse_args()
+    config.apply_profile_args(args)
+
     print("=== Setup ===")
-    if not check_keys():
+    profile_ok = check_profile()
+    keys_ok = check_keys()
+    if not (profile_ok and keys_ok):
         sys.exit(1)
     print()
 

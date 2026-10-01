@@ -20,7 +20,7 @@ from jobspy.model import Country
 from jobsearch import config, storage
 from jobsearch.config import (
     read_resume, read_job_preferences, file_hash, extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
+    resume_path, job_preferences_path, profile_dir,
 )
 from jobsearch.llm import ask_json
 from jobsearch.evaluation import evaluate_job
@@ -28,12 +28,16 @@ from jobsearch.preselection import preselect, format_preselection, DEFAULT_N
 from jobsearch.rubric import load_or_compile_rubric
 from jobsearch.scrape import ScrapeError, validate_post
 
-QUERIES_PATH = os.path.join(DATA_DIR, "search_queries.json")
 QUERY_MAX_TOKENS = 2048
 DEFAULT_MAX_RESULTS = 10
 DEFAULT_SITES = ["indeed", "linkedin"]
 _COUNTRY_CODE_RE = re.compile(r"^[a-z]{2}$")
 _COUNTRY_NAMES = {c.value[1]: c.value[0] for c in Country}  # alpha-2 -> JobSpy country name
+
+
+def queries_path():
+    """ the active profile's search_queries.json """
+    return os.path.join(profile_dir(), "search_queries.json")
 
 
 def _resolve_target_locations(resume, preferences):
@@ -132,12 +136,12 @@ def compile_queries():
         primary_country = primary_country.lower()
 
     cache = {
-        "resume_hash": file_hash(RESUME_PATH),
-        "preferences_hash": file_hash(JOB_PREFERENCES_PATH),
+        "resume_hash": file_hash(resume_path()),
+        "preferences_hash": file_hash(job_preferences_path()),
         "primary_country": primary_country,
         "queries": queries,
     }
-    with open(QUERIES_PATH, "w") as f:
+    with open(queries_path(), "w") as f:
         json.dump(cache, f, indent=2)
     return cache
 
@@ -146,12 +150,12 @@ def load_or_compile_queries():
     """ return the cached query set if resume.md/job_preferences.md haven't changed, else
         recompile
     """
-    if os.path.exists(QUERIES_PATH):
-        with open(QUERIES_PATH) as f:
+    if os.path.exists(queries_path()):
+        with open(queries_path()) as f:
             cached = json.load(f)
         if (
-            cached.get("resume_hash") == file_hash(RESUME_PATH)
-            and cached.get("preferences_hash") == file_hash(JOB_PREFERENCES_PATH)
+            cached.get("resume_hash") == file_hash(resume_path())
+            and cached.get("preferences_hash") == file_hash(job_preferences_path())
         ):
             return cached
     return compile_queries()

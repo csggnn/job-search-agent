@@ -7,6 +7,7 @@ that `python discover_jobs.py` keeps working.
 
 import argparse
 
+from jobsearch import config
 from jobsearch.discovery import discover_jobs, add_discovery_arguments
 from jobsearch.preselection import DEFAULT_N
 
@@ -23,7 +24,9 @@ def main():
                         help="skip pre-selection (no LLM call) and take the discovered job ads "
                              "in discovery order")
     add_discovery_arguments(parser)
+    config.add_profile_argument(parser)
     args = parser.parse_args()
+    config.apply_profile_args(args)
     discover_jobs(evaluate=args.evaluate, limit=args.limit, max_results_per_query=args.max_results,
                   force_queries=args.force, preselect_job_ads=not args.no_preselect, debug=args.debug)
 

@@ -10,10 +10,14 @@ without credentials.
 
 - **`tests/unit/`** offline unit tests for the deterministic helpers (URL normalization,
   rubric hashing and application, section extraction, query validation, JSON parsing) and
-  for pre-selection, whose one LLM call is patched out. No LLM, network or `.env` required.
+  for pre-selection, whose one LLM call is patched out, and for profile selection, `--scratch` and
+  `scripts/profile.sh` against temporary directories. No LLM, network or API keys
+  required.
 - **`tests/e2e/`** a live end-to-end smoke test that drives the pipeline through the CLI
-  entrypoint and inspects the saved SQLite row. Requires API keys. Set `TARGET_URL` near
-  the top of `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
+  entrypoint with `--default-profile` and inspects the saved SQLite row. Requires API keys.
+  Its setup runs `scripts/profile.sh reset-default`, which deletes the checkout's
+  default-profile database, rubric and search queries. Set `TARGET_URL` near the top of
+  `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
 
 ```
 podman-compose exec job-search python3 -m unittest discover -s tests/unit   # offline
@@ -31,16 +35,23 @@ A hand-curated set of 5-10 cases, deliberately not the whole database. The datab
 real usage and grows on its own. An eval set only means anything if it is small enough to
 hold ground truth a human has actually checked.
 
-**The database is for usage; `evals/` is for eval.** Eval code may import only the pure
+**The database is for usage; the eval set is for eval.** Eval code may import only the pure
 helpers from `jobsearch.storage` (`normalize_url`, `rubric_content_hash`), never `get_*`,
-`save_*` or `list_*`, which open the database. Nothing under `evals/` reads or writes
-`data/evaluations.db`, and the eval set is never populated by sweeping it.
+`save_*` or `list_*`, which open the database. Nothing under `evals/` reads or writes a
+profile's `evaluations.db`, and the eval set is never populated by sweeping it.
+
+The eval set belongs to a profile: it lives in the profile's `evals/` directory
+(`cases.json`, `ads/`, `runs/`), next to the rubric it is scored against. `capture.py`,
+`draft.py` and `run_evals.py` use `profiles/personal/evals/` by default and
+`profiles/default/evals/` with `--default-profile`. A profile with no `cases.json` has no
+cases: `run_evals.py` exits with "no cases to run" and does not read the other profile's.
+Paths below are relative to the profile's `evals/` directory.
 
 ### Case shape
 
-`evals/cases.json`, each case: `{name, url, ad, verified, notes, expected: {...}}`.
+`cases.json`, each case: `{name, url, ad, verified, notes, expected: {...}}`.
 
-`ad` names a file in `evals/ads/` and is what the case replays against. The `url` is
+`ad` names a file in `ads/` and is what the case replays against. The `url` is
 provenance, not an input, so a posting being taken down cannot break a case. `ad: null`
 means capture failed; the case is kept, reported and skipped. The ad is recorded explicitly
 rather than derived from `name`, so renaming a case cannot orphan its inputs.
@@ -104,7 +115,7 @@ both sit inside a tolerance band while one is much closer.
 Tolerances are harness policy, not per-case data. `--tolerance-commute` is deliberately
 tight because the commute accept/reject boundary is only a few minutes wide.
 
-Each run is snapshotted to `evals/runs/` with the rubric hash and both model ids, so
+Each run is snapshotted to `runs/` with the rubric hash and both model ids, so
 `--compare` can attribute a change afterwards.
 
 ## Cost tiers

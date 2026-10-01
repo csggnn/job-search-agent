@@ -18,11 +18,14 @@ import re
 
 from jobsearch.config import (
     read_resume, read_job_preferences, file_hash, extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
+    resume_path, job_preferences_path, profile_dir,
 )
 from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL
 
-RUBRIC_PATH = os.path.join(DATA_DIR, "compatibility_rubric.json")
+
+def rubric_path():
+    """ the active profile's compatibility_rubric.json """
+    return os.path.join(profile_dir(), "compatibility_rubric.json")
 
 
 def test_regex(pattern, test_text):
@@ -155,33 +158,33 @@ def compile_rubric():
     reviewed = reflect_on_rubric(resume, preferences, draft)
 
     rubric = {
-        "resume_hash": file_hash(RESUME_PATH),
-        "preferences_hash": file_hash(JOB_PREFERENCES_PATH),
+        "resume_hash": file_hash(resume_path()),
+        "preferences_hash": file_hash(job_preferences_path()),
         "criteria": reviewed["criteria"],
         "scoring_guidance": extract_section(preferences, "Scoring Notes"),
     }
-    with open(RUBRIC_PATH, "w") as f:
+    with open(rubric_path(), "w") as f:
         json.dump(rubric, f, indent=2)
     return rubric
 
 
 def load_rubric():
-    """ return the rubric cached on disk, or None if RUBRIC_PATH is absent.
+    """ return the rubric cached on disk, or None if rubric_path() is absent.
 
         Callers that require one fixed rubric for a sequence of evaluations, such as the eval
         harness, use this with rubric_is_stale() in place of load_or_compile_rubric().
     """
-    if not os.path.exists(RUBRIC_PATH):
+    if not os.path.exists(rubric_path()):
         return None
-    with open(RUBRIC_PATH) as f:
+    with open(rubric_path()) as f:
         return json.load(f)
 
 
 def rubric_is_stale(rubric):
     """ True if resume.md/job_preferences.md have changed since rubric was compiled """
     return (
-        rubric.get("resume_hash") != file_hash(RESUME_PATH)
-        or rubric.get("preferences_hash") != file_hash(JOB_PREFERENCES_PATH)
+        rubric.get("resume_hash") != file_hash(resume_path())
+        or rubric.get("preferences_hash") != file_hash(job_preferences_path())
     )
 
 

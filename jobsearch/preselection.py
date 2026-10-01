@@ -69,8 +69,8 @@ EXCERPT_CHARS = 900
 # job ads older than this are dropped outright; should eventually become a user parameter
 MAX_AGE_DAYS = 45
 
-# Anchors locating the substantive middle of a job ad. Measured over evals/ads/: a
-# requirements anchor appears in 7/7 ads at 21-79% of the way in, a responsibilities anchor
+# Anchors locating the substantive middle of a job ad. Measured over the eval set's ads:
+# a requirements anchor appears in 7/7 ads at 21-79% of the way in, a responsibilities anchor
 # in 6/7 at 11-43%, and an offer/benefits anchor in 4/7 - three of them past 76%, one false
 # positive at 8% inside a company blurb, which is why TAIL_MIN_POSITION guards the tail cut.
 # Headings appear in 0/7 ads and bullets in only 4/7, so neither can anchor the window.

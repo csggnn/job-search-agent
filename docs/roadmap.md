@@ -15,7 +15,7 @@ what it invalidates.
 
 This needs a place to keep the description first. `save_evaluation()` currently drops
 `job["description"]` and no column stores it, which is why a re-evaluation must always
-re-scrape. `evals/ads/` solves this for the eval set only; its capture path
+re-scrape. The eval set's stored ads solve this for the eval set only; its capture path
 (`scrape.fetch_page_text` plus `extract_post`) is the seam a storage-side version would
 reuse.
 
@@ -42,12 +42,13 @@ Pre-selection is a selector, so a single run says nothing about it. The question
   ad was evaluated.
 
 Both need a fixture holding a captured job ad list as discovery returns it. The existing
-`evals/ads/` files are single postings and cannot exercise a stage whose input is a list.
+ad files of the eval set are single postings and cannot exercise a stage whose input is a
+list.
 
 ## 4. Ground truth is reviewed by hand-editing JSON
 
-`evals/draft.py` pre-fills a case and the human corrects it in `evals/cases.json`. At the
-current size, 5-10 cases, this is workable. A guided review loop that walks unverified
+`evals/draft.py` pre-fills a case and the human corrects it in the eval set's
+`cases.json`. At the current size, 5-10 cases, this is workable. A guided review loop that walks unverified
 cases one at a time, showing the posting alongside what the pipeline claimed and prompting
 accept/flip/skip, would make it faster and harder to typo if the eval set grows.
 

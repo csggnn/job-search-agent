@@ -12,8 +12,6 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from jobsearch import config
 
-DB_PATH = os.path.join(config.DATA_DIR, "evaluations.db")
-
 # query params that are tracking noise, not part of a job posting's identity
 _TRACKING_PARAMS = {"trk", "trackingid", "refid", "ref", "originalsubdomain", "position", "pagenum"}
 
@@ -66,6 +64,11 @@ _MIGRATIONS = [
 APPLICATION_STATUSES = {"new", "applied", "discarded"}
 
 
+def db_path():
+    """ the active profile's evaluations database """
+    return os.path.join(config.profile_dir(), "evaluations.db")
+
+
 def _migrate_schema(conn):
     """ add any columns from _MIGRATIONS that are missing from an existing evaluations table """
     existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(evaluations)")}
@@ -76,8 +79,9 @@ def _migrate_schema(conn):
 
 def _get_connection():
     """ open a connection to the evaluations DB, creating/migrating the schema if needed """
-    os.makedirs(config.DATA_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    path = db_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(_SCHEMA)
     _migrate_schema(conn)

@@ -7,7 +7,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 
 | Module | Concern |
 |--------|---------|
-| `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, lazy env access (`require_env`) so modules import without a populated `.env`, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
+| `jobsearch/config.py` | Profile resolution (`profile_dir`, `--default-profile`, `--scratch`) and the paths built on it, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
 | `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
@@ -61,7 +61,8 @@ response converter reads `content[0].text` and cannot parse a leading `ThinkingB
 The pipeline is configured for Anthropic models, but every call goes through aisuite, so
 switching provider is a matter of changing the `provider:model` strings
 (`EXTRACTION_MODEL`, `RUBRIC_MODEL`) in `jobsearch/llm.py` and setting that provider's key
-in `.env`. `_provider_kwargs` is Anthropic-specific and would need its own branch for a
+in `~/.config/job-search-agent/.env` and adding its name to `config.API_KEYS` and
+`.env.example`. `_provider_kwargs` is Anthropic-specific and would need its own branch for a
 provider whose response converter has a similar quirk.
 
 ## Commands
@@ -76,6 +77,14 @@ provider whose response converter has a similar quirk.
 Every flag has its own help string; the four commands above are the definitive list, kept
 here only as pointers so it never needs to be transcribed and re-synced by hand. Test and
 eval commands are in [evals.md](evals.md).
+
+Every entry point, including the eval and setup scripts, takes two profile flags:
+
+- `--default-profile` runs on `profiles/default/` instead of `profiles/personal/`.
+- `--scratch` runs on a temporary copy of the selected profile, deleted when the command
+  exits.
+
+See [Profiles and keys](#profiles-and-keys).
 
 ### Scoring one posting directly
 
@@ -125,7 +134,7 @@ Compatibility is scored against a rubric, a set of weighted criteria, generated 
 once per resume/preferences version rather than per job:
 
 ```
-data/resume.md + data/job_preferences.md
+<profile>/resume.md + <profile>/job_preferences.md
         │  sha256 of both files vs the rubric's stored resume_hash / preferences_hash
         ▼
 load_or_compile_rubric()   cheap check on every evaluate_job() call
@@ -135,7 +144,7 @@ compile_rubric()  ->  draft_rubric()       agentic: proposes criteria, calls the
                                            test_regex tool to validate each pattern
                   ->  reflect_on_rubric()  one-shot critique and revision pass
         ▼
-data/compatibility_rubric.json
+<profile>/compatibility_rubric.json
     {resume_hash, preferences_hash, criteria[], scoring_guidance}
         │
         ▼
@@ -178,7 +187,7 @@ defaults to the cached one when omitted.
 `discover_jobs.py` finds new job ad URLs instead of requiring one to be pasted in:
 
 - derives search phrases from `resume.md` and `job_preferences.md`, cached in
-  `data/search_queries.json` and invalidated when either file changes;
+  the profile's `search_queries.json` and invalidated when either file changes;
 - runs each phrase against Indeed and LinkedIn via
   [JobSpy](https://github.com/speedyapply/JobSpy);
 - dedupes results against URLs already in `evaluations.db`;
@@ -346,8 +355,8 @@ these use raw SQL and one Python call:
 | Task | Command |
 |------|---------|
 | List the top-ranked saved jobs | `propose_jobs.py 5 --no-discover` (ranks the saved evaluations on the combined score without searching or evaluating) |
-| Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
-| Filter saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
+| Show everything saved for one job | `sqlite3 profiles/personal/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
+| Filter saved jobs | `sqlite3 profiles/personal/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
 | Mark a job reviewed, applied or discarded | `storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
 
 ## Files on disk
@@ -358,49 +367,69 @@ discover_jobs.py        CLI entrypoint: find, pre-select and optionally score ne
 propose_jobs.py         CLI entrypoint: evaluate 3N job ads, propose the top N by combined score
 jobsearch/              the package: scrape, commute, rubric, evaluation, discovery,
                         pre-selection, ranking, storage, LLM wrapper, config
-evals/                  the eval harness and its hand-curated case set
+evals/                  the eval harness code
 tests/                  unit/ (offline) and e2e/ (live, needs keys)
-scripts/                check_setup.py, recompile_rubric.py
-data/                   personalization files and generated caches
+scripts/                check_setup.py, recompile_rubric.py, profile.sh
+profiles/default/       the sample candidate, its generated caches and eval set
+profiles/personal/      the user's candidate, its generated caches and eval set
 docs/                   architecture, evals, roadmap
+.env.example            template for ~/.config/job-search-agent/.env
 ```
+
+Paths in the table are relative to the profile directory, except `.env`. `cases.json`,
+`ads/` and `runs/` are in the profile's `evals/` directory.
 
 | File | Written by | In git | Notes |
 |------|-----------|--------|-------|
-| `.env` | user | template only | real values are local-only |
-| `data/resume.md` | user | fictional sample only | real content is local-only |
-| `data/job_preferences.md` | user | fictional sample only | `## Location` lists the on-site search locations; `## Home Address` is the commute origin; `## Scoring Notes` is passed to the LLM verbatim |
-| `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume or preferences change |
-| `data/search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
-| `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL plus per-criterion breakdown; real usage only, never eval runs |
-| `evals/cases.json` | `capture.py` / `draft.py`, then hand-edited | no | ground truth; `"verified": false` until reviewed |
-| `evals/ads/*.json` | `capture.py` | no | a posting's raw page text plus extracted fields, so a case outlives the posting |
-| `evals/runs/*.json` | `run_evals.py` | no | one snapshot per run: metrics, rubric hash, model ids |
+| `~/.config/job-search-agent/.env` | user | no | API keys; `.env.example` is the committed template |
+| `resume.md` | user | default profile only | the default profile holds a fictional sample |
+| `job_preferences.md` | user | default profile only | `## Location` lists the on-site search locations; `## Home Address` is the commute origin; `## Scoring Notes` is passed to the LLM verbatim |
+| `compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume or preferences change |
+| `search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
+| `evaluations.db` | `storage.save_evaluation()` | no | one row per URL plus per-criterion breakdown; real usage only, never eval runs |
+| `cases.json` | `capture.py` / `draft.py`, then hand-edited | no | ground truth; `"verified": false` until reviewed |
+| `ads/*.json` | `capture.py` | no | a posting's raw page text plus extracted fields, so a case outlives the posting |
+| `runs/*.json` | `run_evals.py` | no | one snapshot per run: metrics, rubric hash, model ids |
 
-## Personalization files stay out of git
+## Profiles and keys
 
-`.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
-committed as a fictional sample candidate that runs the full pipeline as-is.
-
-The **skip-worktree** bit is stored in a checkout's index. A fresh clone and each new
-worktree start without it. Set it on all three files before editing them:
+A profile is one candidate's directory. Both profiles use the same file names:
 
 ```
-git update-index --skip-worktree .env data/resume.md data/job_preferences.md
+profiles/
+  default/    resume.md and job_preferences.md committed (fictional sample candidate);
+              generated files and evals/ gitignored
+  personal/   the user's candidate, gitignored as a whole
 ```
 
-With the bit set, edits with real keys, resume or preferences do not appear in `git status`
-or `git diff` and are not picked up by `git add -A`, so personal data and API keys cannot
-be committed by accident.
+`config.resolve_profile(checkout_root, default_profile)` selects the directory. With
+`--default-profile` it returns `profiles/default/`. Without it, it returns
+`profiles/personal/`, or raises `ProfileError` naming each missing `resume.md` or
+`job_preferences.md` and `--default-profile`. There is no fallback from one profile to the
+other. Every path to profile data is computed from `config.profile_dir()` on use; the
+profile is resolved on first use, never at import. Entry points resolve it in
+`config.apply_profile_args(args)`. Python callers with no command line call
+`config.use_default_profile()` to select the default profile.
 
-Changing a committed file requires re-enabling tracking first, for whichever of the three
-files (`.env`, `data/resume.md`, `data/job_preferences.md`) is being changed:
+`--scratch` copies the selected profile to a temporary directory, and `profile_dir()`
+returns the copy. The copy is removed at interpreter exit, so every write of the command
+(database, rubric and query caches, eval runs) is discarded.
 
-```
-git update-index --no-skip-worktree <file>
-# edit, commit the change
-git update-index --skip-worktree <file>
-```
+`scripts/profile.sh reset-default` deletes the default profile's `evaluations.db`,
+`compatibility_rubric.json` and `search_queries.json`. It keeps the inputs and `evals/`, and
+does not touch the personal profile.
+
+API keys live in `~/.config/job-search-agent/.env`, shared by every checkout and worktree.
+`docker-compose.yml` mounts that directory read-only at `/config`, and `config.py` loads
+`/config/.env` at import. podman-compose creates the directory empty when it is missing; a
+command that reads a missing key then fails in `config.require_env()`, naming the key and the
+file. `config.API_KEYS` lists every key the pipeline and the SDKs it calls read;
+`tests/unit/test_profiles.py` checks that `.env.example` names each of them, and
+`scripts/check_setup.py` reports each one that is unset.
+
+No personal file is tracked, so personal data needs no git index flag, and branch switches
+and merges do not touch it. `git clean -x` deletes `profiles/personal/`; the README gives
+the backup and restore commands.
 
 ## Cost and caching
 
