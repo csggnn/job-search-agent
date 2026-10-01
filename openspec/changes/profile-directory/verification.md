@@ -239,3 +239,61 @@ State of every checkout listed by `git worktree list` after the migration. The w
 
 The main checkout and `.trees/csg-37-migration-test` are on local branches at `2ec4181`.
 `.trees/csg-37-profile-directory` held an empty `data/` directory, removed with `rmdir`.
+
+## 8.6 After the explicit-directory change
+
+The active profile moved from module state in `config.py` to an argument: entry points call
+`config.profile_from_args(args)` and pass `profile.directory` down. Checks re-run on the
+changed code, in this worktree with a copy of the main checkout's `profiles/personal/`:
+
+- Unit suite: `Ran 194 tests ... OK`.
+- `grep -rn "DATA_DIR\|profile_dir()\|use_default_profile\|apply_profile_args\|_profile = \|global " jobsearch evals scripts tests *.py`: no output.
+- `--help` of the 8 entry points lists `--default-profile` and `--scratch`.
+- Live e2e suite: `Ran 2 tests in 97.509s, OK (skipped=1)`; full run then cache hit, 14
+  criteria saved.
+- `check_setup.py` and `check_setup.py --default-profile`: profile and keys OK, Tavily,
+  Anthropic and Groq calls answered.
+- `evals/run_evals.py --criteria-only`: `profile: personal`, `Scored 7/7 case(s)`, accuracy
+  0.946, precision 0.9, recall 0.818, the same as the run in 8.3.
+  `--default-profile`: exit 1, `no cases to run in the default profile`.
+- `discover_jobs.py --default-profile --scratch`: `66 discovered -> ... -> 10 selected (1 LLM
+  call)`, exit 0.
+- `evaluate_job_post.py <url> --default-profile --scratch`, run twice (Serco, Space
+  Applications Services): both evaluations complete; the office address was not found in
+  either run. `profiles/default/` file sha256 unchanged after each run; no
+  `/tmp/job-search-scratch-*` directory remains.
+- `commute.commute_route(config.DEFAULT_PROFILE_DIR, <Space Applications office address>)`:
+  21.4 min, 12.4 km from `Rue des Halles 4, 1000 Bruxelles, Belgium`.
+- `/code-review medium`: one finding. The home address was read before commute scoring
+  knew a route was needed, so a profile without `## Home Address` failed every evaluation,
+  including remote jobs, and aborted `run_evals.py` and `draft.py` runs. Fixed: commute
+  scoring takes the profile directory and `commute_route()` reads the address. Covered by
+  `CommuteHomeAddressTest` in `tests/unit/test_profiles.py`.
+
+### After the `Profile` class
+
+Functions take a `config.Profile`, which derives every path inside the profile; the rubric
+and query caches use `Profile.input_hashes` and `Profile.is_stale`. Re-run:
+
+- Unit suite: `Ran 195 tests ... OK`.
+- `--help` of the 8 entry points lists `--default-profile` and `--scratch`.
+- `check_setup.py` and `check_setup.py --default-profile`: profile and keys OK.
+- `evals/run_evals.py --criteria-only`: `Scored 7/7 case(s)`, accuracy 0.946, precision
+  0.9, recall 0.818. `--default-profile`: `no cases to run in the default profile`.
+- `propose_jobs.py 3 --no-discover`: `profile: personal`, `94 evaluated`.
+- `commute.commute_route(<default Profile>, <Space Applications office address>)`: 21.4
+  min, 12.4 km.
+- `Profile.is_stale` on the default rubric compiled before the change: `False`; existing
+  caches stay valid.
+- Live e2e suite: `Ran 2 tests in 95.502s, OK (skipped=1)`; full run then cache hit, 12
+  criteria saved.
+
+### Personal profile by default in Python
+
+Public `jobsearch` functions take `profile=None` last; `None` resolves the personal profile.
+`Profile.is_stale` is renamed `Profile.inputs_changed_since`.
+
+- Unit suite: `Ran 196 tests ... OK`.
+- `storage.list_evaluations()` with no argument: 94 evaluations, the personal database.
+  `storage.list_evaluations(profile=config.resolve_profile(default_profile=True))`: 1.
+- `propose_jobs.py 3 --no-discover`: `profile: personal`, `94 evaluated`.
