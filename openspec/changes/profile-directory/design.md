@@ -210,8 +210,10 @@ In each existing worktree: clear the skip-worktree bits, discard the worktree's 
 `data/`, and copy `profiles/personal/` from the main checkout if the worktree runs on
 personal data. Evaluations saved in a worktree's `data/evaluations.db` are discarded.
 
-Rollback: revert the merge, copy `profiles/personal/` files back to `data/`, copy
-`~/.config/job-search-agent/.env` back to `.env`, and set the skip-worktree bits again.
+Rollback: revert the merge, copy `resume.md`, `job_preferences.md` and `evaluations.db`
+from `profiles/personal/` back to `data/`, move `cases.json`, `ads/` and `runs/` from
+`profiles/personal/evals/` back to `evals/`, copy `~/.config/job-search-agent/.env` back to
+`.env`, and set the skip-worktree bits again.
 
 ## Open Questions
 
