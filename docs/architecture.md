@@ -27,7 +27,7 @@ path.
 `jobsearch/evaluation.py:evaluate_job`:
 
 ```
-evaluate_job(profile, url)
+evaluate_job(url, profile=profile)
   │
   ├─ URL already evaluated and rubric unchanged?  ──►  return the saved evaluation
   │
@@ -357,7 +357,7 @@ these use raw SQL and one Python call:
 | List the top-ranked saved jobs | `propose_jobs.py 5 --no-discover` (ranks the saved evaluations on the combined score without searching or evaluating) |
 | Show everything saved for one job | `sqlite3 profiles/personal/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs | `sqlite3 profiles/personal/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
-| Mark a job reviewed, applied or discarded | `storage.update_review(profile, url, reviewed=True, application_status="applied", notes="...")` |
+| Mark a job reviewed, applied or discarded | `storage.update_review(url, reviewed=True, application_status="applied", notes="...", profile=profile)` |
 
 ## Files on disk
 
@@ -402,10 +402,10 @@ profiles/
   personal/   the user's candidate, gitignored as a whole
 ```
 
-`config.resolve_profile(checkout_root, default_profile)` selects the directory. With
-`--default-profile` it returns `profiles/default/`. Without it, it returns
-`profiles/personal/`, or raises `ProfileError` naming each missing `resume.md` or
-`job_preferences.md` and `--default-profile`. There is no fallback from one profile to the
+`config.resolve_profile(default_profile=False, checkout_root=CHECKOUT_ROOT)` selects the
+directory. With `default_profile=True` (`--default-profile`) it returns `profiles/default/`.
+Without it, it returns `profiles/personal/`, or raises `ProfileError` naming each missing
+`resume.md` or `job_preferences.md` and `--default-profile`. There is no fallback from one profile to the
 other.
 
 Entry points call `config.profile_from_args(args)`, which returns a `config.Profile`, and
@@ -426,7 +426,7 @@ The rubric and search query caches store `profile.input_hashes()`, the content h
 current files.
 
 `--scratch` copies the selected profile to a temporary directory, and `profile_from_args`
-returns the copy's directory. The copy is removed at interpreter exit, so every write of the command
+returns a `Profile` on the copy. The copy is removed at interpreter exit, so every write of the command
 (database, rubric and query caches, eval runs) is discarded.
 
 `scripts/profile.sh reset-default` deletes the default profile's `evaluations.db`,

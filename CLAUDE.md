@@ -133,7 +133,7 @@ podman-compose exec job-search python3 evals/run_evals.py --compare
 
 Ad-hoc querying of saved evaluations has no dedicated script; use `sqlite3` directly
 against a profile's `evaluations.db`. Marking a job reviewed, applied or discarded is a direct
-call to `storage.update_review(profile, url, ...)`, also with no CLI wrapper yet.
+call to `storage.update_review(url, ..., profile=profile)`, also with no CLI wrapper yet.
 
 ## Profiles and keys
 

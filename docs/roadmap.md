@@ -7,7 +7,7 @@ filed.
 
 ## 1. Finer-grained evaluation cache
 
-`evaluate_job(profile, url, force=True)` re-scrapes, re-computes commute, and re-judges
+`evaluate_job(url, force=True)` re-scrapes, re-computes commute, and re-judges
 compatibility together. Splitting the cache into independent layers, scrape freshness,
 rubric freshness (already tracked via `rubric_content_hash`), and home-address/commute
 freshness, would let a single-dimension change such as a new home address refresh only
