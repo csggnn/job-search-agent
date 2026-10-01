@@ -191,7 +191,8 @@ mkdir -p ~/.config/job-search-agent profiles/personal/evals
 cp .env ~/.config/job-search-agent/.env
 chmod 600 ~/.config/job-search-agent/.env
 cp data/resume.md data/job_preferences.md data/evaluations.db profiles/personal/
-mv evals/cases.json evals/ads evals/runs profiles/personal/evals/
+cp data/compatibility_rubric.json data/search_queries.json profiles/personal/
+mv evals/cases.json* evals/ads evals/runs profiles/personal/evals/
 git update-index --no-skip-worktree .env data/resume.md data/job_preferences.md
 git checkout -- .env data/resume.md data/job_preferences.md
 ```
@@ -204,7 +205,14 @@ rm -rf data
 ```
 
 After the merge, `data/` holds only generated files: the sample files are tracked under
-`profiles/default/`. The rubric and query caches are rebuilt on the first personal run.
+`profiles/default/`.
+
+The rubric and query caches are copied because both are LLM output and are not reproduced by
+a rebuild. A rebuilt rubric names its criteria differently, so eval labels drafted against
+the old rubric no longer match, and saved evaluations scored under the old rubric are scored
+again when discovery finds them. Both caches are reused as long as `resume.md` and
+`job_preferences.md` are unchanged. `cp` reports a cache that does not exist and copies the
+others.
 
 In each existing worktree: clear the skip-worktree bits, discard the worktree's copies with
 `git checkout -- .env data/resume.md data/job_preferences.md`, merge `master`, remove
