@@ -92,8 +92,8 @@ class UpsertCaseTest(unittest.TestCase):
     """ the ad filename derives from the case name, so a blank name writes ".json" """
 
     def _upsert(self, cases, name, url):
-        with mock.patch.object(capture.dataset, "save_ad", lambda n, ad: f"{n}.json"):
-            return upsert_case(cases, name, url, {"post": {}})
+        with mock.patch.object(capture.dataset, "save_ad", lambda evals_dir, n, ad: f"{n}.json"):
+            return upsert_case("evals", cases, name, url, {"post": {}})
 
     def test_blank_name_falls_back_to_the_captured_name(self):
         cases = [{"name": "", "url": "https://example.com/job/1", "ad": "", "expected": {}}]

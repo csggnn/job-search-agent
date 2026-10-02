@@ -12,8 +12,6 @@ from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 
 from jobsearch import config
 
-DB_PATH = os.path.join(config.DATA_DIR, "evaluations.db")
-
 # query params that are tracking noise, not part of a job posting's identity
 _TRACKING_PARAMS = {"trk", "trackingid", "refid", "ref", "originalsubdomain", "position", "pagenum"}
 
@@ -74,10 +72,13 @@ def _migrate_schema(conn):
             conn.execute(ddl)
 
 
-def _get_connection():
-    """ open a connection to the evaluations DB, creating/migrating the schema if needed """
-    os.makedirs(config.DATA_DIR, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+def _get_connection(profile):
+    """ open a connection to the evaluations DB of `profile`, creating/migrating the schema if
+        needed
+    """
+    path = profile.evaluations_db_path
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    conn = sqlite3.connect(path)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(_SCHEMA)
     _migrate_schema(conn)
@@ -108,12 +109,12 @@ def rubric_content_hash(rubric):
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-def list_evaluated_urls():
+def list_evaluated_urls(profile):
     """ return [(url, normalized_url), ...] for every saved evaluation - the original url last
         passed to save_evaluation() plus its normalized form, for callers that need to diff
         against another set of urls (e.g. cases.json) using the same normalization.
     """
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute("SELECT url, normalized_url FROM evaluations").fetchall()
     finally:
@@ -121,13 +122,13 @@ def list_evaluated_urls():
     return rows
 
 
-def list_evaluated_job_openings():
+def list_evaluated_job_openings(profile):
     """ return [(normalized_url, company, job_title, application_status), ...] for every saved
         evaluation - the job-opening identity fields, for callers that dedupe on the opening
         rather than on the url it was found under (jobsearch.preselection). Read-only, no
         schema of its own: list_evaluated_urls() returns urls only.
     """
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute(
             "SELECT normalized_url, company, job_title, application_status FROM evaluations"
@@ -143,14 +144,14 @@ _LIST_COLUMNS = (
 )
 
 
-def list_evaluations():
+def list_evaluations(profile):
     """ return every saved evaluation as a dict of _LIST_COLUMNS, most recently evaluated
         first. The fields ranking needs (compatibility_score, commute_score,
         application_status) plus the identity and display fields, without the rationale and
         per-criterion detail. For jobsearch.ranking, which scores rows regardless of how
         they were evaluated.
     """
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute(
             f"SELECT {', '.join(_LIST_COLUMNS)} FROM evaluations ORDER BY evaluated_at DESC"
@@ -167,11 +168,11 @@ _EVALUATION_COLUMNS = (
 )
 
 
-def get_evaluation(url):
+def get_evaluation(url, profile):
     """ return the full saved evaluation row for url as a dict, or None if never evaluated.
         includes both pipeline-derived fields and user-tracked fields (reviewed, notes, etc).
     """
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         row = conn.execute(
             f"SELECT {', '.join(_EVALUATION_COLUMNS)} FROM evaluations WHERE normalized_url = ?",
@@ -188,11 +189,11 @@ def get_evaluation(url):
 _CRITERION_COLUMNS = ("name", "type", "weight", "matched", "score", "rationale")
 
 
-def get_evaluation_criteria(url):
+def get_evaluation_criteria(url, profile):
     """ return the list of evaluation_criteria rows (name, type, weight, matched, score,
         rationale) for url's saved evaluation, or [] if never evaluated.
     """
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         rows = conn.execute(
             f"SELECT {', '.join(_CRITERION_COLUMNS)} FROM evaluation_criteria "
@@ -205,7 +206,7 @@ def get_evaluation_criteria(url):
     return [dict(zip(_CRITERION_COLUMNS, row)) for row in rows]
 
 
-def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
+def save_evaluation(url, rubric_hash, job, commute, compatibility, overview, profile):
     """ upsert the pipeline-derived fields of the evaluation for url: updates the existing row
         if one exists for this normalized_url (preserving user-tracked fields like reviewed/
         notes/application_status), else inserts a fresh row with their defaults. Always
@@ -215,7 +216,7 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
     evaluated_at = datetime.now(timezone.utc).isoformat()
     is_remote = 1 if commute["address"] == config.FULLY_REMOTE else 0
 
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         existing = conn.execute(
             "SELECT id FROM evaluations WHERE normalized_url = ?", (normalized,)
@@ -272,7 +273,8 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
         conn.close()
 
 
-def update_review(url, reviewed=None, application_status=None, status_reason=None, notes=None):
+def update_review(url, profile, reviewed=None, application_status=None, status_reason=None,
+                  notes=None):
     """ partial update of the user-tracked fields for an existing evaluation; None = leave
         unchanged. Raises ValueError if the url has never been evaluated, or if
         application_status isn't one of APPLICATION_STATUSES.
@@ -291,7 +293,7 @@ def update_review(url, reviewed=None, application_status=None, status_reason=Non
     if not updates:
         return
 
-    conn = _get_connection()
+    conn = _get_connection(profile)
     try:
         existing = conn.execute(
             "SELECT id FROM evaluations WHERE normalized_url = ?", (normalized,)

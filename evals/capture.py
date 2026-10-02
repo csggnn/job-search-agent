@@ -23,7 +23,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import dataset
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.llm import EXTRACTION_MODEL
 from jobsearch.scrape import extract_post, fetch_page_text
 
@@ -63,18 +63,18 @@ def capture(url, name=None):
     return name, ad
 
 
-def re_extract(case):
+def re_extract(evals_dir, case):
     """ rebuild an ad's post from its stored raw_content. one LLM call, no fetch.
         applies to ads whose posting URL no longer resolves.
     """
-    ad = dataset.load_ad(case)
+    ad = dataset.load_ad(evals_dir, case)
     ad["post"] = extract_post(ad["raw_content"], source=f"ad {case['ad']!r}")
     ad["extraction_model"] = EXTRACTION_MODEL
     ad["extracted_at"] = _now()
     return ad
 
 
-def upsert_case(cases, name, url, ad):
+def upsert_case(evals_dir, cases, name, url, ad):
     """ record a captured ad on a new or existing case, preserving any ground truth.
         returns (name, added). The returned name may differ from the one passed in.
     """
@@ -83,7 +83,7 @@ def upsert_case(cases, name, url, ad):
         # an existing case keeps its recorded name, which the extracted company/title may no
         # longer produce. A case with no name falls back to the captured slug.
         name = cases[index]["name"]
-    filename = dataset.save_ad(name, ad)
+    filename = dataset.save_ad(evals_dir, name, ad)
     if index is None:
         cases.append({
             "name": name,
@@ -100,7 +100,7 @@ def upsert_case(cases, name, url, ad):
     return name, index is None
 
 
-def _capture_urls(cases, urls, name=None, truncated=None):
+def _capture_urls(evals_dir, cases, urls, name=None, truncated=None):
     """ capture each url into the eval set, reporting failures without aborting the batch """
     failed = []
     truncated = truncated if truncated is not None else []
@@ -114,7 +114,7 @@ def _capture_urls(cases, urls, name=None, truncated=None):
             print(f"  FAILED: {type(e).__name__}: {e}")
             failed.append(url)
             continue
-        name_used, added = upsert_case(cases, captured_name, url, ad)
+        name_used, added = upsert_case(evals_dir, cases, captured_name, url, ad)
         print(f"  {'added' if added else 'updated'} case {name_used!r} "
               f"({len(ad['raw_content'])} chars of page text)")
         if looks_truncated(ad["post"]):
@@ -132,7 +132,7 @@ def _report_truncated(truncated):
               f"site, or drop the case. run_evals.py skips these ads.")
 
 
-def _list_cases(cases):
+def _list_cases(evals_dir, cases):
     """ print each case's name, ad/verified state, and drafted ground truth.
 
         days_on_office and address_contains are independent of the rubric and remain valid
@@ -153,7 +153,7 @@ def _list_cases(cases):
         if isinstance(days, list):
             days = days[0] if days[0] == days[1] else f"{days[0]}-{days[1]}"
         where = expected.get("address_contains") or case.get("url", "")
-        print(f"  {'*' if dataset.has_ad(case) else '-':<3} "
+        print(f"  {'*' if dataset.has_ad(evals_dir, case) else '-':<3} "
               f"{'*' if case.get('verified') else '-':<2} "
               f"{case['name'][:52]:<52} {str(days if days is not None else '?'):<5} "
               f"{str(score if score is not None else '?'):<7} {where[:60]}")
@@ -171,25 +171,28 @@ def main():
                         help="capture ads for these existing cases, dropping the rest")
     parser.add_argument("--re-extract", nargs="*", metavar="NAME",
                         help="rebuild post(s) from saved raw text; no NAME means all")
+    config.add_profile_argument(parser)
     args = parser.parse_args()
+    profile = config.profile_from_args(args)
+    evals_dir = profile.evals_dir
 
-    cases = dataset.load_cases()
+    cases = dataset.load_cases(evals_dir)
 
     if args.list_cases:
-        _list_cases(cases)
+        _list_cases(evals_dir, cases)
         return
 
     if args.re_extract is not None:
         targets = [c for c in cases if c["name"] in args.re_extract] if args.re_extract else \
-                  [c for c in cases if dataset.has_ad(c)]
+                  [c for c in cases if dataset.has_ad(evals_dir, c)]
         if not targets:
             sys.exit("no matching cases with an ad to re-extract")
         for case in targets:
             print(f"Re-extracting {case['name']} ...")
-            ad = re_extract(case)
-            dataset.save_ad(case["name"], ad)
+            ad = re_extract(evals_dir, case)
+            dataset.save_ad(evals_dir, case["name"], ad)
             print(f"  {ad['post']['job_title']} at {ad['post']['company']}")
-        dataset.save_cases(cases)
+        dataset.save_cases(evals_dir, cases)
         print(f"\nRe-extracted {len(targets)} ad(s) with {EXTRACTION_MODEL}.")
         return
 
@@ -198,7 +201,7 @@ def main():
         missing = set(args.from_cases) - {c["name"] for c in picked}
         if missing:
             sys.exit(f"no such case(s): {sorted(missing)}")
-        backup = dataset.backup_cases()
+        backup = dataset.backup_cases(evals_dir)
         if backup:
             print(f"Backed up the eval set to {backup}\n")
         dropped = len(cases) - len(picked)
@@ -207,8 +210,8 @@ def main():
         cases = [{"name": c["name"], "url": c["url"], "ad": None,
                   "verified": False, "notes": "", "expected": {}} for c in picked]
         truncated = []
-        failed = _capture_urls(cases, [c["url"] for c in cases], truncated=truncated)
-        dataset.save_cases(cases)
+        failed = _capture_urls(evals_dir, cases, [c["url"] for c in cases], truncated=truncated)
+        dataset.save_cases(evals_dir, cases)
         print(f"\nCorpus is now {len(cases)} case(s); dropped {dropped} unpicked.")
         _report_truncated(truncated)
         if failed:
@@ -225,8 +228,8 @@ def main():
         parser.error("--name only makes sense with a single url")
 
     truncated = []
-    failed = _capture_urls(cases, args.urls, name=args.name, truncated=truncated)
-    dataset.save_cases(cases)
+    failed = _capture_urls(evals_dir, cases, args.urls, name=args.name, truncated=truncated)
+    dataset.save_cases(evals_dir, cases)
     _report_truncated(truncated)
     if failed:
         print(f"\n{len(failed)} url(s) failed: {failed}")

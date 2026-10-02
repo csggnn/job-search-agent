@@ -2,6 +2,9 @@
 Read/write layer for the eval set: cases.json (ground truth) and the ads it references
 (stored job-posting inputs).
 
+Every function that reads or writes a file takes the eval directory as its first argument:
+a profile's evals/ directory, jobsearch.config.Profile.evals_dir.
+
 A case references its ad by filename rather than deriving it from the case name, so a
 rename leaves the reference intact. A case with a null "ad" has no captured inputs;
 run_evals.py reports and skips it.
@@ -16,11 +19,11 @@ import re
 from jobsearch import storage
 from jobsearch.scrape import validate_post
 
-EVALS_DIR = os.path.dirname(__file__)
-CASES_PATH = os.path.join(EVALS_DIR, "cases.json")
-BACKUP_PATH = os.path.join(EVALS_DIR, "cases.json.bak")
-ADS_DIR = os.path.join(EVALS_DIR, "ads")
-RUNS_DIR = os.path.join(EVALS_DIR, "runs")
+__all__ = [
+    "EXPECTED_TYPES", "slugify", "cases_path", "load_cases", "save_cases", "backup_cases",
+    "find_case", "save_ad", "load_ad", "case_post", "has_ad", "usable_expected",
+    "validate_expected",
+]
 
 # ground truth holds one value per step, not a range. The accepted margin is a harness-level
 # --tolerance-* option. A per-case range yields a constant pass/fail across the whole band.
@@ -38,30 +41,44 @@ def slugify(text):
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
-def load_cases():
-    """ return the case list, or [] if CASES_PATH is absent """
-    if not os.path.exists(CASES_PATH):
+def cases_path(evals_dir):
+    """ path of the case list in `evals_dir` """
+    return os.path.join(evals_dir, "cases.json")
+
+
+def _backup_path(evals_dir):
+    return os.path.join(evals_dir, "cases.json.bak")
+
+
+def _ads_dir(evals_dir):
+    return os.path.join(evals_dir, "ads")
+
+
+def load_cases(evals_dir):
+    """ return the case list, or [] if cases.json is absent """
+    if not os.path.exists(cases_path(evals_dir)):
         return []
-    with open(CASES_PATH) as f:
+    with open(cases_path(evals_dir)) as f:
         return json.load(f)
 
 
-def save_cases(cases):
-    """ write the case list to cases.json """
-    with open(CASES_PATH, "w") as f:
+def save_cases(evals_dir, cases):
+    """ write the case list to cases.json, creating `evals_dir` if absent """
+    os.makedirs(evals_dir, exist_ok=True)
+    with open(cases_path(evals_dir), "w") as f:
         json.dump(cases, f, indent=2)
         f.write("\n")
 
 
-def backup_cases():
-    """ copy cases.json to BACKUP_PATH. returns the backup path, or None if cases.json is
+def backup_cases(evals_dir):
+    """ copy cases.json to cases.json.bak. returns the backup path, or None if cases.json is
         absent.
     """
-    if not os.path.exists(CASES_PATH):
+    if not os.path.exists(cases_path(evals_dir)):
         return None
-    with open(CASES_PATH) as src, open(BACKUP_PATH, "w") as dst:
+    with open(cases_path(evals_dir)) as src, open(_backup_path(evals_dir), "w") as dst:
         dst.write(src.read())
-    return BACKUP_PATH
+    return _backup_path(evals_dir)
 
 
 def find_case(cases, name=None, url=None):
@@ -78,27 +95,27 @@ def find_case(cases, name=None, url=None):
     return None
 
 
-def ad_filename(name):
+def _ad_filename(name):
     """ the ad filename assigned to a newly captured case """
     return f"{name}.json"
 
 
-def ad_path(ad):
-    """ absolute path of an ad, given the filename stored on a case """
-    return os.path.join(ADS_DIR, ad)
+def _ad_path(evals_dir, ad):
+    """ path of an ad, given the filename stored on a case """
+    return os.path.join(_ads_dir(evals_dir), ad)
 
 
-def save_ad(name, ad):
+def save_ad(evals_dir, name, ad):
     """ write an ad and return the filename to record on the case """
-    os.makedirs(ADS_DIR, exist_ok=True)
-    filename = ad_filename(name)
-    with open(ad_path(filename), "w") as f:
+    os.makedirs(_ads_dir(evals_dir), exist_ok=True)
+    filename = _ad_filename(name)
+    with open(_ad_path(evals_dir, filename), "w") as f:
         json.dump(ad, f, indent=2)
         f.write("\n")
     return filename
 
 
-def load_ad(case):
+def load_ad(evals_dir, case):
     """ return a case's stored ad. raises FileNotFoundError if the case records no
         ad, or the recorded file is absent.
     """
@@ -108,7 +125,7 @@ def load_ad(case):
             f"case {case['name']!r} has no ad - capture one with: "
             f"python evals/capture.py {case.get('url', '<url>')}"
         )
-    path = ad_path(ad)
+    path = _ad_path(evals_dir, ad)
     if not os.path.exists(path):
         raise FileNotFoundError(
             f"ad {ad!r} for case {case['name']!r} is missing - recapture it with: "
@@ -118,14 +135,14 @@ def load_ad(case):
         return json.load(f)
 
 
-def case_post(case):
+def case_post(evals_dir, case):
     """ the job posting a case replays against, checked by scrape.validate_post """
-    return validate_post(load_ad(case)["post"], f"ad {case['ad']!r}")
+    return validate_post(load_ad(evals_dir, case)["post"], f"ad {case['ad']!r}")
 
 
-def has_ad(case):
+def has_ad(evals_dir, case):
     """ True if the case's ad is recorded and present on disk """
-    return bool(case.get("ad")) and os.path.exists(ad_path(case["ad"]))
+    return bool(case.get("ad")) and os.path.exists(_ad_path(evals_dir, case["ad"]))
 
 
 def _well_typed(key, value):

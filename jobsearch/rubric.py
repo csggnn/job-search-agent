@@ -16,13 +16,8 @@ import json
 import os
 import re
 
-from jobsearch.config import (
-    read_resume, read_job_preferences, file_hash, extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
-)
+from jobsearch.config import extract_section
 from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL
-
-RUBRIC_PATH = os.path.join(DATA_DIR, "compatibility_rubric.json")
 
 
 def test_regex(pattern, test_text):
@@ -146,51 +141,44 @@ def reflect_on_rubric(resume, preferences, draft):
     )
 
 
-def compile_rubric():
-    """ agentically (re)build the compatibility rubric from resume.md + job_preferences.md """
-    resume = read_resume()
-    preferences = read_job_preferences()
+def compile_rubric(profile):
+    """ agentically (re)build the compatibility rubric of `profile` from its resume.md +
+        job_preferences.md
+    """
+    resume = profile.read_resume()
+    preferences = profile.read_job_preferences()
 
     draft = draft_rubric(resume, preferences)
     reviewed = reflect_on_rubric(resume, preferences, draft)
 
     rubric = {
-        "resume_hash": file_hash(RESUME_PATH),
-        "preferences_hash": file_hash(JOB_PREFERENCES_PATH),
+        **profile.input_hashes(),
         "criteria": reviewed["criteria"],
         "scoring_guidance": extract_section(preferences, "Scoring Notes"),
     }
-    with open(RUBRIC_PATH, "w") as f:
+    with open(profile.rubric_path, "w") as f:
         json.dump(rubric, f, indent=2)
     return rubric
 
 
-def load_rubric():
-    """ return the rubric cached on disk, or None if RUBRIC_PATH is absent.
+def load_rubric(profile):
+    """ return the rubric cached in `profile`, or None if it has none.
 
         Callers that require one fixed rubric for a sequence of evaluations, such as the eval
-        harness, use this with rubric_is_stale() in place of load_or_compile_rubric().
+        harness, use this with profile.inputs_changed_since(rubric) in place of load_or_compile_rubric().
     """
-    if not os.path.exists(RUBRIC_PATH):
+    if not os.path.exists(profile.rubric_path):
         return None
-    with open(RUBRIC_PATH) as f:
+    with open(profile.rubric_path) as f:
         return json.load(f)
 
 
-def rubric_is_stale(rubric):
-    """ True if resume.md/job_preferences.md have changed since rubric was compiled """
-    return (
-        rubric.get("resume_hash") != file_hash(RESUME_PATH)
-        or rubric.get("preferences_hash") != file_hash(JOB_PREFERENCES_PATH)
-    )
-
-
-def load_or_compile_rubric():
+def load_or_compile_rubric(profile):
     """ return the cached rubric if resume.md/job_preferences.md haven't changed, else recompile """
-    cached = load_rubric()
-    if cached is not None and not rubric_is_stale(cached):
+    cached = load_rubric(profile=profile)
+    if cached is not None and not profile.inputs_changed_since(cached):
         return cached
-    return compile_rubric()
+    return compile_rubric(profile=profile)
 
 
 def match_text(job_title, location, description):

@@ -210,76 +210,70 @@ class ExtractSectionTest(unittest.TestCase):
 class HomeAddressTest(unittest.TestCase):
     # config.home_address() reads the "## Home Address" section of job_preferences.md
 
-    def setUp(self):
-        self._real_read = config.read_job_preferences
-
-    def tearDown(self):
-        config.read_job_preferences = self._real_read
-
-    def _with_preferences(self, text):
-        config.read_job_preferences = lambda: text
-
     def test_reads_the_address_from_its_section(self):
-        self._with_preferences(
+        preferences = (
             "# Job Preferences\n\n## Location\n- Metropolis, FD\n\n"
             "## Home Address\n1 Riverside Dr, 00001 Metropolis, Freedonia\n\n## Scoring Notes\nweigh A\n"
         )
-        self.assertEqual(config.home_address(), "1 Riverside Dr, 00001 Metropolis, Freedonia")
+        self.assertEqual(config.home_address(preferences),
+                         "1 Riverside Dr, 00001 Metropolis, Freedonia")
 
     def test_skips_blank_lines_before_the_address(self):
-        self._with_preferences("## Home Address\n\n\n  1 Riverside Dr, Metropolis  \n")
-        self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
+        preferences = "## Home Address\n\n\n  1 Riverside Dr, Metropolis  \n"
+        self.assertEqual(config.home_address(preferences), "1 Riverside Dr, Metropolis")
 
     def test_raises_naming_the_file_when_section_absent(self):
-        self._with_preferences("# Job Preferences\n\n## Location\n- Metropolis, FD\n")
         with self.assertRaises(RuntimeError) as ctx:
-            config.home_address()
+            config.home_address("# Job Preferences\n\n## Location\n- Metropolis, FD\n")
         self.assertIn("job_preferences.md", str(ctx.exception))
 
     def test_raises_when_section_still_holds_the_placeholder(self):
-        self._with_preferences("## Home Address\n(fill in: full street address, e.g. 1 Riverside Dr)\n")
         with self.assertRaises(RuntimeError):
-            config.home_address()
+            config.home_address(
+                "## Home Address\n(fill in: full street address, e.g. 1 Riverside Dr)\n")
 
     def test_raises_when_section_is_empty(self):
-        self._with_preferences("## Home Address\n\n## Scoring Notes\nweigh A\n")
         with self.assertRaises(RuntimeError):
-            config.home_address()
+            config.home_address("## Home Address\n\n## Scoring Notes\nweigh A\n")
 
 
 class DefaultDataTest(unittest.TestCase):
-    # the active data/resume.md and data/job_preferences.md must fill every section the
-    # pipeline parses, so a fresh clone runs with only .env filled in
+    # the committed sample in profiles/default/ must fill every section the pipeline parses,
+    # so a fresh clone runs with --default-profile and only the API keys set up. The files
+    # are read from DEFAULT_PROFILE_DIR whichever profile is active.
 
     # "(fill in ...)" template text, or a bracketed token that is not a markdown link's text
     PLACEHOLDER = re.compile(r"\(fill in|\[[^\]\n]+\](?!\()")
 
     def setUp(self):
-        self.resume = config.read_resume()
-        self.preferences = config.read_job_preferences()
+        sample = config.Profile("default", config.DEFAULT_PROFILE_DIR)
+        self.resume_path = sample.resume_path
+        self.preferences_path = sample.job_preferences_path
+        self.resume = sample.read_resume()
+        self.preferences = sample.read_job_preferences()
 
     def test_home_address_resolves(self):
         try:
-            config.home_address()
+            config.home_address(self.preferences)
         except RuntimeError as e:
-            self.fail(f"## Home Address in {config.JOB_PREFERENCES_PATH}: {e}")
+            self.fail(f"## Home Address in {self.preferences_path}: {e}")
 
     def test_target_locations_come_from_the_location_section(self):
         section = extract_section(self.preferences, "Location")
-        self.assertTrue(section, f"## Location missing or empty in {config.JOB_PREFERENCES_PATH}")
+        self.assertTrue(section, f"## Location missing or empty in {self.preferences_path}")
         bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
                    if line.strip().startswith("-")]
-        self.assertTrue(bullets, f"## Location has no '-' entries in {config.JOB_PREFERENCES_PATH}")
+        self.assertTrue(bullets, f"## Location has no '-' entries in {self.preferences_path}")
         self.assertEqual(_resolve_target_locations(self.resume, self.preferences), bullets,
                          "target locations differ from the ## Location entries")
 
     def test_scoring_notes_present(self):
         self.assertTrue(extract_section(self.preferences, "Scoring Notes"),
-                        f"## Scoring Notes missing or empty in {config.JOB_PREFERENCES_PATH}")
+                        f"## Scoring Notes missing or empty in {self.preferences_path}")
 
     def test_no_placeholder_text(self):
-        for path, text in ((config.RESUME_PATH, self.resume),
-                           (config.JOB_PREFERENCES_PATH, self.preferences)):
+        for path, text in ((self.resume_path, self.resume),
+                           (self.preferences_path, self.preferences)):
             match = self.PLACEHOLDER.search(text)
             self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
 
@@ -318,14 +312,15 @@ class EvaluateJobAdTest(unittest.TestCase):
 
     @mock.patch("jobsearch.discovery.evaluate_job", return_value={"url": "saved"})
     def test_complete_job_ad_is_evaluated_as_its_own_post(self, evaluate_job):
-        self.assertEqual(_evaluate_job_ad(self.JOB_AD), {"url": "saved"})
-        evaluate_job.assert_called_once_with(self.JOB_AD["url"], post=self.JOB_AD)
+        self.assertEqual(_evaluate_job_ad("profile", self.JOB_AD), {"url": "saved"})
+        evaluate_job.assert_called_once_with(self.JOB_AD["url"], post=self.JOB_AD,
+                                             profile="profile")
 
     @mock.patch("jobsearch.discovery.evaluate_job")
     def test_job_ad_without_description_is_skipped_unevaluated(self, evaluate_job):
         # a LinkedIn ad whose description fetch failed
         with mock.patch("builtins.print"):
-            self.assertIsNone(_evaluate_job_ad({**self.JOB_AD, "description": None}))
+            self.assertIsNone(_evaluate_job_ad("profile", {**self.JOB_AD, "description": None}))
         evaluate_job.assert_not_called()
 
 

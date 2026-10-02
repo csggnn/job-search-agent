@@ -8,8 +8,8 @@ of the pipeline runs:
     --no-commute      adds days_on_office and the compatibility judgment. 2 LLM calls/case.
     (default)         adds the address search and ORS routing.
 
-Each run is written to evals/runs/ with the rubric hash and both model ids. --compare
-diffs against an earlier one.
+Each run is written to the active profile's evals/runs/ with the rubric hash and both model
+ids. --compare diffs against an earlier one.
 
 resolve_rubric() loads one rubric per run and does not compile. Compiling mid-run would
 score cases in the same run against two rubrics.
@@ -29,11 +29,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import dataset, scoring
 from evals.capture import looks_truncated
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.commute import commute_score as commute_score_fn, figure_days_on_office
 from jobsearch.evaluation import compatibility_score
 from jobsearch.llm import EXTRACTION_MODEL, RUBRIC_MODEL
-from jobsearch.rubric import evaluate_rubric, load_rubric, match_text, rubric_is_stale
+from jobsearch.rubric import evaluate_rubric, load_rubric, match_text
 
 DEFAULT_TOLERANCE_SCORE = 10
 # in weighted minutes. The commute accept/reject boundary spans roughly 10 minutes, so this
@@ -41,12 +41,14 @@ DEFAULT_TOLERANCE_SCORE = 10
 DEFAULT_TOLERANCE_COMMUTE = 5
 
 
-def resolve_rubric():
-    """ return (rubric, stale) for the run. exits if no rubric has been compiled. """
-    rubric = load_rubric()
+def resolve_rubric(profile):
+    """ return (rubric, stale) for the run on `profile`. exits if no rubric has been
+        compiled.
+    """
+    rubric = load_rubric(profile=profile)
     if rubric is None:
         sys.exit("no compiled rubric - build one with: python scripts/recompile_rubric.py")
-    stale = rubric_is_stale(rubric)
+    stale = profile.inputs_changed_since(rubric)
     if stale:
         print("WARNING: the rubric is stale - resume.md or job_preferences.md changed after it "
               "was compiled.\n         Scoring against the compiled rubric. Run "
@@ -54,18 +56,18 @@ def resolve_rubric():
     return rubric, stale
 
 
-def run_case(case, rubric, tolerances, tier):
+def run_case(profile, case, rubric, tolerances, tier):
     """ replay one case against its ad and score it -> a run snapshot "cases" entry """
     result = {"name": case["name"], "verified": bool(case.get("verified"))}
     expected = case.get("expected") or {}
 
-    if not dataset.has_ad(case):
+    if not dataset.has_ad(profile.evals_dir, case):
         return {**result, "skipped": "no_ad"}
     if not expected:
         return {**result, "skipped": "undrafted"}
     dataset.validate_expected(case)
 
-    post = dataset.case_post(case)
+    post = dataset.case_post(profile.evals_dir, case)
     if looks_truncated(post):
         # a login-wall ad matches no criteria and lowers every metric independently of
         # pipeline behavior
@@ -91,7 +93,8 @@ def run_case(case, rubric, tolerances, tier):
 
     wants_commute = any(k in expected for k in ("address_contains", "commute_score"))
     if tier == "full" and wants_commute:
-        commute = commute_score_fn(post["company"], post["location"], post["description"])
+        commute = commute_score_fn(profile, post["company"], post["location"],
+                                   post["description"])
         if "days_on_office" in expected:
             result["days_on_office"] = scoring.score_scalar(
                 expected["days_on_office"], commute["days_on_office"], 0
@@ -114,21 +117,21 @@ def run_case(case, rubric, tolerances, tier):
     return result
 
 
-def write_snapshot(snapshot):
-    """ write a run to evals/runs/<run_id>.json and return the path """
-    os.makedirs(dataset.RUNS_DIR, exist_ok=True)
-    path = os.path.join(dataset.RUNS_DIR, f"{snapshot['run_id']}.json")
+def write_snapshot(profile, snapshot):
+    """ write a run to the profile's runs/<run_id>.json and return the path """
+    os.makedirs(profile.runs_dir, exist_ok=True)
+    path = os.path.join(profile.runs_dir, f"{snapshot['run_id']}.json")
     with open(path, "w") as f:
         json.dump(snapshot, f, indent=2)
         f.write("\n")
     return path
 
 
-def latest_run(exclude=None):
-    """ (snapshot, path) of the most recent run in evals/runs/, or None. Ordered by filename,
+def latest_run(profile, exclude=None):
+    """ (snapshot, path) of the most recent run of `profile`, or None. Ordered by filename,
         which is the run_id timestamp.
     """
-    paths = sorted(glob.glob(os.path.join(dataset.RUNS_DIR, "*.json")))
+    paths = sorted(glob.glob(os.path.join(profile.runs_dir, "*.json")))
     paths = [p for p in paths if p != exclude]
     if not paths:
         return None
@@ -257,24 +260,28 @@ def main():
                              f"(default {DEFAULT_TOLERANCE_COMMUTE})")
     parser.add_argument("--compare", nargs="?", const=True, metavar="PATH",
                         help="diff against a run snapshot (default: the previous run)")
+    config.add_profile_argument(parser)
     args = parser.parse_args()
+    profile = config.profile_from_args(args)
 
     tier = "criteria-only" if args.criteria_only else "no-commute" if args.no_commute else "full"
     tolerances = {"score": args.tolerance_score, "commute": args.tolerance_commute}
 
-    rubric, stale = resolve_rubric()
-    cases = dataset.load_cases()
+    cases = dataset.load_cases(profile.evals_dir)
     if args.verified_only:
         cases = [c for c in cases if c.get("verified")]
     if not cases:
-        sys.exit("no cases to run" + (" with \"verified\": true - review a draft and flip it, "
-                                      "see: python evals/draft.py --all" if args.verified_only
-                                      else " - add one with: python evals/capture.py <url>"))
+        sys.exit(f"no cases to run in the {profile.name} profile ({profile.evals_dir})"
+                 + (" with \"verified\": true - review a draft and flip it, see: "
+                    "python evals/draft.py --all" if args.verified_only
+                    else " - add one with: python evals/capture.py <url>"))
+
+    rubric, stale = resolve_rubric(profile)
 
     print("=== Case results ===")
     case_results = []
     for case in cases:
-        result = run_case(case, rubric, tolerances, tier)
+        result = run_case(profile, case, rubric, tolerances, tier)
         case_results.append(result)
         _print_case(result)
 
@@ -293,12 +300,12 @@ def main():
         "cases": case_results,
         "metrics": metrics,
     }
-    path = write_snapshot(snapshot)
+    path = write_snapshot(profile, snapshot)
 
     if args.compare:
         found = None
         if args.compare is True:
-            found = latest_run(exclude=path)
+            found = latest_run(profile, exclude=path)
         elif os.path.exists(args.compare):
             with open(args.compare) as f:
                 found = (json.load(f), args.compare)

@@ -34,10 +34,11 @@ it, and the pipeline SHALL NOT write it.
 - **WHEN** a user runs `git clean -x -f -d` in a checkout
 - **THEN** `~/.config/job-search-agent/.env` is unchanged
 
-#### Scenario: Key directory is missing
-- **WHEN** `~/.config/job-search-agent/` does not exist and the user starts the container
-- **THEN** the start fails
-- **AND** the README names the error and the command that creates the directory
+#### Scenario: Keys are missing
+- **WHEN** `~/.config/job-search-agent/.env` does not exist or lacks a key, and the user runs
+  a command that reads that key
+- **THEN** the command fails with an error naming the key and `~/.config/job-search-agent/.env`
+- **AND** `scripts/check_setup.py` names each missing key
 
 ### Requirement: Keys are configured from a committed template
 The repository SHALL commit `.env.example`, listing every API key the pipeline reads, with

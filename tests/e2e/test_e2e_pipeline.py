@@ -1,17 +1,19 @@
 """
 End-to-end smoke test for the job-evaluation pipeline.
 
-This test is deliberately a BLACK BOX: it drives the pipeline only through the stable
-public seams that survive the planned package refactor -
+The test drives the pipeline through two seams:
 
   * the CLI entrypoints  `evaluate_job_post.py` / `discover_jobs.py`  (invoked as
-    subprocesses), and
-  * the on-disk SQLite database `data/evaluations.db` (inspected with the stdlib
-    sqlite3 module).
+    subprocesses with --default-profile), and
+  * the default profile's SQLite database `profiles/default/evaluations.db` (inspected
+    with the stdlib sqlite3 module).
 
-It imports nothing from the project's own modules, so moving/renaming functions into a
-`jobsearch/` package does not touch it. Run it BEFORE the refactor to capture a green
-baseline, then again AFTER to confirm nothing regressed.
+From the project it imports only jobsearch.config, to locate the default profile and to
+load the API keys from ~/.config/job-search-agent/.env.
+
+Setup runs `scripts/reset_default_profile.sh`, which deletes the checkout's default-profile
+database, compiled rubric and search queries. The run regenerates them from the committed
+sample resume and job preferences.
 
 Run (inside the container):
 
@@ -29,7 +31,6 @@ to include the discovery test. If TARGET_URL stops resolving, the test FAILS wit
 clear message so you can swap in a fresh posting.
 """
 
-import os
 import sqlite3
 import subprocess
 import sys
@@ -38,8 +39,11 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # tests/e2e/<file> -> repo root
-DB_PATH = REPO_ROOT / "data" / "evaluations.db"
-ENV_PATH = REPO_ROOT / ".env"
+sys.path.insert(0, str(REPO_ROOT))
+
+from jobsearch import config
+
+DB_PATH = config.Profile("default", config.DEFAULT_PROFILE_DIR).evaluations_db_path
 
 # env keys the pipeline needs to run for real; GROQ_API_KEY is only used by check_setup.py
 REQUIRED_ENV = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ORS_API_KEY")
@@ -59,30 +63,6 @@ TARGET_URL = "https://canonical.com/careers/6707824"
 RUN_DISCOVERY_SMOKE = False
 
 
-def _dotenv_values():
-    """ best-effort parse of .env (KEY=value, ignoring blank/comment lines and trailing
-        inline comments) - only used to decide whether the required keys are available to
-        the child process, so we can skip cleanly instead of failing when they're absent
-    """
-    values = {}
-    if not ENV_PATH.exists():
-        return values
-    for line in ENV_PATH.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, _, raw = line.partition("=")
-        # strip a trailing inline comment (the template ships `KEY=   # explanation`)
-        value = raw.split("#", 1)[0].strip()
-        values[key.strip()] = value
-    return values
-
-
-def _env_available(key, dotenv):
-    """ True if `key` has a non-empty value in the process env or in .env """
-    return bool(os.environ.get(key) or dotenv.get(key))
-
-
 def _log(msg):
     """ print a progress/summary line (unittest is silent on success, and this is a slow
         end-to-end run, so report what was actually exercised). Goes to stderr - the same
@@ -94,12 +74,11 @@ def _log(msg):
 class PipelineEndToEndTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        dotenv = _dotenv_values()
-        missing = [k for k in REQUIRED_ENV if not _env_available(k, dotenv)]
+        missing = [k for k in REQUIRED_ENV if not config.get_env(k)]
         if missing:
             raise unittest.SkipTest(
                 f"missing required config for an end-to-end run: {', '.join(missing)} "
-                f"(set them in {ENV_PATH} or the environment)"
+                f"(set them in {config.KEYS_FILE} or the environment)"
             )
         if not TARGET_URL:
             raise ValueError(
@@ -107,11 +86,13 @@ class PipelineEndToEndTest(unittest.TestCase):
                 "the top of this file"
             )
         cls.url = TARGET_URL
+        subprocess.run(["bash", str(REPO_ROOT / "scripts" / "reset_default_profile.sh")],
+                       check=True, capture_output=True)
 
     def _run_evaluate(self, args):
         """ invoke the evaluate entrypoint as a subprocess from the repo root """
         return subprocess.run(
-            [sys.executable, "evaluate_job_post.py", *args],
+            [sys.executable, "evaluate_job_post.py", "--default-profile", *args],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -243,7 +224,7 @@ class PipelineEndToEndTest(unittest.TestCase):
                 "RUN_DISCOVERY_SMOKE = True near the top of this file to run it"
             )
         result = subprocess.run(
-            [sys.executable, "discover_jobs.py"],
+            [sys.executable, "discover_jobs.py", "--default-profile"],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

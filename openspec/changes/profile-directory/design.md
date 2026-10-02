@@ -37,7 +37,8 @@ and the eval set.
 **Goals:**
 
 - A "default" profile and a "personal" profile exist and are self-contained: a run never reads or writes another profile's files.
-- A run writes only inside its checkout. It reads keys from `~/.config/job-search-agent/.env`.
+- A run writes only inside its checkout, except a `--scratch` copy, which lives in a
+  temporary directory removed at exit. It reads keys from `~/.config/job-search-agent/.env`.
 - The profile a run uses is visible: a run without `--default-profile` uses
   `profiles/personal/` of its checkout and fails when that profile is incomplete. A run with
   `--default-profile` uses `profiles/default/`.
@@ -75,9 +76,7 @@ directory and never branches on the profile name after resolution.
 **A run uses the personal profile unless `--default-profile` is given.**
 A run with `--default-profile` uses `profiles/default/`. Without it, a run uses
 `profiles/personal/` and fails when `resume.md` or `job_preferences.md` is missing there,
-naming the missing file and `--default-profile`. Every entry point accepts the flag. Python
-callers with no command line use the personal profile unless they select the default
-profile first.
+naming the missing file and `--default-profile`. Every entry point accepts the flag.
 
 Alternative considered: a configuration file that selects the profile. Rejected: the
 profile would depend on a file outside the command and outside the checkout.
@@ -89,9 +88,26 @@ Alternative considered: per-file fallback from `profiles/personal/` to `profiles
 Rejected: a personal resume combined with sample preferences is a candidate nobody intends,
 and its evaluations would land in the personal database.
 
+**The profile directory is passed as an argument.**
+The entry point resolves the profile once with `config.profile_from_args(args)`, which
+returns a `Profile`: the profile's name and directory, and every path inside it, derived
+from the directory. Every public function that reads or writes profile data takes a
+required `profile` argument, so no call reads or writes a profile its caller
+did not name. No module holds the active profile.
+
+Alternative considered: a module-level active profile in `config.py`, set by the entry
+point and read through `config.profile_dir()`. Rejected: every function that reads profile
+data gains an input its signature does not show, correctness depends on the entry point
+selecting the profile before any path is read, and tests must save and restore the module
+state.
+
+Alternative considered: `profile=None`, resolving the personal profile in the call.
+Rejected: every caller in the repository passes the profile, and a call that omits it reads
+or writes the personal profile without naming it.
+
 **`--scratch` runs on a temporary copy of the profile.**
-With `--scratch`, a run copies the selected profile directory to a temporary directory and
-uses the copy. The copy is deleted when the command exits. All writes (database, rubric and
+With `--scratch`, `config.profile_from_args(args)` copies the selected profile directory to
+a temporary directory and returns the copy's directory. The copy is deleted when the command exits. All writes (database, rubric and
 query caches, eval runs) land in the copy. It combines with `--default-profile`. A scratch
 copy lasts one command: a second command does not see the first one's writes.
 
@@ -101,9 +117,10 @@ saves.
 
 **Keys live in `~/.config/job-search-agent/.env`, mounted read-only.**
 Every checkout and worktree reads the same `.env`. The container mounts the directory
-read-only, so the code cannot change keys. CI sets keys as environment variables. podman
-4.9.3 refuses to start a container whose bind-mount source is missing, so the setup step
-that creates `.env` also creates the directory.
+read-only, so the code cannot change keys. CI sets keys as environment variables.
+podman-compose 1.0.6 creates a missing bind-mount source as an empty directory, so the
+container starts without keys. A command that reads a missing key fails with an error naming
+the key and `~/.config/job-search-agent/.env`.
 
 Alternative considered: `.env` gitignored in the checkout. Rejected: `git clean -x` deletes
 it, copying or archiving the checkout includes it, and each worktree needs its own copy.
@@ -140,7 +157,7 @@ that identifies a backup folder. Rejected: the script and its tests add maintena
 behavior that two shell commands provide. `cp -r` into an existing folder nests the copy
 and does not overwrite it.
 
-**`scripts/profile.sh reset-default` clears the default profile's generated state.**
+**`scripts/reset_default_profile.sh` clears the default profile's generated state.**
 It removes the default profile's database, rubric and search queries, and keeps its inputs
 and eval set. It runs on the host or in the container. The e2e test and the README use the
 same command, so both clear the same files.
@@ -164,9 +181,9 @@ evaluations and user-tracked fields that cannot be regenerated.
   `profiles/personal/`.
 - [Copying the database while a pipeline command writes produces a torn copy] → Documented.
   Commands are started by hand.
-- [`~/.config/job-search-agent/` is missing, and `podman-compose up` fails with
-  `statfs ...: no such file or directory`] → The `.env` setup step creates it. The README
-  names the error and its fix.
+- [`~/.config/job-search-agent/.env` is missing, and the container starts without keys] →
+  The first command that reads a key fails naming the key and the file.
+  `scripts/check_setup.py` lists every missing key.
 
 During migration only. These apply to branches created before this change, checked out in
 the main checkout, until they are merged or rebased onto `master`:
@@ -190,7 +207,8 @@ mkdir -p ~/.config/job-search-agent profiles/personal/evals
 cp .env ~/.config/job-search-agent/.env
 chmod 600 ~/.config/job-search-agent/.env
 cp data/resume.md data/job_preferences.md data/evaluations.db profiles/personal/
-mv evals/cases.json evals/ads evals/runs profiles/personal/evals/
+cp data/compatibility_rubric.json data/search_queries.json profiles/personal/
+mv evals/cases.json* evals/ads evals/runs profiles/personal/evals/
 git update-index --no-skip-worktree .env data/resume.md data/job_preferences.md
 git checkout -- .env data/resume.md data/job_preferences.md
 ```
@@ -203,7 +221,14 @@ rm -rf data
 ```
 
 After the merge, `data/` holds only generated files: the sample files are tracked under
-`profiles/default/`. The rubric and query caches are rebuilt on the first personal run.
+`profiles/default/`.
+
+The rubric and query caches are copied because both are LLM output and are not reproduced by
+a rebuild. A rebuilt rubric names its criteria differently, so eval labels drafted against
+the old rubric no longer match, and saved evaluations scored under the old rubric are scored
+again when discovery finds them. Both caches are reused as long as `resume.md` and
+`job_preferences.md` are unchanged. `cp` reports a cache that does not exist and copies the
+others.
 
 In each existing worktree: clear the skip-worktree bits, discard the worktree's copies with
 `git checkout -- .env data/resume.md data/job_preferences.md`, merge `master`, remove
@@ -217,5 +242,5 @@ from `profiles/personal/` back to `data/`, move `cases.json`, `ads/` and `runs/`
 
 ## Open Questions
 
-- Should `.git/info/exclude` entries be written by `scripts/profile.sh` instead of by hand?
+- Should `.git/info/exclude` entries be written by a script instead of by hand?
   This changes only the migration and README steps.
