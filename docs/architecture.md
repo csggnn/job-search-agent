@@ -402,24 +402,12 @@ profiles/
   personal/   the user's candidate, gitignored as a whole
 ```
 
-`config.resolve_profile(default_profile=False, checkout_root=CHECKOUT_ROOT)` selects the
-directory. With `default_profile=True` (`--default-profile`) it returns `profiles/default/`.
-Without it, it returns `profiles/personal/`, or raises `ProfileError` naming each missing
-`resume.md` or `job_preferences.md` and `--default-profile`. There is no fallback from one profile to the
-other.
-
-Entry points call `config.profile_from_args(args)`, which returns a `config.Profile`, and
-pass it down. `Profile` holds the name and directory and derives every path inside the
-profile: `resume_path`, `job_preferences_path`, `evaluations_db_path`, `rubric_path`,
-`search_queries_path`, `evals_dir` and `runs_dir`. It also reads the resume, the
-preferences and the home address. Every public function that reads or writes profile data
-takes `profile=None` as its last argument: the `storage` database functions, the `rubric`
-and `discovery` cache functions, `evaluate_job` and `discover_jobs`. `None` resolves the
-personal profile in that call, so Python callers get the same default as the commands, and
-selecting the default profile takes an explicit `config.resolve_profile(default_profile=True)`.
-Commute scoring takes a required `Profile` and reads its home address only when it computes
-a route. `evals/dataset.py` takes `profile.evals_dir` only.
-No module holds the active profile, and nothing is resolved at import.
+Entry points call `config.profile_from_args(args)` and pass the returned `config.Profile`
+down. A run uses `profiles/personal/` unless given `--default-profile`. A personal profile
+missing `resume.md` or `job_preferences.md` is an error; there is no fallback to the
+default profile. `Profile` derives every path inside the profile and reads its files.
+Every public function that reads or writes profile data takes `profile=None`, which
+resolves the personal profile. No module holds the active profile.
 
 The rubric and search query caches store `profile.input_hashes()`, the content hashes of
 `resume.md` and `job_preferences.md`. `profile.inputs_changed_since(cache)` compares them with the
