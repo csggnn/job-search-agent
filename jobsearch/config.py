@@ -7,7 +7,7 @@ A profile is one candidate's directory: resume.md, job_preferences.md, the gener
 database, rubric and search queries, and the eval set. profiles/default/ holds the
 committed sample candidate. profiles/personal/ holds the user's own candidate and is
 gitignored. A run uses the personal profile unless --default-profile is given. An entry
-point resolves the profile with profile_from_args() and passes its directory to every
+point resolves the profile with profile_from_args() and passes the Profile to every
 function that reads or writes profile data. No module holds the active profile, and nothing
 is resolved at import time.
 
@@ -168,10 +168,7 @@ def _scratch_copy(directory):
     scratch_root = tempfile.mkdtemp(prefix="job-search-scratch-")
     atexit.register(shutil.rmtree, scratch_root, ignore_errors=True)
     copy = os.path.join(scratch_root, os.path.basename(directory))
-    if os.path.isdir(directory):
-        shutil.copytree(directory, copy)
-    else:
-        os.makedirs(copy)
+    shutil.copytree(directory, copy)
     return copy
 
 
