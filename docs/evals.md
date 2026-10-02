@@ -8,11 +8,10 @@ it run?", the evals ask "did this change make the judgments better?".
 `tests/unit/` and `tests/e2e/` are separate subdirectories so the offline suite runs
 without credentials.
 
-- **`tests/unit/`** offline unit tests for the deterministic helpers (URL normalization,
-  rubric hashing and application, section extraction, query validation, JSON parsing) and
-  for pre-selection, whose one LLM call is patched out, and for profile selection,
-  `--scratch` and `scripts/reset_default_profile.sh` against temporary directories. No LLM,
-  network or API keys required.
+- **`tests/unit/`** offline tests for all code that needs no API key. CI runs the suite on
+  every pull request with no API key defined. `DefaultDataTest` reads the committed
+  `resume.md` and `job_preferences.md` of `profiles/default/`. No test reads a profile's
+  database, caches or eval set, so the suite does not depend on their state.
 - **`tests/e2e/`** a live end-to-end smoke test that drives the pipeline through the CLI
   entrypoint with `--default-profile` and inspects the saved SQLite row. Requires API keys.
   Its setup runs `scripts/reset_default_profile.sh`, which deletes the checkout's
