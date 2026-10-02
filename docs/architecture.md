@@ -406,8 +406,8 @@ Entry points call `config.profile_from_args(args)` and pass the returned `config
 down. A run uses `profiles/personal/` unless given `--default-profile`. A personal profile
 missing `resume.md` or `job_preferences.md` is an error; there is no fallback to the
 default profile. `Profile` derives every path inside the profile and reads its files.
-Every public function that reads or writes profile data takes `profile=None`, which
-resolves the personal profile. No module holds the active profile.
+Every public function that reads or writes profile data takes a required `profile`
+argument. No module holds the active profile.
 
 The rubric and search query caches store `profile.input_hashes()`, the content hashes of
 `resume.md` and `job_preferences.md`. `profile.inputs_changed_since(cache)` compares them with the

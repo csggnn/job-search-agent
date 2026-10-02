@@ -110,9 +110,8 @@ def _validate_queries(queries, target_locations):
     return valid
 
 
-def compile_queries(profile=None):
+def compile_queries(profile):
     """ (re)build the search query set of `profile` from its resume.md + job_preferences.md """
-    profile = profile or config.resolve_profile()
     resume = profile.read_resume()
     preferences = profile.read_job_preferences()
     target_locations = _resolve_target_locations(resume, preferences)
@@ -138,11 +137,10 @@ def compile_queries(profile=None):
     return cache
 
 
-def load_or_compile_queries(profile=None):
+def load_or_compile_queries(profile):
     """ return the cached query set if resume.md/job_preferences.md haven't changed, else
         recompile
     """
-    profile = profile or config.resolve_profile()
     if os.path.exists(profile.search_queries_path):
         with open(profile.search_queries_path) as f:
             cached = json.load(f)
@@ -259,9 +257,8 @@ def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=Fal
     return list(aggregated.values())
 
 
-def filter_new_job_ads(job_ads, profile=None):
+def filter_new_job_ads(job_ads, profile):
     """ drop job ads already present in the evaluations DB of `profile` (by normalized url) """
-    profile = profile or config.resolve_profile()
     known = {normalized for _, normalized in storage.list_evaluated_urls(profile=profile)}
     return [c for c in job_ads if storage.normalize_url(c["url"]) not in known]
 
@@ -302,9 +299,9 @@ def add_discovery_arguments(parser):
     parser.add_argument("--debug", action="store_true", help="print intermediate search details")
 
 
-def discover_jobs(evaluate=False, limit=None,
+def discover_jobs(profile, evaluate=False, limit=None,
                   max_results_per_query=DEFAULT_MAX_RESULTS, force_queries=False,
-                  preselect_job_ads=True, debug=False, profile=None):
+                  preselect_job_ads=True, debug=False):
     """ full discovery pipeline for `profile`: compile/reuse search queries, search the job
         boards, dedupe within-run and against storage, pre-select the job ads worth
         evaluating, then either list them or run evaluate_job() on them.
@@ -314,7 +311,6 @@ def discover_jobs(evaluate=False, limit=None,
         behaviour (evaluate the first `limit` job ads in discovery order), so the two are
         comparable on one job ad set.
     """
-    profile = profile or config.resolve_profile()
     cache = (compile_queries(profile=profile) if force_queries
              else load_or_compile_queries(profile=profile))
 

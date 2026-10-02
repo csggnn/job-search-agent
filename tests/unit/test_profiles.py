@@ -97,11 +97,6 @@ class ProfileSelectionTest(_CheckoutTestCase):
         self.assertNotIn(os.path.join(self.personal_dir, "resume.md"), message)
         self.assertIn("--default-profile", message)
 
-    def test_python_callers_get_the_personal_profile_by_default(self):
-        self.add_personal()
-        self.assertEqual(config.resolve_profile(checkout_root=self.root),
-                         config.Profile("personal", self.personal_dir))
-
     def test_requesting_the_default_profile(self):
         self.add_personal()
         self.assertEqual(config.resolve_profile(True, self.root),

@@ -109,12 +109,11 @@ def rubric_content_hash(rubric):
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-def list_evaluated_urls(profile=None):
+def list_evaluated_urls(profile):
     """ return [(url, normalized_url), ...] for every saved evaluation - the original url last
         passed to save_evaluation() plus its normalized form, for callers that need to diff
         against another set of urls (e.g. cases.json) using the same normalization.
     """
-    profile = profile or config.resolve_profile()
     conn = _get_connection(profile)
     try:
         rows = conn.execute("SELECT url, normalized_url FROM evaluations").fetchall()
@@ -123,13 +122,12 @@ def list_evaluated_urls(profile=None):
     return rows
 
 
-def list_evaluated_job_openings(profile=None):
+def list_evaluated_job_openings(profile):
     """ return [(normalized_url, company, job_title, application_status), ...] for every saved
         evaluation - the job-opening identity fields, for callers that dedupe on the opening
         rather than on the url it was found under (jobsearch.preselection). Read-only, no
         schema of its own: list_evaluated_urls() returns urls only.
     """
-    profile = profile or config.resolve_profile()
     conn = _get_connection(profile)
     try:
         rows = conn.execute(
@@ -146,14 +144,13 @@ _LIST_COLUMNS = (
 )
 
 
-def list_evaluations(profile=None):
+def list_evaluations(profile):
     """ return every saved evaluation as a dict of _LIST_COLUMNS, most recently evaluated
         first. The fields ranking needs (compatibility_score, commute_score,
         application_status) plus the identity and display fields, without the rationale and
         per-criterion detail. For jobsearch.ranking, which scores rows regardless of how
         they were evaluated.
     """
-    profile = profile or config.resolve_profile()
     conn = _get_connection(profile)
     try:
         rows = conn.execute(
@@ -171,11 +168,10 @@ _EVALUATION_COLUMNS = (
 )
 
 
-def get_evaluation(url, profile=None):
+def get_evaluation(url, profile):
     """ return the full saved evaluation row for url as a dict, or None if never evaluated.
         includes both pipeline-derived fields and user-tracked fields (reviewed, notes, etc).
     """
-    profile = profile or config.resolve_profile()
     conn = _get_connection(profile)
     try:
         row = conn.execute(
@@ -193,11 +189,10 @@ def get_evaluation(url, profile=None):
 _CRITERION_COLUMNS = ("name", "type", "weight", "matched", "score", "rationale")
 
 
-def get_evaluation_criteria(url, profile=None):
+def get_evaluation_criteria(url, profile):
     """ return the list of evaluation_criteria rows (name, type, weight, matched, score,
         rationale) for url's saved evaluation, or [] if never evaluated.
     """
-    profile = profile or config.resolve_profile()
     conn = _get_connection(profile)
     try:
         rows = conn.execute(
@@ -211,13 +206,12 @@ def get_evaluation_criteria(url, profile=None):
     return [dict(zip(_CRITERION_COLUMNS, row)) for row in rows]
 
 
-def save_evaluation(url, rubric_hash, job, commute, compatibility, overview, profile=None):
+def save_evaluation(url, rubric_hash, job, commute, compatibility, overview, profile):
     """ upsert the pipeline-derived fields of the evaluation for url: updates the existing row
         if one exists for this normalized_url (preserving user-tracked fields like reviewed/
         notes/application_status), else inserts a fresh row with their defaults. Always
         replaces evaluation_criteria for the row, since those are fully derived.
     """
-    profile = profile or config.resolve_profile()
     normalized = normalize_url(url)
     evaluated_at = datetime.now(timezone.utc).isoformat()
     is_remote = 1 if commute["address"] == config.FULLY_REMOTE else 0
@@ -279,13 +273,12 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview, pro
         conn.close()
 
 
-def update_review(url, reviewed=None, application_status=None, status_reason=None, notes=None,
-                  profile=None):
+def update_review(url, profile, reviewed=None, application_status=None, status_reason=None,
+                  notes=None):
     """ partial update of the user-tracked fields for an existing evaluation; None = leave
         unchanged. Raises ValueError if the url has never been evaluated, or if
         application_status isn't one of APPLICATION_STATUSES.
     """
-    profile = profile or config.resolve_profile()
     if application_status is not None and application_status not in APPLICATION_STATUSES:
         raise ValueError(f"application_status must be one of {APPLICATION_STATUSES}, got {application_status!r}")
 

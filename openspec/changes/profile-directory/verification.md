@@ -297,3 +297,13 @@ Public `jobsearch` functions take `profile=None` last; `None` resolves the perso
 - `storage.list_evaluations()` with no argument: 94 evaluations, the personal database.
   `storage.list_evaluations(profile=config.resolve_profile(default_profile=True))`: 1.
 - `propose_jobs.py 3 --no-discover`: `profile: personal`, `94 evaluated`.
+
+### Required `profile` argument
+
+Public `jobsearch` functions take a required `profile` argument.
+
+- Unit suite: `Ran 194 tests ... OK`.
+- `storage.list_evaluations()` with no argument: `TypeError: list_evaluations() missing 1
+  required positional argument: 'profile'`.
+- `propose_jobs.py 3 --no-discover --default-profile --scratch`: `profile: default (scratch
+  copy of /workspace/profiles/default)`, `0 job(s) proposed out of 0 evaluated`.

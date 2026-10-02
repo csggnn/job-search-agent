@@ -16,7 +16,6 @@ import json
 import os
 import re
 
-from jobsearch import config
 from jobsearch.config import extract_section
 from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL
 
@@ -142,11 +141,10 @@ def reflect_on_rubric(resume, preferences, draft):
     )
 
 
-def compile_rubric(profile=None):
+def compile_rubric(profile):
     """ agentically (re)build the compatibility rubric of `profile` from its resume.md +
         job_preferences.md
     """
-    profile = profile or config.resolve_profile()
     resume = profile.read_resume()
     preferences = profile.read_job_preferences()
 
@@ -163,22 +161,20 @@ def compile_rubric(profile=None):
     return rubric
 
 
-def load_rubric(profile=None):
+def load_rubric(profile):
     """ return the rubric cached in `profile`, or None if it has none.
 
         Callers that require one fixed rubric for a sequence of evaluations, such as the eval
         harness, use this with profile.inputs_changed_since(rubric) in place of load_or_compile_rubric().
     """
-    profile = profile or config.resolve_profile()
     if not os.path.exists(profile.rubric_path):
         return None
     with open(profile.rubric_path) as f:
         return json.load(f)
 
 
-def load_or_compile_rubric(profile=None):
+def load_or_compile_rubric(profile):
     """ return the cached rubric if resume.md/job_preferences.md haven't changed, else recompile """
-    profile = profile or config.resolve_profile()
     cached = load_rubric(profile=profile)
     if cached is not None and not profile.inputs_changed_since(cached):
         return cached

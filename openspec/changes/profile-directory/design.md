@@ -91,16 +91,19 @@ and its evaluations would land in the personal database.
 **The profile directory is passed as an argument.**
 The entry point resolves the profile once with `config.profile_from_args(args)`, which
 returns a `Profile`: the profile's name and directory, and every path inside it, derived
-from the directory. Every public function that reads or writes profile data takes
-`profile=None` as its last argument. `None` resolves the personal profile in that call, so a
-Python caller gets the same default as a command, and the default profile is selected
-explicitly in both. No module holds the active profile.
+from the directory. Every public function that reads or writes profile data takes a
+required `profile` argument, so no call reads or writes a profile its caller
+did not name. No module holds the active profile.
 
 Alternative considered: a module-level active profile in `config.py`, set by the entry
 point and read through `config.profile_dir()`. Rejected: every function that reads profile
 data gains an input its signature does not show, correctness depends on the entry point
 selecting the profile before any path is read, and tests must save and restore the module
 state.
+
+Alternative considered: `profile=None`, resolving the personal profile in the call.
+Rejected: every caller in the repository passes the profile, and a call that omits it reads
+or writes the personal profile without naming it.
 
 **`--scratch` runs on a temporary copy of the profile.**
 With `--scratch`, `config.profile_from_args(args)` copies the selected profile directory to

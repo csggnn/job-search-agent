@@ -10,7 +10,7 @@ jobsearch.rubric; content acquisition lives in jobsearch.scrape.
 
 import json
 
-from jobsearch import config, storage
+from jobsearch import storage
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.commute import commute_score
 from jobsearch.llm import ask_json
@@ -109,7 +109,7 @@ def _print_evaluation(evaluation, cached):
         print("Notes:", evaluation["notes"])
 
 
-def evaluate_job(url, force=False, post=None, profile=None):
+def evaluate_job(url, profile, force=False, post=None):
     """ scrape a job posting and produce a full evaluation for `profile`: commute,
         compatibility, overview.
         returns a saved evaluation instead of re-running the pipeline if one already exists
@@ -118,7 +118,6 @@ def evaluate_job(url, force=False, post=None, profile=None):
         post is the posting's already-extracted fields (see scrape.POST_FIELDS); other keys
         are ignored. When given, the url is not scraped and serves as the storage key.
     """
-    profile = profile or config.resolve_profile()
     rubric = load_or_compile_rubric(profile=profile)
     rubric_hash = storage.rubric_content_hash(rubric)
 

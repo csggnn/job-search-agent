@@ -50,8 +50,7 @@ evaluating.
 **The profile is an argument, never module state.** Every entry point calls
 `config.add_profile_argument(parser)` and `config.profile_from_args(args)`, and passes the
 returned `config.Profile` to the functions it calls. Every public `jobsearch` function that
-reads or writes profile data takes `profile=None` as its last argument; `None` resolves the
-personal profile in that call, as a command run without `--default-profile` does.
+reads or writes profile data takes a required `profile` argument.
 `evals/dataset.py` takes only `profile.evals_dir`. Every path inside a profile is derived in
 `config.Profile`. No module holds the active profile. Code never branches on the profile
 name.
