@@ -386,7 +386,8 @@ API keys live in `~/.config/job-search-agent/.env`, shared by every checkout and
 `/config/.env` at import. podman-compose creates the directory empty when it is missing; a
 command that reads a missing key then fails in `config.require_env()`, and the error names
 the key and the file. `config.API_KEYS` lists every key the pipeline and the SDKs it calls read.
-`EnvExampleTest` in `tests/unit/test_units.py` checks that `.env.example` names each of them.
+`EnvExampleTest` in `tests/unit/test_units.py` checks that `.env.example` names each of them,
+and `scripts/check_setup.py` reports each one that is unset.
 
 ## Personalization files stay out of git
 

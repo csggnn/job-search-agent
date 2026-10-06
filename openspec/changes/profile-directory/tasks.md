@@ -18,7 +18,9 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 - [x] 1.3 Add `config.API_KEYS` listing every key name the pipeline can read, including `ANTHROPIC_API_KEY` and `GROQ_API_KEY`. Requiredness stays in `config.require_env` and `check_setup.py`. Add `test_env_example_names_every_api_key`, which fails and names each missing entry. Scenario "A key is missing from the template": verify by removing one key from `.env.example`, running the suite and recording the failure message, then restoring it.
   - Removing `GROQ_API_KEY` from `.env.example` fails `test_env_example_names_every_api_key` with `AssertionError: Lists differ: ['GROQ_API_KEY'] != []`.
 - [x] 1.4 Make `scripts/check_setup.py` take its keys through `config`: import `jobsearch.config`, which loads `/config/.env`, and read the Tavily key with `config.require_env`.
-- [ ] 1.5 Make `scripts/check_setup.py` report each key in `config.API_KEYS` that is unset, naming `config.KEYS_FILE`.
+- [x] 1.5 Make `scripts/check_setup.py` report each key in `config.API_KEYS` that is unset, naming `config.KEYS_FILE`.
+  - With `TAVILY_API_KEY` and `GROQ_API_KEY` set empty: prints `MISSING: TAVILY_API_KEY is not set in ~/.config/job-search-agent/.env` and the same line for `GROQ_API_KEY`, exits 1, and makes no API call.
+  - With every key set: prints `OK: every API key is set`, then runs the Tavily, Anthropic and Groq calls and exits 0.
 - [x] 1.6 Document the keys. `README.md` setup: `mkdir -p ~/.config/job-search-agent`, `.env` created there from `.env.example`, `chmod 600`. `CLAUDE.md` and `docs/architecture.md`: keys in `~/.config/job-search-agent/.env`, the read-only `/config` mount, `config.API_KEYS` and the test that checks `.env.example` against it.
 
 ## 2. Profile layout and resolution

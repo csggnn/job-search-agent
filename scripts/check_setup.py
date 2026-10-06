@@ -1,6 +1,7 @@
 """
-Environment smoke-check (not a unit test): confirms API keys and aisuite/Tavily wiring
-work by running a Tavily search and sending the same context to Anthropic and Groq.
+Environment smoke-check (not a unit test): reports API keys missing from the environment,
+then confirms API keys and aisuite/Tavily wiring work by running a Tavily search and
+sending the same context to Anthropic and Groq.
 Run with: python scripts/check_setup.py
 """
 
@@ -46,7 +47,22 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
     return response.choices[0].message.content
 
 
+def check_keys():
+    """ print the API keys missing from the environment. returns True if none """
+    missing = [name for name in config.API_KEYS if not config.get_env(name)]
+    for name in missing:
+        print(f"MISSING: {name} is not set in {config.KEYS_FILE}")
+    if not missing:
+        print("OK: every API key is set")
+    return not missing
+
+
 if __name__ == "__main__":
+    print("=== Setup ===")
+    if not check_keys():
+        sys.exit(1)
+    print()
+
     print("=== Tavily search ===")
     context = search(QUERY)
     print(context[:400], "...\n")
