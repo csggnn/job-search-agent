@@ -1,14 +1,14 @@
 # Tasks
 
 Each task names the spec scenarios it verifies. A scenario is verified by a test named after
-it, or by a manual check whose result is recorded under the task. Section 9 collects every
+it, or by a manual check whose result is recorded under the task. Section 7 collects every
 scenario into the table the implementation PR description carries.
 
 Unit tests run with `podman-compose exec job-search python3 -m unittest discover -s tests/unit`.
 
 ## 1. Keys
 
-- [x] 1.1 Commit `.env.example` holding the key names of the current `.env` template with no values. Remove `.env` from the index (`git rm --cached .env`). Scenario "Fresh clone" (personal-data-protection): verified in 8.2.
+- [x] 1.1 Commit `.env.example` holding the key names of the current `.env` template with no values. Remove `.env` from the index (`git rm --cached .env`). Scenario "Fresh clone" (personal-data-protection): verified in 6.2.
 - [x] 1.2 In `docker-compose.yml`, remove `env_file` and mount `${HOME}/.config/job-search-agent` read-only at `/config`. Make `config.py` call `load_dotenv("/config/.env")`, which does nothing when the file is absent. Verify that `podman-compose up -d` starts when the directory exists without `.env`, that it creates the directory empty and starts when the directory is missing, that an edited `.env` applies to the next command without recreating the container, and that writing `/config/.env` from inside the container fails because the mount is read-only. Record the results. Scenario "Key directory is missing" (personal-data-protection): the recorded start and `require_env` error.
   - Versions: podman-compose 1.0.6, podman 4.9.3.
   - Directory present, no `.env`: the container starts. `config.require_env("TAVILY_API_KEY")` raises `RuntimeError: required environment variable 'TAVILY_API_KEY' is not set: add it to ~/.config/job-search-agent/.env`.
@@ -23,65 +23,52 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
   - With every key set: prints `OK: every API key is set`, then runs the Tavily, Anthropic and Groq calls and exits 0.
 - [x] 1.6 Document the keys. `README.md` setup: `mkdir -p ~/.config/job-search-agent`, `.env` created there from `.env.example`, `chmod 600`. `CLAUDE.md` and `docs/architecture.md`: keys in `~/.config/job-search-agent/.env`, the read-only `/config` mount, `config.API_KEYS` and the test that checks `.env.example` against it.
 
-## 2. Profile layout and resolution
+## 2. Data directory and template
 
-- [ ] 2.1 `git mv data/resume.md data/job_preferences.md profiles/default/`. Replace the `data/` and `evals/` data rules in `.gitignore` with: `profiles/personal/`, the generated files and `evals/` of `profiles/default/`. Verify with `git check-ignore -v` on each path listed in the design's directory tree.
-- [ ] 2.2 Implement profile resolution in `config.py` as a pure function of the checkout root and the `--default-profile` value. Resolve on first path use, not at import. Expose `profile_dir()`, `profile_name()`, `DEFAULT_PROFILE_DIR`, `evals_data_dir()` (`profile_dir()/evals`) and `use_default_profile()` for Python callers with no command line. Add `add_profile_argument(parser)`, which registers `--default-profile` and `--scratch`, and `apply_profile_args(args)`. Do not read `sys.argv` at import, so importing `jobsearch` does not depend on the importing process's arguments. Remove `DATA_DIR`. The error for a missing personal file names that file and `--default-profile`. Unit tests against temporary directories, one per scenario (profile-selection): `test_fresh_clone_runs_the_default_profile`, `test_fresh_clone_without_the_flag`, `test_personal_files_select_the_personal_profile`, `test_one_personal_file_is_missing`, `test_requesting_the_default_profile`.
-- [ ] 2.3 Switch `storage.DB_PATH`, `rubric.RUBRIC_PATH` and `discovery.QUERIES_PATH` to paths computed from `config.profile_dir()` on use. Add `test_incomplete_personal_profile_writes_no_database`: with no personal files, and with only a personal resume, opening storage raises and creates no database file in either profile. Verify `grep -rn "DATA_DIR" jobsearch evals scripts tests` returns nothing.
-- [ ] 2.4 In `evals/dataset.py`, give every function that reads or writes files (`load_cases`, `save_cases`, `backup_cases`, `save_ad`, `load_ad`, `case_post`, `has_ad`) the eval directory as its first argument, and add `cases_path(evals_dir)` for the path `draft.py` prints. Remove the path constants computed at import (`EVALS_DIR`, `CASES_PATH`, `BACKUP_PATH`, `ADS_DIR`, `RUNS_DIR`). Prefix internal names with an underscore (`_ad_filename`, `_ad_path`, `_well_typed`, and the backup and ads paths) and list the public names in `__all__`. In `capture.py`, `draft.py` and `run_evals.py`, read `config.evals_data_dir()` once after `config.apply_profile_args(args)` and pass it. `run_evals.py` builds its runs directory from the same value. Update the `save_ad` patch in `tests/unit/test_evals.py` to the new signature. Scenarios "Evals use the active profile's eval set and rubric" and "A profile without an eval set does not use another profile's": verified in 8.3.
-- [ ] 2.5 Make `tests/e2e/test_e2e_pipeline.py` run `scripts/profile.sh reset-default` in setup, run the pipeline with `--default-profile`, and read the database path from `config.profile_dir()` after `config.use_default_profile()`. State in its docstring that it clears the checkout's default-profile state.
-- [ ] 2.6 Call `config.add_profile_argument(parser)` and `config.apply_profile_args(args)` in every entry point before any profile path is used: `evaluate_job_post.py`, `discover_jobs.py`, `propose_jobs.py`, `evals/capture.py`, `evals/draft.py`, `evals/run_evals.py`, `scripts/check_setup.py`, `scripts/recompile_rubric.py`. Verify by running each entry point with `--help` and recording that both flags are listed.
-- [ ] 2.7 Implement `--scratch` in `apply_profile_args`: copy the resolved profile directory to a temporary directory, point `profile_dir()` at it, and delete it at exit. Unit tests against temporary directories, one per scenario (profile-selection): `test_scratch_run_on_the_personal_profile`, `test_scratch_run_on_the_default_profile`, `test_a_scratch_copy_lasts_one_command`.
+- [ ] 2.1 `git mv data/resume.md data/job_preferences.md data.example/`. Replace the `data/` and `evals/` data rules in `.gitignore` with `data/`. Verify with `git check-ignore -v` on each path listed under `data/` in the design's directory tree, and that no file under `data.example/` is ignored.
+- [ ] 2.2 In `config.py`, add `SAMPLE_DIR` (`data.example/`) and `EVALS_DATA_DIR` (`DATA_DIR/evals`).
+- [ ] 2.3 In `evals/dataset.py`, derive `CASES_PATH`, `BACKUP_PATH`, `ADS_DIR` and `RUNS_DIR` from `config.EVALS_DATA_DIR`. Update the docstrings in `evals/__init__.py` and `evals/draft.py` that name the eval data paths.
 
-## 3. Unit tests read the committed sample
+## 3. Missing user data
 
-- [ ] 3.1 Point `DefaultDataTest` at `config.DEFAULT_PROFILE_DIR`. Give the section helpers it calls (`config.home_address()` and the target-location resolution) an optional preferences-text argument, so the test does not read the active profile. Scenarios "Required section removed" and "Resolved locations differ from the Location entries" (default-profile-data): verify by removing `## Scoring Notes` from the sample and reordering its `## Location` entries, recording each failure, then restoring the file.
-- [ ] 3.2 Scenarios "Home address resolves", "Target locations come from the Location section" and "Scoring guidance is present" (default-profile-data): verify the existing `DefaultDataTest` tests pass against `profiles/default/`, and that the sample home address geocodes through OpenRouteService from inside the container. Record the coordinate.
-- [ ] 3.3 Scenario "Personal profile does not affect the check": create a personal profile whose preferences lack `## Scoring Notes`, run the unit suite, and record that `DefaultDataTest` passes. Delete the personal profile afterwards.
+- [ ] 3.1 Add `config.require_data()`, which raises when `RESUME_PATH` or `JOB_PREFERENCES_PATH` is missing. The error names each missing file and `cp -r data.example data`. Unit tests against temporary directories: `test_fresh_clone` (data-directory), which checks that both files are named with the command, and `test_one_file_is_missing`, which checks that only the missing file is named.
+- [ ] 3.2 Call `config.require_data()` after argument parsing and before any other work in `evaluate_job_post.py`, `discover_jobs.py`, `propose_jobs.py`, `scripts/recompile_rubric.py`, `evals/capture.py`, `evals/draft.py` and `evals/run_evals.py`. Add `test_one_file_is_missing_makes_no_api_call`: with `data/` holding only a resume, `evaluate_job_post.py`'s entry point raises, and patched `scrape_post` and `load_or_compile_rubric` are not called. Scenario "Fresh clone" (data-directory): verified in 6.2.
+- [ ] 3.3 Make `scripts/check_setup.py` report a missing resume or job preferences, naming each with `cp -r data.example data`, and each of `## Location`, `## Home Address` and `## Scoring Notes` that is missing or empty in `data/job_preferences.md`, naming the file. It continues with the key checks in both cases. Put the data check in a pure function with unit tests `test_preferences_lack_a_section` and `test_no_user_data` (data-directory). Also run `check_setup.py` without `data/` and with a `data/job_preferences.md` lacking `## Home Address`, and record both outputs.
+- [ ] 3.4 In `tests/e2e/test_e2e_pipeline.py`, fail in setup with `cp -r data.example data` when `data/resume.md` is missing, and state in the docstring that the test writes to the checkout's `data/` and belongs in a checkout holding the example data.
 
-## 4. Setup verification
+## 4. Unit tests read the template
 
-- [ ] 4.1 Make `scripts/check_setup.py` report, for the active profile, each of `## Location`, `## Home Address` and `## Scoring Notes` that is missing or empty, naming the file. Put the section check in a pure function with a unit test, `test_personal_preferences_lack_a_section`. Scenario "Personal preferences lack a section": also run `check_setup.py` against a personal profile without `## Home Address` and record the output.
+- [ ] 4.1 Point `DefaultDataTest` at `config.SAMPLE_DIR`. Give the section helpers it calls (`config.home_address()` and the target-location resolution) an optional preferences-text argument, so the test does not read `data/`. Scenarios "Required section removed" and "Resolved locations differ from the Location entries" (default-profile-data): verify by removing `## Scoring Notes` from the template and reordering its `## Location` entries, recording each failure, then restoring the file.
+- [ ] 4.2 Scenarios "Home address resolves", "Target locations come from the Location section" and "Scoring guidance is present" (default-profile-data): verify the `DefaultDataTest` tests pass against `data.example/`, and that the template home address geocodes through OpenRouteService from inside the container. Record the coordinate.
+- [ ] 4.3 Scenarios "User data does not affect the check" and "Checkout without user data" (default-profile-data): run the unit suite once with a `data/job_preferences.md` lacking `## Scoring Notes` and once without `data/`, and record that `DefaultDataTest` passes both times.
 
-## 5. Reset
+## 5. Docs
 
-- [ ] 5.1 Write `scripts/profile.sh` with `reset-default` as in the design. It resolves the checkout from its own location and uses only `rm`. `reset-default` removes `profiles/default/evaluations.db`, `compatibility_rubric.json` and `search_queries.json`, and runs on the host or in the container.
-- [ ] 5.2 Add `tests/unit/test_profile_sh.py`, which copies the script into a temporary checkout-like tree and runs it with `bash`: `test_reset_the_default_profile` (profile-selection).
+- [ ] 5.1 Rewrite the `README.md` setup: create `data/` with `cp -r data.example data`, run the example data, then add personal data by removing `data/`, creating it again from `data.example/` and replacing the resume and job preferences. No step runs `git update-index`. Add the sentence that `data/` is ignored by git, holds data that cannot be regenerated, and is backed up by copying it while no pipeline command runs. Add a developer section on separate checkouts (a clone or a worktree): create the example data in a second checkout, copy `data/` from one checkout to another, and state that changes to one checkout's `data/` do not reach another. Scenarios "README setup" (personal-data-protection), "Developer sets up a checkout for the example data" and "Developer moves personal data to another checkout" (data-directory): verify by reading the rendered README on the pushed branch, and record the result per scenario.
+- [ ] 5.2 Update `CLAUDE.md`: replace "Git-invisible files" with the `data/` and `data.example/` layout and the separate-checkouts practice, and update the paths in the evals rules (`evals/ads/` becomes `data/evals/ads/`).
+- [ ] 5.3 Update `docs/architecture.md`, `docs/evals.md` and `docs/roadmap.md`, and the docstring in `jobsearch/preselection.py`. Verify `grep -rn "skip-worktree\|evals/cases\|evals/ads\|evals/runs" --include=*.md --include=*.py . | grep -v openspec` returns nothing.
 
-## 6. Worktrees
+## 6. Acceptance
 
-- [ ] 6.1 Scenario "New worktree without copied data" (profile-selection): create a worktree without copying, run the unit suite, and record that a run without `--default-profile` fails naming `--default-profile`.
-- [ ] 6.2 Scenario "Worktree with copied personal data": from the worktree, run `cp -r ../../profiles/personal profiles/`, evaluate one URL there, and record that the run used the personal profile and that the main checkout's personal database row count and modification time are unchanged.
-- [ ] 6.3 Scenario "A worktree uses the shared keys" (personal-data-protection): in a worktree with nothing copied, evaluate one URL with `--default-profile` and record that the API calls succeed.
+- [ ] 6.1 Run the full unit suite. Verify all tests pass.
+- [ ] 6.2 Fresh-clone run: clone the branch into a new folder and follow the README.
+  - Scenarios "Fresh clone" (personal-data-protection) and "Fresh clone" (data-directory): record that `.env.example` exists, `.env` does not, and `propose_jobs.py` before `data/` exists fails naming both files and `cp -r data.example data`, and creates no `data/`.
+  - Scenario "Fresh clone proposes jobs": create `data/` from the template, run `propose_jobs.py 2` and record the summary.
+  - Scenario "Switching from the sample to a personal profile": follow the README step that adds personal data with a second fictional candidate, run `propose_jobs.py 2`, and record that no example job appears.
+  - Scenario "After setup and a run": capture one eval case, run `evals/run_evals.py --criteria-only`, and record `git status --short` and `git add -A --dry-run`.
+  - Scenarios "Switching branches after a run" and "Merging after a run": create a branch with one commit, switch to it, switch back, merge it, and record that no step conflicts and `~/.config/job-search-agent/.env` and the files in `data/` are unchanged (checksums).
+- [ ] 6.3 Separate checkouts.
+  - Scenario "A worktree uses the shared keys": from the clone of 6.2, create a worktree, create its `data/` from the template and copy nothing else into it, evaluate one URL, and record that the API calls succeed.
+  - Scenario "Copying the directory transfers the user data": evaluate a URL in the clone, replace the worktree's `data/` with a copy of the clone's `data/`, evaluate the same URL in the worktree, and record the `(cached from ...)` suffix. Run `evals/run_evals.py --criteria-only` in both and record that they score the same cases.
+  - Scenario "Cleaning a checkout keeps the keys": record the checksum of `~/.config/job-search-agent/.env`, run `git clean -x -f -d` in the clone as the last step, and record that the checksum is unchanged.
+- [ ] 6.4 Run the live e2e suite in a checkout holding the example data, with keys available. Verify it passes.
+- [ ] 6.5 Run an automated review of the diff (`/code-review`) and resolve or record each finding.
 
-## 7. Docs
+## 7. Scenario coverage
 
-- [ ] 7.1 Rewrite the `README.md` setup: the sample run first with `--default-profile`, then the personal profile with no cleanup step, no `git update-index`. Add a section on the personal profile covering its files, the backup command (`cp -r profiles/personal <folder>`), the restore command (`rm -rf profiles/.personal.restore && cp -r <folder> profiles/.personal.restore && rm -rf profiles/personal && mv profiles/.personal.restore profiles/personal`), which starts from an empty staging directory, the `git clean -x` warning and the warning about copying during a running command. Scenario "Restore over newer data" (personal-data-protection): add a file to a test personal profile that the backup lacks, leave a `profiles/.personal.restore` holding other files, run the restore command, and record that `diff -r` against the backup reports no difference. Add a developer section covering `--scratch` and the statement that a scratch copy lasts one command, `reset-default`, the worktree copy command (`cp -r ../../profiles/personal profiles/`), the statement that changes to a worktree's data stay in its copy, and the statement that a run without `--default-profile` or `--scratch` in a checkout with the real personal profile writes to it. Apply the first-mention link rule. Scenarios "README setup", "First mention of a committed file", "First mention of .env", "First mention of a personal file", "Developer looks for a safe test setup", "User looks for how to protect personal data": verify on the pushed branch on GitHub by clicking each first-mention link, and record the result per scenario.
-- [ ] 7.2 Update `CLAUDE.md`: replace "Git-invisible files" with the profile layout, add `--default-profile`, `--scratch` and `scripts/profile.sh reset-default` to the Commands section, name the `git clean -x` risk, and update the paths in the evals rules (`data/evaluations.db`, `evals/ads/`).
-- [ ] 7.3 Update `docs/architecture.md`, `docs/evals.md` and `docs/roadmap.md`, and the docstrings in `evals/__init__.py`, `evals/draft.py`, `jobsearch/preselection.py` and `tests/e2e/test_e2e_pipeline.py`. Verify `grep -rn "skip-worktree\|data/resume\|data/job_preferences\|data/evaluations\|evals/cases\|evals/ads" --include=*.md --include=*.py . | grep -v openspec` returns nothing.
+- [ ] 7.1 Write the implementation PR description as a table with one row per scenario in the three delta specs: scenario, verifying test or task, result. Verify every scenario has a row and no row is empty.
 
-## 8. Acceptance
+## 8. Migration (after merge)
 
-- [ ] 8.1 Run the full unit suite. Verify all tests pass.
-- [ ] 8.2 Fresh-clone run: clone the branch into a new folder and follow the README.
-  - Scenarios "Fresh clone" (personal-data-protection) and "Fresh clone runs the default profile": record that `.env.example` exists, `.env` does not, and the first run uses the default profile.
-  - Scenario "Fresh clone proposes jobs": run `propose_jobs.py --default-profile 2` and record the summary.
-  - Scenario "Personal files select the personal profile" and "Switching from the sample to a personal profile": add a second fictional profile as the personal profile, run `propose_jobs.py 2`, and record that no sample job appears.
-  - Scenario "Personal run leaves the default profile unchanged": record the row counts of both databases.
-  - Scenario "Returning to the default profile": run `propose_jobs.py --default-profile` and record that only sample jobs appear.
-  - Scenario "After setup and a personal run": record `git status --short` and `git add -A --dry-run`.
-  - Scenario "Cleaning a checkout keeps the keys": record the checksum of `~/.config/job-search-agent/.env`, run `git clean -x -f -d` in the clone, and record that the checksum is unchanged.
-  - Scenarios "Switching branches after a personal run" and "Merging after a personal run": create a branch with one commit, switch to it, switch back, merge it, and record that no step conflicts and `~/.config/job-search-agent/.env` and the personal files are unchanged (checksums).
-- [ ] 8.3 Evals: in the main checkout after migration, run `evals/run_evals.py --criteria-only` on the personal profile and record that it scores the personal cases. Run it with `--default-profile` and record the "no cases to run" exit.
-- [ ] 8.4 Run the live e2e suite with keys available. Verify it passes.
-  - Scenario "Run after a reset": evaluate one URL with `--default-profile`, run `scripts/profile.sh reset-default`, evaluate it again with `--default-profile`, and record that the second output has no `(cached from ...)` suffix.
-- [ ] 8.5 Run an automated review of the diff (`/code-review`) and resolve or record each finding.
-
-## 9. Scenario coverage
-
-- [ ] 9.1 Write the implementation PR description as a table with one row per scenario in the three delta specs: scenario, verifying test or task, result. Verify every scenario has a row and no row is empty.
-
-## 10. Migration (after merge, main checkout)
-
-- [ ] 10.1 Run the design's Migration Plan in the main checkout. Verify `propose_jobs.py` uses the personal profile and its shortlist matches one taken before migration.
-- [ ] 10.2 In each existing worktree: clear the skip-worktree bits, run `git checkout -- .env data/resume.md data/job_preferences.md` (the worktree's copies duplicate the main checkout's data), merge `master`, run `rm -rf data`, then `cp -r ../../profiles/personal profiles/` if the worktree runs on personal data. Rebase open branches onto `master`.
+- [ ] 8.1 Run the design's Migration Plan in each checkout that holds personal data. Verify `propose_jobs.py` returns a shortlist matching one taken before migration, and that `evals/run_evals.py --criteria-only` scores the personal cases.
+- [ ] 8.2 In each other checkout: clear the skip-worktree bits, run `git checkout -- data/resume.md data/job_preferences.md`, merge `master`, run `rm -rf data`, then create `data/` from `data.example/` or from a copy of another checkout's `data/`. Rebase open branches onto `master`.
