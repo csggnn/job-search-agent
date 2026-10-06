@@ -165,7 +165,8 @@ evaluations and user-tracked fields that cannot be regenerated.
 - [Copying the database while a pipeline command writes produces a torn copy] → Documented.
   Commands are started by hand.
 - [`~/.config/job-search-agent/` is missing] → podman-compose creates it empty. A command
-  that reads a key fails in `config.require_env()`, naming the key and the file.
+  that reads a key fails in `config.require_env()`, and the error names the key and
+  the file.
 
 During migration only. These apply to branches created before this change, checked out in
 the main checkout, until they are merged or rebased onto `master`:

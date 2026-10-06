@@ -37,7 +37,7 @@ it, and the pipeline SHALL NOT write it.
 #### Scenario: Key directory is missing
 - **WHEN** `~/.config/job-search-agent/` does not exist and the user starts the container
 - **THEN** the container starts and `~/.config/job-search-agent/` exists, empty
-- **AND** a command that reads an API key fails naming the key and
+- **AND** a command that reads an API key fails and names the key and
   `~/.config/job-search-agent/.env`
 
 ### Requirement: Keys are configured from a committed template

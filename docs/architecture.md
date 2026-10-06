@@ -384,8 +384,8 @@ docs/                   architecture, evals, roadmap
 API keys live in `~/.config/job-search-agent/.env`, shared by every checkout and worktree.
 `docker-compose.yml` mounts that directory read-only at `/config`, and `config.py` loads
 `/config/.env` at import. podman-compose creates the directory empty when it is missing; a
-command that reads a missing key then fails in `config.require_env()`, naming the key and the
-file. `config.API_KEYS` lists every key the pipeline and the SDKs it calls read.
+command that reads a missing key then fails in `config.require_env()`, and the error names
+the key and the file. `config.API_KEYS` lists every key the pipeline and the SDKs it calls read.
 `EnvExampleTest` in `tests/unit/test_units.py` checks that `.env.example` names each of them.
 
 ## Personalization files stay out of git
