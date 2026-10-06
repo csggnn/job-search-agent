@@ -3,8 +3,9 @@ Shared configuration for the pipeline: filesystem paths to the personalization f
 small helpers for reading/hashing them, a couple of cross-cutting constants, and
 environment access.
 
-Environment variables are read lazily (never at import time), so the rest of the
-package can be imported - and its pure helpers unit-tested - without a populated .env.
+API keys are loaded from /config/.env, the container mount of ~/.config/job-search-agent/.
+Environment variables are read lazily (never at import time), so the rest of the package
+can be imported - and its pure helpers unit-tested - without any keys.
 Kept free of any candidate-specific content.
 """
 
@@ -14,7 +15,14 @@ import re
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv("/config/.env")
+
+# where the user keeps the API keys, mounted at /config in the container
+KEYS_FILE = "~/.config/job-search-agent/.env"
+
+# every API key the pipeline or the SDKs it calls read from the environment. .env.example
+# names each of them. Whether a key is required is checked where it is used.
+API_KEYS = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "GROQ_API_KEY", "ORS_API_KEY")
 
 # --- filesystem layout ---
 DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data"))
@@ -37,7 +45,8 @@ def require_env(name):
     try:
         return os.environ[name]
     except KeyError:
-        raise RuntimeError(f"required environment variable {name!r} is not set")
+        raise RuntimeError(f"required environment variable {name!r} is not set: add it to "
+                           f"{KEYS_FILE}")
 
 
 def home_address():

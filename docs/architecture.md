@@ -7,7 +7,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 
 | Module | Concern |
 |--------|---------|
-| `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, lazy env access (`require_env`) so modules import without a populated `.env`, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
+| `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
 | `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
@@ -61,7 +61,8 @@ response converter reads `content[0].text` and cannot parse a leading `ThinkingB
 The pipeline is configured for Anthropic models, but every call goes through aisuite, so
 switching provider is a matter of changing the `provider:model` strings
 (`EXTRACTION_MODEL`, `RUBRIC_MODEL`) in `jobsearch/llm.py` and setting that provider's key
-in `.env`. `_provider_kwargs` is Anthropic-specific and would need its own branch for a
+in `~/.config/job-search-agent/.env` and adding its name to `config.API_KEYS` and
+`.env.example`. `_provider_kwargs` is Anthropic-specific and would need its own branch for a
 provider whose response converter has a similar quirk.
 
 ## Commands
@@ -363,11 +364,12 @@ tests/                  unit/ (offline) and e2e/ (live, needs keys)
 scripts/                check_setup.py, recompile_rubric.py
 data/                   personalization files and generated caches
 docs/                   architecture, evals, roadmap
+.env.example            template for ~/.config/job-search-agent/.env
 ```
 
 | File | Written by | In git | Notes |
 |------|-----------|--------|-------|
-| `.env` | user | template only | real values are local-only |
+| `~/.config/job-search-agent/.env` | user | no | API keys; `.env.example` is the committed template |
 | `data/resume.md` | user | fictional sample only | real content is local-only |
 | `data/job_preferences.md` | user | fictional sample only | `## Location` lists the on-site search locations; `## Home Address` is the commute origin; `## Scoring Notes` is passed to the LLM verbatim |
 | `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume or preferences change |
@@ -377,24 +379,33 @@ docs/                   architecture, evals, roadmap
 | `evals/ads/*.json` | `capture.py` | no | a posting's raw page text plus extracted fields, so a case outlives the posting |
 | `evals/runs/*.json` | `run_evals.py` | no | one snapshot per run: metrics, rubric hash, model ids |
 
+## API keys
+
+API keys live in `~/.config/job-search-agent/.env`, shared by every checkout and worktree.
+`docker-compose.yml` mounts that directory read-only at `/config`, and `config.py` loads
+`/config/.env` at import. podman-compose creates the directory empty when it is missing; a
+command that reads a missing key then fails in `config.require_env()`, naming the key and the
+file. `config.API_KEYS` lists every key the pipeline and the SDKs it calls read.
+`EnvExampleTest` in `tests/unit/test_units.py` checks that `.env.example` names each of them.
+
 ## Personalization files stay out of git
 
-`.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
-committed as a fictional sample candidate that runs the full pipeline as-is.
+`data/resume.md` and `data/job_preferences.md` are committed as a fictional sample candidate
+that runs the full pipeline as-is.
 
 The **skip-worktree** bit is stored in a checkout's index. A fresh clone and each new
-worktree start without it. Set it on all three files before editing them:
+worktree start without it. Set it on both files before editing them:
 
 ```
-git update-index --skip-worktree .env data/resume.md data/job_preferences.md
+git update-index --skip-worktree data/resume.md data/job_preferences.md
 ```
 
-With the bit set, edits with real keys, resume or preferences do not appear in `git status`
-or `git diff` and are not picked up by `git add -A`, so personal data and API keys cannot
-be committed by accident.
+With the bit set, edits with a real resume or preferences do not appear in `git status` or
+`git diff` and are not picked up by `git add -A`, so personal data cannot be committed by
+accident.
 
-Changing a committed file requires re-enabling tracking first, for whichever of the three
-files (`.env`, `data/resume.md`, `data/job_preferences.md`) is being changed:
+Changing a committed file requires re-enabling tracking first, for whichever of the two
+files (`data/resume.md`, `data/job_preferences.md`) is being changed:
 
 ```
 git update-index --no-skip-worktree <file>

@@ -1,3 +1,6 @@
+# API keys live in ~/.config/job-search-agent/.env. A .env in the checkout is not read.
+.env
+
 # Derived/regenerated - not needed in version control, rebuilt automatically
 # from resume.md + job_preferences.md by compile_rubric()
 data/compatibility_rubric.json

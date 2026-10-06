@@ -39,7 +39,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # tests/e2e/<file> -> repo root
 DB_PATH = REPO_ROOT / "data" / "evaluations.db"
-ENV_PATH = REPO_ROOT / ".env"
+ENV_PATH = Path("/config/.env")  # ~/.config/job-search-agent/.env, mounted
 
 # env keys the pipeline needs to run for real; GROQ_API_KEY is only used by check_setup.py
 REQUIRED_ENV = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "ORS_API_KEY")
@@ -60,7 +60,7 @@ RUN_DISCOVERY_SMOKE = False
 
 
 def _dotenv_values():
-    """ best-effort parse of .env (KEY=value, ignoring blank/comment lines and trailing
+    """ best-effort parse of ENV_PATH (KEY=value, ignoring blank/comment lines and trailing
         inline comments) - only used to decide whether the required keys are available to
         the child process, so we can skip cleanly instead of failing when they're absent
     """
@@ -79,7 +79,7 @@ def _dotenv_values():
 
 
 def _env_available(key, dotenv):
-    """ True if `key` has a non-empty value in the process env or in .env """
+    """ True if `key` has a non-empty value in the process env or in ENV_PATH """
     return bool(os.environ.get(key) or dotenv.get(key))
 
 

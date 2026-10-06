@@ -28,11 +28,16 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 job-search-agent runs inside a container and relies on your own accounts for LLM, web
 search and commute-routing calls; it is currently configured to work with Anthropic, but can be edited to use other providers.
 
-1. Clone the repo, stop git from tracking your personal edits, and fill in `.env`, which is
-   present as a template:
+1. Clone the repo, stop git from tracking your personal edits, and put your API keys in
+   [`~/.config/job-search-agent/.env`](.env.example), created from the template:
    ```
-   git update-index --skip-worktree .env data/resume.md data/job_preferences.md
+   git update-index --skip-worktree data/resume.md data/job_preferences.md
+   mkdir -p ~/.config/job-search-agent
+   [ -e ~/.config/job-search-agent/.env ] || cp .env.example ~/.config/job-search-agent/.env
+   chmod 600 ~/.config/job-search-agent/.env
    ```
+   Every checkout and worktree reads this file. The container mounts it read-only. When the
+   file already exists, the copy is skipped: edit the existing file to add or change keys.
 
 | Variable | Used for | Notes |
 |----------|----------|-------|

@@ -119,14 +119,20 @@ Ad-hoc querying of saved evaluations has no dedicated script; use `sqlite3` dire
 against `data/evaluations.db`. Marking a job reviewed, applied or discarded is a direct
 call to `storage.update_review(url, ...)`, also with no CLI wrapper yet.
 
+## API keys
+
+API keys live in `~/.config/job-search-agent/.env`, outside every checkout. The container
+mounts that directory read-only at `/config`, and `config.py` loads `/config/.env`.
+`.env.example` names every key in `config.API_KEYS`; a unit test enforces it.
+
 ## Git-invisible files
 
-`.env` is committed as a template. `data/resume.md` and `data/job_preferences.md` are
-committed as a fictional sample candidate. The **skip-worktree** bit is local to each
-checkout's index: a fresh clone and each new worktree start without it. Set it with
-`git update-index --skip-worktree .env data/resume.md data/job_preferences.md` before
-editing them. With the bit set, edits with real keys, resume or preferences will not show
-up in `git status` or `git diff`, and will not be picked up by `git add -A`.
+`data/resume.md` and `data/job_preferences.md` are committed as a fictional sample
+candidate. The **skip-worktree** bit is local to each checkout's index: a fresh clone and
+each new worktree start without it. Set it with
+`git update-index --skip-worktree data/resume.md data/job_preferences.md` before editing
+them. With the bit set, edits with a real resume or preferences will not show up in
+`git status` or `git diff`, and will not be picked up by `git add -A`.
 To change the committed version, run `git update-index --no-skip-worktree <file>`, commit,
 then re-apply `git update-index --skip-worktree <file>`.
 
@@ -135,7 +141,7 @@ The sample candidate must keep every section the code parses (`## Location`,
 placeholder text. `DefaultDataTest` in `tests/unit/test_units.py` checks this against the
 active files.
 
-`data/compatibility_rubric.json`, `data/search_queries.json`, `data/evaluations.db`,
+`.env`, `data/compatibility_rubric.json`, `data/search_queries.json`, `data/evaluations.db`,
 `evals/cases.json`, `evals/ads/` and `evals/runs/` are gitignored entirely.
 
 ## Issue tracking

@@ -5,11 +5,14 @@ Run with: python scripts/check_setup.py
 """
 
 import os
-from dotenv import load_dotenv
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 from tavily import TavilyClient
 import aisuite as ai
 
-load_dotenv()
+from jobsearch import config
 
 QUERY = "What is the current state of AI agent frameworks in 2025?"
 
@@ -20,7 +23,7 @@ MODELS = [
 
 
 def search(query: str) -> str:
-    tavily = TavilyClient(api_key=os.environ["TAVILY_API_KEY"])
+    tavily = TavilyClient(api_key=config.require_env("TAVILY_API_KEY"))
     results = tavily.search(query, max_results=3)
     return "\n\n".join(r["content"] for r in results["results"])
 
