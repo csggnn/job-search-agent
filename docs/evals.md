@@ -30,21 +30,15 @@ needs API keys and a live posting.
 
 ## The eval set
 
-A hand-curated set of 5-10 cases, deliberately not the whole database. The database records
-real usage and grows on its own. An eval set only means anything if it is small enough to
-hold ground truth a human has actually checked.
+The eval set is a set of 5-10 job ads with hand-verified expected results. It measures
+whether a change makes the scoring more accurate, and shows which step and which case
+account for the errors. It is kept separate from the database because each case must be
+hand-verified and because the set must stay stable as the software evolves.
 
-**The database is for usage; the eval set is for eval.** Eval code may import only the pure
-helpers from `jobsearch.storage` (`normalize_url`, `rubric_content_hash`), never `get_*`,
-`save_*` or `list_*`, which open the database. Nothing under `evals/` reads or writes a
-profile's `evaluations.db`, and the eval set is never populated by sweeping it.
-
-The eval set belongs to a profile: it lives in the profile's `evals/` directory
-(`cases.json`, `ads/`, `runs/`), next to the rubric it is scored against. `capture.py`,
-`draft.py` and `run_evals.py` use `profiles/personal/evals/` by default and
-`profiles/default/evals/` with `--default-profile`. A profile with no `cases.json` has no
-cases: `run_evals.py` exits with "no cases to run" and does not read the other profile's.
-Paths below are relative to the profile's `evals/` directory.
+Each profile (personal and default) has its own eval set in the profile's `evals/`
+directory (`cases.json`, `ads/`, `runs/`). Paths below are relative to that directory. Eval
+commands use the personal profile unless given `--default-profile`. `profiles/default/` has
+no eval set yet.
 
 ### Case shape
 
