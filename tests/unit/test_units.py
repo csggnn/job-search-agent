@@ -8,6 +8,7 @@ query validation, JSON-reply parsing):
     podman-compose exec job-search python3 -m unittest discover -s tests/unit -v
 """
 
+import os
 import re
 import unittest
 from unittest import mock
@@ -249,7 +250,7 @@ class HomeAddressTest(unittest.TestCase):
 
 class DefaultDataTest(unittest.TestCase):
     # the active data/resume.md and data/job_preferences.md must fill every section the
-    # pipeline parses, so a fresh clone runs with only .env filled in
+    # pipeline parses, so a fresh clone runs with only the API keys filled in
 
     # "(fill in ...)" template text, or a bracketed token that is not a markdown link's text
     PLACEHOLDER = re.compile(r"\(fill in|\[[^\]\n]+\](?!\()")
@@ -282,6 +283,16 @@ class DefaultDataTest(unittest.TestCase):
                            (config.JOB_PREFERENCES_PATH, self.preferences)):
             match = self.PLACEHOLDER.search(text)
             self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
+
+
+class EnvExampleTest(unittest.TestCase):
+
+    def test_env_example_names_every_api_key(self):
+        path = os.path.join(os.path.dirname(__file__), "..", "..", ".env.example")
+        with open(path) as f:
+            named = set(re.findall(r"^([A-Z0-9_]+)=", f.read(), re.MULTILINE))
+        missing = [key for key in config.API_KEYS if key not in named]
+        self.assertEqual(missing, [], f".env.example does not name: {', '.join(missing)}")
 
 
 class ValidateQueriesTest(unittest.TestCase):

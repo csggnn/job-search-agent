@@ -10,7 +10,7 @@ without credentials.
 
 - **`tests/unit/`** offline unit tests for the deterministic helpers (URL normalization,
   rubric hashing and application, section extraction, query validation, JSON parsing) and
-  for pre-selection, whose one LLM call is patched out. No LLM, network or `.env` required.
+  for pre-selection, whose one LLM call is patched out. No LLM, network or API keys required.
 - **`tests/e2e/`** a live end-to-end smoke test that drives the pipeline through the CLI
   entrypoint and inspects the saved SQLite row. Requires API keys. Set `TARGET_URL` near
   the top of `tests/e2e/test_e2e_pipeline.py` to a currently-live posting.
