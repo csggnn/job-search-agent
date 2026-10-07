@@ -9,8 +9,8 @@ A re-draft retains existing values for criteria present in the rubric and fills 
 rubric recompile that adds criteria therefore leaves reviewed values intact. --force
 discards existing values.
 
-Drafting reads ads and writes cases.json. It calls no storage function and does not
-open data/evaluations.db.
+Drafting reads ads and writes data/evals/cases.json. It calls no storage function and
+does not open data/evaluations.db.
 
 Run with:
     python evals/draft.py <url|NAME>   # captures an ad if the url has none
@@ -26,6 +26,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import capture, dataset
+from jobsearch import config
 from jobsearch.commute import commute_score
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.evaluation import compatibility_score
@@ -154,6 +155,7 @@ def main():
 
     if not args.target and not args.all:
         parser.error("give a case NAME, a url, or --all")
+    config.require_data()
 
     rubric = load_rubric()
     if rubric is None:

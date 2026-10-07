@@ -23,7 +23,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import dataset
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.llm import EXTRACTION_MODEL
 from jobsearch.scrape import extract_post, fetch_page_text
 
@@ -172,6 +172,7 @@ def main():
     parser.add_argument("--re-extract", nargs="*", metavar="NAME",
                         help="rebuild post(s) from saved raw text; no NAME means all")
     args = parser.parse_args()
+    config.require_data()
 
     cases = dataset.load_cases()
 

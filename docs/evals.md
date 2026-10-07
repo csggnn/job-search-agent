@@ -31,16 +31,16 @@ A hand-curated set of 5-10 cases, deliberately not the whole database. The datab
 real usage and grows on its own. An eval set only means anything if it is small enough to
 hold ground truth a human has actually checked.
 
-**The database is for usage; `evals/` is for eval.** Eval code may import only the pure
+**The database is for usage; `data/evals/` is for eval.** Eval code may import only the pure
 helpers from `jobsearch.storage` (`normalize_url`, `rubric_content_hash`), never `get_*`,
 `save_*` or `list_*`, which open the database. Nothing under `evals/` reads or writes
 `data/evaluations.db`, and the eval set is never populated by sweeping it.
 
 ### Case shape
 
-`evals/cases.json`, each case: `{name, url, ad, verified, notes, expected: {...}}`.
+`data/evals/cases.json`, each case: `{name, url, ad, verified, notes, expected: {...}}`.
 
-`ad` names a file in `evals/ads/` and is what the case replays against. The `url` is
+`ad` names a file in `data/evals/ads/` and is what the case replays against. The `url` is
 provenance, not an input, so a posting being taken down cannot break a case. `ad: null`
 means capture failed; the case is kept, reported and skipped. The ad is recorded explicitly
 rather than derived from `name`, so renaming a case cannot orphan its inputs.
@@ -104,7 +104,7 @@ both sit inside a tolerance band while one is much closer.
 Tolerances are harness policy, not per-case data. `--tolerance-commute` is deliberately
 tight because the commute accept/reject boundary is only a few minutes wide.
 
-Each run is snapshotted to `evals/runs/` with the rubric hash and both model ids, so
+Each run is snapshotted to `data/evals/runs/` with the rubric hash and both model ids, so
 `--compare` can attribute a change afterwards.
 
 ## Cost tiers
@@ -137,5 +137,5 @@ after a posting is taken down.
 | `evals/draft.py` | stored ad to pre-filled ground truth for a human to correct |
 | `evals/run_evals.py` | replay the eval set, score it, snapshot the run, compare runs |
 
-Stored ads hold verbatim scraped job-ad text. That content is data under `evals/` and is
-never inlined into a `.py` file.
+Stored ads hold verbatim scraped job-ad text. That content is data under `data/evals/` and
+is never inlined into a `.py` file.

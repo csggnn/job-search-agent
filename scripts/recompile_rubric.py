@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from jobsearch import config
 from jobsearch.rubric import compile_rubric, load_or_compile_rubric
 
 
@@ -25,6 +26,7 @@ def main():
                         help="only recompile if resume.md/job_preferences.md hashes changed "
                              "(same check evaluate_job() uses); otherwise force a fresh build")
     args = parser.parse_args()
+    config.require_data()
 
     rubric = load_or_compile_rubric() if args.if_changed else compile_rubric()
 

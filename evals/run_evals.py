@@ -8,8 +8,8 @@ of the pipeline runs:
     --no-commute      adds days_on_office and the compatibility judgment. 2 LLM calls/case.
     (default)         adds the address search and ORS routing.
 
-Each run is written to evals/runs/ with the rubric hash and both model ids. --compare
-diffs against an earlier one.
+Each run is written to data/evals/runs/ with the rubric hash and both model ids.
+--compare diffs against an earlier one.
 
 resolve_rubric() loads one rubric per run and does not compile. Compiling mid-run would
 score cases in the same run against two rubrics.
@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import dataset, scoring
 from evals.capture import looks_truncated
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.commute import commute_score as commute_score_fn, figure_days_on_office
 from jobsearch.evaluation import compatibility_score
 from jobsearch.llm import EXTRACTION_MODEL, RUBRIC_MODEL
@@ -115,7 +115,7 @@ def run_case(case, rubric, tolerances, tier):
 
 
 def write_snapshot(snapshot):
-    """ write a run to evals/runs/<run_id>.json and return the path """
+    """ write a run to data/evals/runs/<run_id>.json and return the path """
     os.makedirs(dataset.RUNS_DIR, exist_ok=True)
     path = os.path.join(dataset.RUNS_DIR, f"{snapshot['run_id']}.json")
     with open(path, "w") as f:
@@ -125,8 +125,8 @@ def write_snapshot(snapshot):
 
 
 def latest_run(exclude=None):
-    """ (snapshot, path) of the most recent run in evals/runs/, or None. Ordered by filename,
-        which is the run_id timestamp.
+    """ (snapshot, path) of the most recent run in data/evals/runs/, or None. Ordered by
+        filename, which is the run_id timestamp.
     """
     paths = sorted(glob.glob(os.path.join(dataset.RUNS_DIR, "*.json")))
     paths = [p for p in paths if p != exclude]
@@ -258,6 +258,7 @@ def main():
     parser.add_argument("--compare", nargs="?", const=True, metavar="PATH",
                         help="diff against a run snapshot (default: the previous run)")
     args = parser.parse_args()
+    config.require_data()
 
     tier = "criteria-only" if args.criteria_only else "no-commute" if args.no_commute else "full"
     tolerances = {"score": args.tolerance_score, "commute": args.tolerance_commute}

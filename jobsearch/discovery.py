@@ -60,7 +60,7 @@ def _resolve_target_locations(resume, preferences):
     if match and not match.group(1).strip().startswith("["):
         return [match.group(1).strip()]
 
-    return [config.home_address()]
+    return [config.home_address(preferences)]
 
 
 def draft_queries(resume, preferences, target_locations):

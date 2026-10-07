@@ -12,7 +12,7 @@ parses arguments and picks the pools to rank.
 
 import argparse
 
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.discovery import discover_jobs, add_discovery_arguments
 from jobsearch.ranking import propose, format_proposal
 
@@ -35,6 +35,7 @@ def main():
         parser.error("n must be >= 1")
     if args.preselect_multiplier < 1:
         parser.error("--preselect-multiplier must be >= 1")
+    config.require_data()
 
     fresh = []
     if not args.no_discover:

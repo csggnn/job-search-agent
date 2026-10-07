@@ -10,9 +10,13 @@ query validation, JSON-reply parsing):
 
 import os
 import re
+import shutil
+import sys
+import tempfile
 import unittest
 from unittest import mock
 
+import evaluate_job_post
 from jobsearch import config, storage
 from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
@@ -227,6 +231,11 @@ class HomeAddressTest(unittest.TestCase):
         )
         self.assertEqual(config.home_address(), "1 Riverside Dr, 00001 Metropolis, Freedonia")
 
+    def test_skips_a_comment_and_a_subheading_before_the_address(self):
+        self._with_preferences("## Home Address\n<!-- street address -->\n### Home\n"
+                               "1 Riverside Dr, Metropolis\n")
+        self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
+
     def test_skips_blank_lines_before_the_address(self):
         self._with_preferences("## Home Address\n\n\n  1 Riverside Dr, Metropolis  \n")
         self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
@@ -249,40 +258,145 @@ class HomeAddressTest(unittest.TestCase):
 
 
 class DefaultDataTest(unittest.TestCase):
-    # the active data/resume.md and data/job_preferences.md must fill every section the
-    # pipeline parses, so a fresh clone runs with only the API keys filled in
+    # the template in data.example/ must fill every section the pipeline parses, so a fresh
+    # clone runs on it with only the API keys set up. Reads the template, not data/.
 
     # "(fill in ...)" template text, or a bracketed token that is not a markdown link's text
     PLACEHOLDER = re.compile(r"\(fill in|\[[^\]\n]+\](?!\()")
 
+    RESUME_PATH = os.path.join(config.SAMPLE_DIR, "resume.md")
+    PREFERENCES_PATH = os.path.join(config.SAMPLE_DIR, "job_preferences.md")
+
     def setUp(self):
-        self.resume = config.read_resume()
-        self.preferences = config.read_job_preferences()
+        with open(self.RESUME_PATH) as f:
+            self.resume = f.read()
+        with open(self.PREFERENCES_PATH) as f:
+            self.preferences = f.read()
 
     def test_home_address_resolves(self):
         try:
-            config.home_address()
+            config.home_address(self.preferences)
         except RuntimeError as e:
-            self.fail(f"## Home Address in {config.JOB_PREFERENCES_PATH}: {e}")
+            self.fail(f"## Home Address in {self.PREFERENCES_PATH}: {e}")
 
     def test_target_locations_come_from_the_location_section(self):
         section = extract_section(self.preferences, "Location")
-        self.assertTrue(section, f"## Location missing or empty in {config.JOB_PREFERENCES_PATH}")
+        self.assertTrue(section, f"## Location missing or empty in {self.PREFERENCES_PATH}")
         bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
                    if line.strip().startswith("-")]
-        self.assertTrue(bullets, f"## Location has no '-' entries in {config.JOB_PREFERENCES_PATH}")
-        self.assertEqual(_resolve_target_locations(self.resume, self.preferences), bullets,
-                         "target locations differ from the ## Location entries")
+        self.assertTrue(bullets, f"## Location has no '-' entries in {self.PREFERENCES_PATH}")
+        self.assertEqual(sorted(_resolve_target_locations(self.resume, self.preferences)),
+                         sorted(bullets), "target locations differ from the ## Location entries")
 
     def test_scoring_notes_present(self):
         self.assertTrue(extract_section(self.preferences, "Scoring Notes"),
-                        f"## Scoring Notes missing or empty in {config.JOB_PREFERENCES_PATH}")
+                        f"## Scoring Notes missing or empty in {self.PREFERENCES_PATH}")
 
     def test_no_placeholder_text(self):
-        for path, text in ((config.RESUME_PATH, self.resume),
-                           (config.JOB_PREFERENCES_PATH, self.preferences)):
+        for path, text in ((self.RESUME_PATH, self.resume),
+                           (self.PREFERENCES_PATH, self.preferences)):
             match = self.PLACEHOLDER.search(text)
             self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
+
+
+class RequireDataTest(unittest.TestCase):
+    # config.require_data() raises when the resume or the job preferences is missing, with
+    # the message of config.missing_data_message()
+
+    def setUp(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root)
+        self.data_dir = os.path.join(root, "data")
+        self.resume = os.path.join(self.data_dir, "resume.md")
+        self.preferences = os.path.join(self.data_dir, "job_preferences.md")
+        for name, value in (("DATA_DIR", self.data_dir), ("RESUME_PATH", self.resume),
+                            ("JOB_PREFERENCES_PATH", self.preferences)):
+            patcher = mock.patch.object(config, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _write_resume(self):
+        os.makedirs(self.data_dir)
+        with open(self.resume, "w") as f:
+            f.write("# Resume\n")
+
+    def test_fresh_clone(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            config.require_data()
+        message = str(ctx.exception)
+        self.assertIn(self.resume, message)
+        self.assertIn(self.preferences, message)
+        self.assertIn("create data/ from the template: cp -r data.example data", message)
+
+    def test_one_file_is_missing(self):
+        self._write_resume()
+        with self.assertRaises(RuntimeError) as ctx:
+            config.require_data()
+        message = str(ctx.exception)
+        self.assertIn(self.preferences, message)
+        self.assertNotIn(self.resume, message)
+        self.assertIn("restore the missing file, or remove data/ and create it again", message)
+
+    @mock.patch("jobsearch.evaluation.load_or_compile_rubric")
+    @mock.patch("jobsearch.evaluation.scrape_post")
+    def test_one_file_is_missing_makes_no_api_call(self, scrape_post, load_or_compile_rubric):
+        self._write_resume()
+        with mock.patch.object(sys, "argv", ["evaluate_job_post.py", "https://example.com/1"]):
+            with self.assertRaises(RuntimeError):
+                evaluate_job_post.main()
+        scrape_post.assert_not_called()
+        load_or_compile_rubric.assert_not_called()
+
+    def test_no_user_data(self):
+        message = config.missing_data_message()
+        self.assertIn(self.resume, message)
+        self.assertIn(self.preferences, message)
+        self.assertIn("cp -r data.example data", message)
+
+    def test_complete_data(self):
+        self._write_resume()
+        with open(self.preferences, "w") as f:
+            f.write("# Job Preferences\n")
+        self.assertIsNone(config.missing_data_message())
+
+
+class EmptyPreferencesSectionsTest(unittest.TestCase):
+    # config.empty_preferences_sections() names the sections the pipeline reads that are
+    # missing or empty
+
+    PREFERENCES = ("## Location\n- Metropolis, Freedonia\n\n"
+                   "## Home Address\n1 Riverside Dr, Metropolis\n\n"
+                   "## Scoring Notes\nweigh A\n")
+
+    def test_complete_preferences(self):
+        self.assertEqual(config.empty_preferences_sections(self.PREFERENCES), [])
+
+    def test_preferences_lack_a_section(self):
+        preferences = self.PREFERENCES.replace("## Home Address\n1 Riverside Dr, Metropolis\n\n", "")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
+
+    def test_preferences_section_is_empty(self):
+        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis\n", "")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
+
+    def test_preferences_section_holds_the_placeholder(self):
+        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
+                                               "(fill in: full street address)")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
+
+    def test_section_holding_only_a_comment_is_empty(self):
+        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
+                                               "<!-- full street address -->")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
+
+    def test_section_holding_only_a_subheading_is_empty(self):
+        preferences = self.PREFERENCES.replace("weigh A", "### Must-haves")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Scoring Notes"])
+
+    def test_section_starting_with_a_subheading_has_content(self):
+        preferences = self.PREFERENCES.replace("## Scoring Notes\nweigh A\n",
+                                               "## Scoring Notes\n### Must-haves\n- weigh A\n")
+        self.assertEqual(config.empty_preferences_sections(preferences), [])
 
 
 class EnvExampleTest(unittest.TestCase):

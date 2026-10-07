@@ -23,10 +23,13 @@ outside `data/`.
 
 ### Requirement: A run without user data fails and states how to create it
 Every pipeline command and eval command SHALL fail when `data/` lacks the resume or the
-job preferences. The error SHALL name each missing file and give the command that creates
-`data/` from the template, `cp -r data.example data`. The command SHALL fail before any
-API call or database write. No command SHALL read the template in place of missing user
-data.
+job preferences. The error SHALL name each missing file. When `data/` does not exist, the
+error SHALL give the command that creates `data/` from the template,
+`cp -r data.example data`. When `data/` exists, the error SHALL state that the user
+restores the missing file in `data/`, or removes `data/` and creates it again from the
+template. No error SHALL give a command that copies template files into an existing
+`data/`. The command SHALL fail before any API call or database write. No command SHALL
+read the template in place of missing user data.
 
 #### Scenario: Fresh clone
 - **WHEN** a user runs `propose_jobs.py` on a fresh clone with only API keys set up
@@ -38,6 +41,9 @@ data.
 - **WHEN** `data/` holds a resume and no job preferences and the user runs
   `evaluate_job_post.py <url>`
 - **THEN** the run fails with an error naming the missing job preferences
+- **AND** the error states that the user restores the file, or removes `data/` and creates
+  it again from the template
+- **AND** the error gives no command that copies template files into `data/`
 - **AND** it does not read the template job preferences
 - **AND** no API call is made
 
@@ -45,7 +51,8 @@ data.
 `scripts/check_setup.py` SHALL report each section the pipeline reads (`## Location`,
 `## Home Address`, `## Scoring Notes`) that is missing or empty in the user's job
 preferences, and SHALL name the job preferences file. It SHALL report a missing resume or
-job preferences file, naming each, with the command that creates `data/` from the template.
+job preferences file, naming each, with the same guidance as the error of a run without
+user data.
 
 #### Scenario: Preferences lack a section
 - **WHEN** the user's job preferences have no `## Home Address` and the user runs

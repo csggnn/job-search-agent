@@ -25,9 +25,15 @@ KEYS_FILE = "~/.config/job-search-agent/.env"
 API_KEYS = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "GROQ_API_KEY", "ORS_API_KEY")
 
 # --- filesystem layout ---
+# every user data path derives from DATA_DIR
 DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data"))
 RESUME_PATH = os.path.join(DATA_DIR, "resume.md")
 JOB_PREFERENCES_PATH = os.path.join(DATA_DIR, "job_preferences.md")
+EVALS_DATA_DIR = os.path.join(DATA_DIR, "evals")
+
+# the example user's data, committed. No pipeline command reads it. A user creates DATA_DIR
+# from it with `cp -r data.example data`.
+SAMPLE_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data.example"))
 
 # sentinel address marking a job with no commuting office, shared by commute scoring and
 # storage (which turns it into the is_remote flag)
@@ -49,12 +55,53 @@ def require_env(name):
                            f"{KEYS_FILE}")
 
 
-def home_address():
-    """ the candidate's home address, from the "## Home Address" section of
-        job_preferences.md, which commute times are measured from. Raises if the section is
-        absent or still holds the "(fill in ...)" template placeholder.
+# the job preferences sections the pipeline reads
+PREFERENCES_SECTIONS = ("Location", "Home Address", "Scoring Notes")
+
+
+def missing_data_message():
+    """ None if the resume and the job preferences exist; otherwise a message naming each
+        missing file and how to restore it. With DATA_DIR present, the message does not
+        suggest copying template files into it.
     """
-    section = extract_section(read_job_preferences(), "Home Address")
+    missing = [path for path in (RESUME_PATH, JOB_PREFERENCES_PATH) if not os.path.exists(path)]
+    if not missing:
+        return None
+    fix = ("restore the missing file, or remove data/ and create it again from the template"
+           if os.path.isdir(DATA_DIR) else "create data/ from the template")
+    return (f"missing user data: {', '.join(missing)}. In the checkout root, {fix}: "
+            "cp -r data.example data")
+
+
+def require_data():
+    """ raise if the resume or the job preferences is missing. Entry points call it before
+        any API call or write.
+    """
+    message = missing_data_message()
+    if message:
+        raise RuntimeError(message)
+
+
+def empty_preferences_sections(preferences):
+    """ the headings of PREFERENCES_SECTIONS that are missing or empty in `preferences` """
+    return [heading for heading in PREFERENCES_SECTIONS
+            if not _section_has_content(extract_section(preferences, heading))]
+
+
+def _section_has_content(section):
+    """ True if `section` holds a value, by the rules of _first_content_line() """
+    return bool(section) and _first_content_line(section) is not None
+
+
+def home_address(preferences=None):
+    """ the candidate's home address, from the "## Home Address" section of
+        job_preferences.md, which commute times are measured from. `preferences` is the job
+        preferences text; when None, the file at JOB_PREFERENCES_PATH is read. Raises if the
+        section is absent or still holds the "(fill in ...)" template placeholder.
+    """
+    if preferences is None:
+        preferences = read_job_preferences()
+    section = extract_section(preferences, "Home Address")
     address = _first_content_line(section) if section else None
     if not address:
         raise RuntimeError(
@@ -98,14 +145,14 @@ def extract_section(markdown_text, heading):
 
 
 def _first_content_line(text):
-    """ first stripped line of `text` that carries a value: non-empty and not a "(fill in
-        ...)" template placeholder. Returns None if that line is a markdown heading or
-        comment, which means the intended section was empty and extract_section() ran on
-        into the next one.
+    """ first stripped line of `text` that carries a value: not blank, not a "(fill in ...)"
+        placeholder, not an HTML comment line and not a "###" or deeper subheading. None if
+        no line qualifies, or if a "#" or "##" heading comes first: an empty section makes
+        extract_section() run into the next one.
     """
     for line in text.splitlines():
         line = line.strip()
-        if not line or line.startswith("(fill in"):
+        if not line or line.startswith(("(fill in", "<!--")) or line.startswith("###"):
             continue
-        return None if line.startswith(("#", "<!--")) else line
+        return None if line.startswith("#") else line
     return None

@@ -7,7 +7,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 
 | Module | Concern |
 |--------|---------|
-| `jobsearch/config.py` | Filesystem paths, personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md`. |
+| `jobsearch/config.py` | Filesystem paths derived from `DATA_DIR` (`EVALS_DATA_DIR`) and `SAMPLE_DIR`, the user-data checks (`require_data`, `missing_data_message`, `empty_preferences_sections`), personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md` or of a given preferences text. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
 | `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |
@@ -359,10 +359,12 @@ discover_jobs.py        CLI entrypoint: find, pre-select and optionally score ne
 propose_jobs.py         CLI entrypoint: evaluate 3N job ads, propose the top N by combined score
 jobsearch/              the package: scrape, commute, rubric, evaluation, discovery,
                         pre-selection, ranking, storage, LLM wrapper, config
-evals/                  the eval harness and its hand-curated case set
+evals/                  the eval harness
 tests/                  unit/ (offline) and e2e/ (live, needs keys)
 scripts/                check_setup.py, recompile_rubric.py
-data/                   personalization files and generated caches
+data.example/           example user's data, committed: the template for data/
+data/                   user data, gitignored: personalization files, generated caches,
+                        the evaluations database and the eval set
 docs/                   architecture, evals, roadmap
 .env.example            template for ~/.config/job-search-agent/.env
 ```
@@ -370,14 +372,16 @@ docs/                   architecture, evals, roadmap
 | File | Written by | In git | Notes |
 |------|-----------|--------|-------|
 | `~/.config/job-search-agent/.env` | user | no | API keys; `.env.example` is the committed template |
-| `data/resume.md` | user | fictional sample only | real content is local-only |
-| `data/job_preferences.md` | user | fictional sample only | `## Location` lists the on-site search locations; `## Home Address` is the commute origin; `## Scoring Notes` is passed to the LLM verbatim |
+| `data.example/resume.md` | maintainers | yes | fictional sample candidate, the template for `data/resume.md` |
+| `data.example/job_preferences.md` | maintainers | yes | fictional sample candidate, the template for `data/job_preferences.md` |
+| `data/resume.md` | user | no | created from `data.example/` |
+| `data/job_preferences.md` | user | no | `## Location` lists the on-site search locations; `## Home Address` is the commute origin; `## Scoring Notes` is passed to the LLM verbatim |
 | `data/compatibility_rubric.json` | `compile_rubric()` | no | regenerated when resume or preferences change |
 | `data/search_queries.json` | `jobsearch/discovery.py` | no | cached search phrases |
 | `data/evaluations.db` | `storage.save_evaluation()` | no | one row per URL plus per-criterion breakdown; real usage only, never eval runs |
-| `evals/cases.json` | `capture.py` / `draft.py`, then hand-edited | no | ground truth; `"verified": false` until reviewed |
-| `evals/ads/*.json` | `capture.py` | no | a posting's raw page text plus extracted fields, so a case outlives the posting |
-| `evals/runs/*.json` | `run_evals.py` | no | one snapshot per run: metrics, rubric hash, model ids |
+| `data/evals/cases.json` | `capture.py` / `draft.py`, then hand-edited | no | ground truth; `"verified": false` until reviewed |
+| `data/evals/ads/*.json` | `capture.py` | no | a posting's raw page text plus extracted fields, so a case outlives the posting |
+| `data/evals/runs/*.json` | `run_evals.py` | no | one snapshot per run: metrics, rubric hash, model ids |
 
 ## API keys
 
@@ -389,30 +393,10 @@ the key and the file. `config.API_KEYS` lists every key the pipeline and the SDK
 `EnvExampleTest` in `tests/unit/test_units.py` checks that `.env.example` names each of them,
 and `scripts/check_setup.py` reports each one that is unset.
 
-## Personalization files stay out of git
+## User data stays out of git
 
-`data/resume.md` and `data/job_preferences.md` are committed as a fictional sample candidate
-that runs the full pipeline as-is.
-
-The **skip-worktree** bit is stored in a checkout's index. A fresh clone and each new
-worktree start without it. Set it on both files before editing them:
-
-```
-git update-index --skip-worktree data/resume.md data/job_preferences.md
-```
-
-With the bit set, edits with a real resume or preferences do not appear in `git status` or
-`git diff` and are not picked up by `git add -A`, so personal data cannot be committed by
-accident.
-
-Changing a committed file requires re-enabling tracking first, for whichever of the two
-files (`data/resume.md`, `data/job_preferences.md`) is being changed:
-
-```
-git update-index --no-skip-worktree <file>
-# edit, commit the change
-git update-index --skip-worktree <file>
-```
+`.gitignore` lists `/data/`. Files in `data/` are never staged, and branch switches and
+merges leave them unchanged.
 
 ## Cost and caching
 
