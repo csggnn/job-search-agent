@@ -60,7 +60,7 @@ def check_data():
         problems += [f"## {heading} is missing or empty in {config.JOB_PREFERENCES_PATH}"
                      for heading in empty]
     for problem in problems:
-        print(f"MISSING: {problem}")
+        print(problem)
     if not problems:
         print("OK: resume and job preferences are complete")
     return not problems
