@@ -231,6 +231,11 @@ class HomeAddressTest(unittest.TestCase):
         )
         self.assertEqual(config.home_address(), "1 Riverside Dr, 00001 Metropolis, Freedonia")
 
+    def test_skips_a_comment_and_a_subheading_before_the_address(self):
+        self._with_preferences("## Home Address\n<!-- street address -->\n### Home\n"
+                               "1 Riverside Dr, Metropolis\n")
+        self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
+
     def test_skips_blank_lines_before_the_address(self):
         self._with_preferences("## Home Address\n\n\n  1 Riverside Dr, Metropolis  \n")
         self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
@@ -378,6 +383,15 @@ class EmptyPreferencesSectionsTest(unittest.TestCase):
         preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
                                                "(fill in: full street address)")
         self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
+
+    def test_section_holding_only_a_comment_is_empty(self):
+        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
+                                               "<!-- full street address -->")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
+
+    def test_section_holding_only_a_subheading_is_empty(self):
+        preferences = self.PREFERENCES.replace("weigh A", "### Must-haves")
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Scoring Notes"])
 
     def test_section_starting_with_a_subheading_has_content(self):
         preferences = self.PREFERENCES.replace("## Scoring Notes\nweigh A\n",

@@ -89,17 +89,8 @@ def empty_preferences_sections(preferences):
 
 
 def _section_has_content(section):
-    """ True if `section` holds a line other than a "(fill in ...)" placeholder. A section
-        whose first such line is a "## " heading is empty: extract_section() ran into the
-        next section.
-    """
-    if not section:
-        return False
-    for line in section.splitlines():
-        line = line.strip()
-        if line and not line.startswith("(fill in"):
-            return re.match(r"##\s", line) is None
-    return False
+    """ True if `section` holds a value, by the rules of _first_content_line() """
+    return bool(section) and _first_content_line(section) is not None
 
 
 def home_address(preferences=None):
@@ -154,14 +145,14 @@ def extract_section(markdown_text, heading):
 
 
 def _first_content_line(text):
-    """ first stripped line of `text` that carries a value: non-empty and not a "(fill in
-        ...)" template placeholder. Returns None if that line is a markdown heading or
-        comment, which means the intended section was empty and extract_section() ran on
-        into the next one.
+    """ first stripped line of `text` that carries a value: not blank, not a "(fill in ...)"
+        placeholder, not an HTML comment line and not a "###" or deeper subheading. None if
+        no line qualifies, or if a "#" or "##" heading comes first: an empty section makes
+        extract_section() run into the next one.
     """
     for line in text.splitlines():
         line = line.strip()
-        if not line or line.startswith("(fill in"):
+        if not line or line.startswith(("(fill in", "<!--")) or line.startswith("###"):
             continue
-        return None if line.startswith(("#", "<!--")) else line
+        return None if line.startswith("#") else line
     return None
