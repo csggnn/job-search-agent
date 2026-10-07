@@ -66,23 +66,34 @@ def missing_data_files():
     return [path for path in (RESUME_PATH, JOB_PREFERENCES_PATH) if not os.path.exists(path)]
 
 
+def missing_data_guidance(data_dir_exists):
+    """ how to resolve missing user data files. With DATA_DIR present, the user restores the
+        files or recreates DATA_DIR from the template. No template file is copied into an
+        existing DATA_DIR, so its contents come from one source.
+    """
+    if not data_dir_exists:
+        return f"Create data/ from the template, in the checkout root: {CREATE_DATA_COMMAND}"
+    return ("Restore the missing file in data/, or remove data/ and create it again from the "
+            f"template, in the checkout root: {CREATE_DATA_COMMAND}")
+
+
 def require_data():
     """ raise if the resume or the job preferences is missing. Entry points call it before
         any API call or write. The template in SAMPLE_DIR is not read in their place.
     """
     missing = missing_data_files()
     if missing:
-        raise RuntimeError(f"missing user data: {', '.join(missing)}. Create data/ from the "
-                           f"template, in the checkout root: {CREATE_DATA_COMMAND}")
+        raise RuntimeError(f"missing user data: {', '.join(missing)}. "
+                           f"{missing_data_guidance(os.path.isdir(DATA_DIR))}")
 
 
-def data_problems(missing_files, preferences_text):
+def data_problems(missing_files, preferences_text, data_dir_exists):
     """ one message per missing user data file and per section of PREFERENCES_SECTIONS that is
         missing or empty in `preferences_text`. `preferences_text` is None when the job
         preferences file is missing. An empty list means the data is complete.
     """
-    problems = [f"{path} does not exist. Create data/ from the template, in the checkout "
-                f"root: {CREATE_DATA_COMMAND}" for path in missing_files]
+    guidance = missing_data_guidance(data_dir_exists)
+    problems = [f"{path} does not exist. {guidance}" for path in missing_files]
     if preferences_text is not None:
         for heading in PREFERENCES_SECTIONS:
             if not _section_has_content(extract_section(preferences_text, heading)):

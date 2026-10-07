@@ -54,7 +54,7 @@ def check_data():
     missing = config.missing_data_files()
     preferences = (None if config.JOB_PREFERENCES_PATH in missing
                    else config.read_job_preferences())
-    problems = config.data_problems(missing, preferences)
+    problems = config.data_problems(missing, preferences, os.path.isdir(config.DATA_DIR))
     for problem in problems:
         print(f"MISSING: {problem}")
     if not problems:

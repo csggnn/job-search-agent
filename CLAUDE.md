@@ -148,7 +148,9 @@ module names the directory.
 No pipeline or eval command reads `data.example/`. A user creates `data/` with
 `cp -r data.example data`. Every entry point calls `config.require_data()` after parsing
 arguments and before any other work, so a run without a resume or job preferences fails
-before any API call or write. A new entry point must do the same.
+before any API call or write. A new entry point must do the same. No message suggests
+copying template files into an existing `data/`: the user restores the file or recreates
+`data/` from the template.
 
 The example data must keep every section the code parses (`## Location`,
 `## Home Address`, `## Scoring Notes`) filled in, with a geocodable home address and no
