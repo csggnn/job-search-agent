@@ -20,15 +20,15 @@ in SQLite so the same URL is never re-evaluated for free.
 `data/job_preferences.md`. `scoring_guidance` (the verbatim `## Scoring Notes` section) is
 the mechanism that keeps domain-specific scoring logic out of code.
 
-**The database is for usage; `evals/` is for eval.** `data/evaluations.db` records real
+**The database is for usage; `data/evals/` is for eval.** `data/evaluations.db` records real
 evaluations and grows on its own. The eval set is curated by hand and stays small enough to
-hold verified ground truth. Eval code may import only the pure helpers from
+hold verified ground truth. Eval code (`evals/*.py`) may import only the pure helpers from
 `jobsearch.storage` (`normalize_url`, `rubric_content_hash`), never `get_*`, `save_*` or
 `list_*`, which open the database. Nothing under `evals/` may read or write
 `data/evaluations.db`, and the eval set must never be populated by sweeping it.
 
-**Stored ads are data, not code.** `evals/ads/` holds verbatim scraped job-ad text. It must
-never be inlined into a `.py` file.
+**Stored ads are data, not code.** `data/evals/ads/` holds verbatim scraped job-ad text. It
+must never be inlined into a `.py` file.
 
 **Keep the docs current.** When you change a file's behavior or logic, check whether
 `README.md`, `docs/architecture.md` or `docs/evals.md` documents that behavior and update it
@@ -131,24 +131,34 @@ API keys live in `~/.config/job-search-agent/.env`, outside every checkout. The 
 mounts that directory read-only at `/config`, and `config.py` loads `/config/.env`.
 `.env.example` names every key in `config.API_KEYS`; a unit test enforces it.
 
-## Git-invisible files
+## User data
 
-`data/resume.md` and `data/job_preferences.md` are committed as a fictional sample
-candidate. The **skip-worktree** bit is local to each checkout's index: a fresh clone and
-each new worktree start without it. Set it with
-`git update-index --skip-worktree data/resume.md data/job_preferences.md` before editing
-them. With the bit set, edits with a real resume or preferences will not show up in
-`git status` or `git diff`, and will not be picked up by `git add -A`.
-To change the committed version, run `git update-index --no-skip-worktree <file>`, commit,
-then re-apply `git update-index --skip-worktree <file>`.
+```
+data.example/   example user's data, committed: resume.md, job_preferences.md
+data/           user data, gitignored as a whole
+  resume.md, job_preferences.md
+  evaluations.db, compatibility_rubric.json, search_queries.json
+  evals/        cases.json, ads/, runs/
+```
 
-The sample candidate must keep every section the code parses (`## Location`,
+Every user data path derives from `config.DATA_DIR`. `config.EVALS_DATA_DIR` is
+`DATA_DIR/evals`, and `evals/dataset.py` derives the eval set paths from it. No other
+module names the directory.
+
+No pipeline or eval command reads `data.example/`. A user creates `data/` with
+`cp -r data.example data`. Every entry point calls `config.require_data()` after parsing
+arguments and before any other work, so a run without a resume or job preferences fails
+before any API call or write. A new entry point must do the same.
+
+The example data must keep every section the code parses (`## Location`,
 `## Home Address`, `## Scoring Notes`) filled in, with a geocodable home address and no
-placeholder text. `DefaultDataTest` in `tests/unit/test_units.py` checks this against the
-active files.
+placeholder text. `DefaultDataTest` in `tests/unit/test_units.py` checks this against
+`config.SAMPLE_DIR` and does not read `data/`.
 
-`.env`, `data/compatibility_rubric.json`, `data/search_queries.json`, `data/evaluations.db`,
-`evals/cases.json`, `evals/ads/` and `evals/runs/` are gitignored entirely.
+Each checkout, a clone or a worktree, has its own `data/`. Keep personal data in one
+checkout and run the example data in another. Running the example data in a checkout that
+holds personal data writes the sample candidate's evaluations into the personal database.
+The e2e tests write to `data/` and belong in a checkout holding the example data.
 
 ## Issue tracking
 

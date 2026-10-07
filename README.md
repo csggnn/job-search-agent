@@ -19,8 +19,8 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 
 ## Default usage
 
-- The user edits `data/resume.md` and `data/job_preferences.md`, with their own resume and
-  preferences.
+- The user writes their own resume and preferences in `data/resume.md` and
+  `data/job_preferences.md`.
 - At any time, the user runs `propose_jobs.py <n>` to get the `n` best-fitting newly-discovered jobs and the `n` overall best-fitting jobs in their job database
 
 ## Setup
@@ -28,10 +28,9 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 job-search-agent runs inside a container and relies on your own accounts for LLM, web
 search and commute-routing calls; it is currently configured to work with Anthropic, but can be edited to use other providers.
 
-1. Clone the repo, stop git from tracking your personal edits, and put your API keys in
+1. Clone the repo and put your API keys in
    [`~/.config/job-search-agent/.env`](.env.example), created from the template:
    ```
-   git update-index --skip-worktree data/resume.md data/job_preferences.md
    mkdir -p ~/.config/job-search-agent
    [ -e ~/.config/job-search-agent/.env ] || cp .env.example ~/.config/job-search-agent/.env
    chmod 600 ~/.config/job-search-agent/.env
@@ -44,33 +43,72 @@ search and commute-routing calls; it is currently configured to work with Anthro
 | `ORS_API_KEY` | OpenRouteService geocoding and driving-time routing | Free |
 | `GROQ_API_KEY` | Only `scripts/check_setup.py` for the moment | Free tier available |
 
-2. Start the container and check the API keys are wired up:
+2. Create `data/` from the example data, a fictional sample candidate:
+   ```
+   cp -r data.example data
+   ```
+
+3. Start the container and check the API keys and data are in place:
    ```
    podman-compose up -d
    podman-compose exec job-search python3 scripts/check_setup.py
    ```
 
-3. Find and present the best-fitting jobs:
+4. Find and present the best-fitting jobs for the sample candidate:
    ```
    podman-compose exec job-search python3 propose_jobs.py 3
    ```
-   `data/resume.md` and `data/job_preferences.md` ship with a fictional sample candidate,
-   so this runs before you add your own profile.
 
-4. Replace `data/resume.md` and `data/job_preferences.md` with your own resume and
+5. Add your own data. Remove `data/` and create it again from the template, so your
+   database holds none of the sample candidate's evaluations:
+   ```
+   rm -rf data
+   cp -r data.example data
+   ```
+   Then replace `data/resume.md` and `data/job_preferences.md` with your own resume and
    preferences. Keep the `## Location`, `## Home Address` and `## Scoring Notes` sections
-   of `job_preferences.md`: the pipeline reads them directly. Then delete the sample
-   candidate's evaluations, which would otherwise be ranked alongside yours:
-   ```
-   rm data/evaluations.db
-   ```
+   of `job_preferences.md`: the pipeline reads them directly. `scripts/check_setup.py`
+   reports each one that is missing or empty.
 
-5. Run the search again on your own profile:
+6. Run the search again on your own data:
    ```
    podman-compose exec job-search python3 propose_jobs.py 3
    ```
    The search queries and the scoring rubric are rebuilt from your files on this run.
    Repeat this command whenever you want new proposals.
+
+## Your data
+
+`data/` holds your resume, your preferences, every evaluation and the eval set. It is
+ignored by git and holds data that cannot be regenerated. Deleting the checkout or running
+`git clean -x` in it deletes `data/`. Backing it up beforehand is your responsibility: copy
+it while no pipeline command runs.
+```
+cp -r data ~/job-search-data-backup
+```
+
+## Separate checkouts for development
+
+Each checkout, a clone or a worktree, has its own `data/`. Changes to one checkout's `data/`
+do not reach another. Keep your personal data in one checkout and run the example data in a
+second one, so evaluations of the sample candidate never enter your personal database.
+
+To test on the example data, create a second checkout, create its `data/` from the
+template, and start its container:
+```
+git worktree add ../job-search-agent-example
+cd ../job-search-agent-example
+cp -r data.example data
+podman-compose up -d
+```
+Runs in the second checkout leave the first checkout's `data/` unchanged.
+
+To run your personal data in another checkout, copy `data/` into it:
+```
+rm -rf <other-checkout>/data
+cp -r <personal-checkout>/data <other-checkout>/data
+```
+The copy does not follow later runs in the source checkout. Copying again replaces it.
 
 ## What to expect
 
