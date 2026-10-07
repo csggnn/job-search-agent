@@ -1,6 +1,6 @@
 """
-Read/write layer for the eval set: cases.json (ground truth) and the ads it references
-(stored job-posting inputs).
+Read/write layer for the eval set in data/evals/: cases.json (ground truth) and the ads it
+references (stored job-posting inputs).
 
 A case references its ad by filename rather than deriving it from the case name, so a
 rename leaves the reference intact. A case with a null "ad" has no captured inputs;
@@ -13,14 +13,13 @@ import json
 import os
 import re
 
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.scrape import validate_post
 
-EVALS_DIR = os.path.dirname(__file__)
-CASES_PATH = os.path.join(EVALS_DIR, "cases.json")
-BACKUP_PATH = os.path.join(EVALS_DIR, "cases.json.bak")
-ADS_DIR = os.path.join(EVALS_DIR, "ads")
-RUNS_DIR = os.path.join(EVALS_DIR, "runs")
+CASES_PATH = os.path.join(config.EVALS_DATA_DIR, "cases.json")
+BACKUP_PATH = os.path.join(config.EVALS_DATA_DIR, "cases.json.bak")
+ADS_DIR = os.path.join(config.EVALS_DATA_DIR, "ads")
+RUNS_DIR = os.path.join(config.EVALS_DATA_DIR, "runs")
 
 # ground truth holds one value per step, not a range. The accepted margin is a harness-level
 # --tolerance-* option. A per-case range yields a constant pass/fail across the whole band.
@@ -48,6 +47,7 @@ def load_cases():
 
 def save_cases(cases):
     """ write the case list to cases.json """
+    os.makedirs(config.EVALS_DATA_DIR, exist_ok=True)
     with open(CASES_PATH, "w") as f:
         json.dump(cases, f, indent=2)
         f.write("\n")

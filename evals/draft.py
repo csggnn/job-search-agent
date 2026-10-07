@@ -9,8 +9,8 @@ A re-draft retains existing values for criteria present in the rubric and fills 
 rubric recompile that adds criteria therefore leaves reviewed values intact. --force
 discards existing values.
 
-Drafting reads ads and writes cases.json. It calls no storage function and does not
-open data/evaluations.db.
+Drafting reads ads and writes data/evals/cases.json. It calls no storage function and
+does not open data/evaluations.db.
 
 Run with:
     python evals/draft.py <url|NAME>   # captures an ad if the url has none

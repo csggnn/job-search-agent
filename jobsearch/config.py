@@ -25,9 +25,15 @@ KEYS_FILE = "~/.config/job-search-agent/.env"
 API_KEYS = ("ANTHROPIC_API_KEY", "TAVILY_API_KEY", "GROQ_API_KEY", "ORS_API_KEY")
 
 # --- filesystem layout ---
+# every user data path derives from DATA_DIR
 DATA_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data"))
 RESUME_PATH = os.path.join(DATA_DIR, "resume.md")
 JOB_PREFERENCES_PATH = os.path.join(DATA_DIR, "job_preferences.md")
+EVALS_DATA_DIR = os.path.join(DATA_DIR, "evals")
+
+# the example user's data, committed. No pipeline command reads it. A user creates DATA_DIR
+# from it with `cp -r data.example data`.
+SAMPLE_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "data.example"))
 
 # sentinel address marking a job with no commuting office, shared by commute scoring and
 # storage (which turns it into the is_remote flag)
@@ -49,12 +55,15 @@ def require_env(name):
                            f"{KEYS_FILE}")
 
 
-def home_address():
+def home_address(preferences=None):
     """ the candidate's home address, from the "## Home Address" section of
-        job_preferences.md, which commute times are measured from. Raises if the section is
-        absent or still holds the "(fill in ...)" template placeholder.
+        job_preferences.md, which commute times are measured from. `preferences` is the job
+        preferences text; when None, the file at JOB_PREFERENCES_PATH is read. Raises if the
+        section is absent or still holds the "(fill in ...)" template placeholder.
     """
-    section = extract_section(read_job_preferences(), "Home Address")
+    if preferences is None:
+        preferences = read_job_preferences()
+    section = extract_section(preferences, "Home Address")
     address = _first_content_line(section) if section else None
     if not address:
         raise RuntimeError(

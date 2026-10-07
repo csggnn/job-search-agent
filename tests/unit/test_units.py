@@ -249,38 +249,43 @@ class HomeAddressTest(unittest.TestCase):
 
 
 class DefaultDataTest(unittest.TestCase):
-    # the active data/resume.md and data/job_preferences.md must fill every section the
-    # pipeline parses, so a fresh clone runs with only the API keys filled in
+    # the template in data.example/ must fill every section the pipeline parses, so a fresh
+    # clone runs on it with only the API keys set up. Reads the template, not data/.
 
     # "(fill in ...)" template text, or a bracketed token that is not a markdown link's text
     PLACEHOLDER = re.compile(r"\(fill in|\[[^\]\n]+\](?!\()")
 
+    RESUME_PATH = os.path.join(config.SAMPLE_DIR, "resume.md")
+    PREFERENCES_PATH = os.path.join(config.SAMPLE_DIR, "job_preferences.md")
+
     def setUp(self):
-        self.resume = config.read_resume()
-        self.preferences = config.read_job_preferences()
+        with open(self.RESUME_PATH) as f:
+            self.resume = f.read()
+        with open(self.PREFERENCES_PATH) as f:
+            self.preferences = f.read()
 
     def test_home_address_resolves(self):
         try:
-            config.home_address()
+            config.home_address(self.preferences)
         except RuntimeError as e:
-            self.fail(f"## Home Address in {config.JOB_PREFERENCES_PATH}: {e}")
+            self.fail(f"## Home Address in {self.PREFERENCES_PATH}: {e}")
 
     def test_target_locations_come_from_the_location_section(self):
         section = extract_section(self.preferences, "Location")
-        self.assertTrue(section, f"## Location missing or empty in {config.JOB_PREFERENCES_PATH}")
+        self.assertTrue(section, f"## Location missing or empty in {self.PREFERENCES_PATH}")
         bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
                    if line.strip().startswith("-")]
-        self.assertTrue(bullets, f"## Location has no '-' entries in {config.JOB_PREFERENCES_PATH}")
+        self.assertTrue(bullets, f"## Location has no '-' entries in {self.PREFERENCES_PATH}")
         self.assertEqual(_resolve_target_locations(self.resume, self.preferences), bullets,
                          "target locations differ from the ## Location entries")
 
     def test_scoring_notes_present(self):
         self.assertTrue(extract_section(self.preferences, "Scoring Notes"),
-                        f"## Scoring Notes missing or empty in {config.JOB_PREFERENCES_PATH}")
+                        f"## Scoring Notes missing or empty in {self.PREFERENCES_PATH}")
 
     def test_no_placeholder_text(self):
-        for path, text in ((config.RESUME_PATH, self.resume),
-                           (config.JOB_PREFERENCES_PATH, self.preferences)):
+        for path, text in ((self.RESUME_PATH, self.resume),
+                           (self.PREFERENCES_PATH, self.preferences)):
             match = self.PLACEHOLDER.search(text)
             self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
 

@@ -8,8 +8,8 @@ of the pipeline runs:
     --no-commute      adds days_on_office and the compatibility judgment. 2 LLM calls/case.
     (default)         adds the address search and ORS routing.
 
-Each run is written to evals/runs/ with the rubric hash and both model ids. --compare
-diffs against an earlier one.
+Each run is written to data/evals/runs/ with the rubric hash and both model ids.
+--compare diffs against an earlier one.
 
 resolve_rubric() loads one rubric per run and does not compile. Compiling mid-run would
 score cases in the same run against two rubrics.
@@ -115,7 +115,7 @@ def run_case(case, rubric, tolerances, tier):
 
 
 def write_snapshot(snapshot):
-    """ write a run to evals/runs/<run_id>.json and return the path """
+    """ write a run to data/evals/runs/<run_id>.json and return the path """
     os.makedirs(dataset.RUNS_DIR, exist_ok=True)
     path = os.path.join(dataset.RUNS_DIR, f"{snapshot['run_id']}.json")
     with open(path, "w") as f:
@@ -125,8 +125,8 @@ def write_snapshot(snapshot):
 
 
 def latest_run(exclude=None):
-    """ (snapshot, path) of the most recent run in evals/runs/, or None. Ordered by filename,
-        which is the run_id timestamp.
+    """ (snapshot, path) of the most recent run in data/evals/runs/, or None. Ordered by
+        filename, which is the run_id timestamp.
     """
     paths = sorted(glob.glob(os.path.join(dataset.RUNS_DIR, "*.json")))
     paths = [p for p in paths if p != exclude]
