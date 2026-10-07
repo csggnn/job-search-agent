@@ -1,7 +1,9 @@
 """
-Environment smoke-check (not a unit test): reports API keys missing from the environment,
-then confirms API keys and aisuite/Tavily wiring work by running a Tavily search and
-sending the same context to Anthropic and Groq.
+Environment smoke-check (not a unit test): reports missing user data files, missing or empty
+job preferences sections and API keys missing from the environment, then confirms API keys
+and aisuite/Tavily wiring work by running a Tavily search and sending the same context to
+Anthropic and Groq. Exits 1 when a key is missing, before any API call, or after the API
+calls when user data is incomplete.
 Run with: python scripts/check_setup.py
 """
 
@@ -47,6 +49,19 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
     return response.choices[0].message.content
 
 
+def check_data():
+    """ print the missing user data files and job preferences sections. returns True if none """
+    missing = config.missing_data_files()
+    preferences = (None if config.JOB_PREFERENCES_PATH in missing
+                   else config.read_job_preferences())
+    problems = config.data_problems(missing, preferences)
+    for problem in problems:
+        print(f"MISSING: {problem}")
+    if not problems:
+        print("OK: resume and job preferences are complete")
+    return not problems
+
+
 def check_keys():
     """ print the API keys missing from the environment. returns True if none """
     missing = [name for name in config.API_KEYS if not config.get_env(name)]
@@ -59,6 +74,7 @@ def check_keys():
 
 if __name__ == "__main__":
     print("=== Setup ===")
+    data_ok = check_data()
     if not check_keys():
         sys.exit(1)
     print()
@@ -73,3 +89,6 @@ if __name__ == "__main__":
         print(f"=== {model} ===")
         answer = ask(client, model, context, QUERY)
         print(answer, "\n")
+
+    if not data_ok:
+        sys.exit(1)

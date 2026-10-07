@@ -339,6 +339,36 @@ class RequireDataTest(unittest.TestCase):
         load_or_compile_rubric.assert_not_called()
 
 
+class DataProblemsTest(unittest.TestCase):
+    # config.data_problems() reports missing user data files and preferences sections
+
+    PREFERENCES = ("## Location\n- Metropolis, Freedonia\n\n"
+                   "## Home Address\n1 Riverside Dr, Metropolis\n\n"
+                   "## Scoring Notes\nweigh A\n")
+
+    def test_complete_data(self):
+        self.assertEqual(config.data_problems([], self.PREFERENCES), [])
+
+    def test_preferences_lack_a_section(self):
+        preferences = self.PREFERENCES.replace("## Home Address\n1 Riverside Dr, Metropolis\n\n", "")
+        [problem] = config.data_problems([], preferences)
+        self.assertIn("## Home Address", problem)
+        self.assertIn(config.JOB_PREFERENCES_PATH, problem)
+
+    def test_preferences_section_is_empty(self):
+        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis\n", "")
+        [problem] = config.data_problems([], preferences)
+        self.assertIn("## Home Address", problem)
+
+    def test_no_user_data(self):
+        missing = [config.RESUME_PATH, config.JOB_PREFERENCES_PATH]
+        problems = config.data_problems(missing, None)
+        self.assertEqual(len(problems), 2)
+        for path, problem in zip(missing, problems):
+            self.assertIn(path, problem)
+            self.assertIn("cp -r data.example data", problem)
+
+
 class EnvExampleTest(unittest.TestCase):
 
     def test_env_example_names_every_api_key(self):

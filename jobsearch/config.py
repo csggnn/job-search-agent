@@ -57,6 +57,9 @@ def require_env(name):
 
 CREATE_DATA_COMMAND = "cp -r data.example data"
 
+# the job preferences sections the pipeline reads
+PREFERENCES_SECTIONS = ("Location", "Home Address", "Scoring Notes")
+
 
 def missing_data_files():
     """ the resume and job preferences paths that do not exist, in that order """
@@ -71,6 +74,22 @@ def require_data():
     if missing:
         raise RuntimeError(f"missing user data: {', '.join(missing)}. Create data/ from the "
                            f"template, in the checkout root: {CREATE_DATA_COMMAND}")
+
+
+def data_problems(missing_files, preferences_text):
+    """ one message per missing user data file and per section of PREFERENCES_SECTIONS that is
+        missing or empty in `preferences_text`. `preferences_text` is None when the job
+        preferences file is missing. An empty list means the data is complete.
+    """
+    problems = [f"{path} does not exist. Create data/ from the template, in the checkout "
+                f"root: {CREATE_DATA_COMMAND}" for path in missing_files]
+    if preferences_text is not None:
+        for heading in PREFERENCES_SECTIONS:
+            section = extract_section(preferences_text, heading)
+            # a section starting with a heading is empty: extract_section ran into the next one
+            if not section or section.startswith("#"):
+                problems.append(f"## {heading} is missing or empty in {JOB_PREFERENCES_PATH}")
+    return problems
 
 
 def home_address(preferences=None):
