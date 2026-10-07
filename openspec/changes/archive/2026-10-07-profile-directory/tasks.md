@@ -99,11 +99,7 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
     - No change, outside this change: the OpenSpec note in `CLAUDE.md` comes from `master`.
     - Fixed after a spec change: `cp -r data.example data` creates `data/data.example/` when `data/` exists, so it did not restore a single missing file. With `data/` present, the guidance directs the user to restore the file or to remove `data/` and create it again from the template. No message copies template files into an existing `data/` (`test_one_file_is_missing`). With `data/` holding only a resume, `check_setup.py` prints `missing user data: /workspace/data/job_preferences.md. In the checkout root, restore the missing file, or remove data/ and create it again from the template: cp -r data.example data`.
 
-## 7. Deviations
+## 7. Migration (after merge)
 
-- [ ] 7.1 Write a table of deviations into the implementation PR description: each spec scenario, design decision or task verification that could not be met as written, had to be changed, or was met only with a qualification. Columns: item, expected, observed, resolution. Verify that each change made during implementation to the delta specs, `design.md` or this file's task text has a row.
-
-## 8. Migration (after merge)
-
-- [ ] 8.1 Run the design's Migration Plan in each checkout that holds personal data. Verify `propose_jobs.py` returns a shortlist matching one taken before migration, and that `evals/run_evals.py --criteria-only` scores the personal cases.
-- [ ] 8.2 In each other checkout: clear the skip-worktree bits, run `git checkout -- data/resume.md data/job_preferences.md`, merge `master`, run `rm -rf data`, then create `data/` from `data.example/` or from a copy of another checkout's `data/`. Rebase open branches onto `master`.
+- [x] 7.1 Run the design's Migration Plan in each checkout that holds personal data. Verify `propose_jobs.py` returns a shortlist matching one taken before migration, and that `evals/run_evals.py --criteria-only` scores the personal cases.
+- [x] 7.2 In each other checkout: clear the skip-worktree bits, run `git checkout -- data/resume.md data/job_preferences.md`, merge `master`, run `rm -rf data`, then create `data/` from `data.example/` or from a copy of another checkout's `data/`. Rebase open branches onto `master`.
