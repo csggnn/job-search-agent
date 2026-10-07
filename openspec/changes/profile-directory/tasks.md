@@ -1,8 +1,8 @@
 # Tasks
 
 Each task names the spec scenarios it verifies. A scenario is verified by a test named after
-it, or by a manual check whose result is recorded under the task. Section 7 collects every
-scenario into the table the implementation PR description carries.
+it, or by a manual check whose result is recorded under the task. Section 7 reports the
+deviations from the specs, the design and these tasks in the implementation PR description.
 
 Unit tests run with `podman-compose exec job-search python3 -m unittest discover -s tests/unit`.
 
@@ -98,9 +98,9 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
     - No change, outside this change: the OpenSpec note in `CLAUDE.md` comes from `master`.
     - Fixed after a spec change: `cp -r data.example data` creates `data/data.example/` when `data/` exists, so it did not restore a single missing file. With `data/` present, the guidance directs the user to restore the file or to remove `data/` and create it again from the template. No message copies template files into an existing `data/` (`test_one_file_is_missing`, `test_file_missing_from_existing_data`). With `data/` holding only a resume, `check_setup.py` prints `MISSING: /workspace/data/job_preferences.md does not exist. Restore the missing file in data/, or remove data/ and create it again from the template, in the checkout root: cp -r data.example data`.
 
-## 7. Scenario coverage
+## 7. Deviations
 
-- [ ] 7.1 Write the implementation PR description as a table with one row per scenario in the three delta specs: scenario, verifying test or task, result. Verify every scenario has a row and no row is empty.
+- [ ] 7.1 Write a table of deviations into the implementation PR description: each spec scenario, design decision or task verification that could not be met as written, had to be changed, or was met only with a qualification. Columns: item, expected, observed, resolution. Verify that each change made during implementation to the delta specs, `design.md` or this file's task text has a row.
 
 ## 8. Migration (after merge)
 
