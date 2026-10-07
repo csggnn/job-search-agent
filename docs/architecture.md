@@ -395,9 +395,10 @@ and `scripts/check_setup.py` reports each one that is unset.
 
 ## User data stays out of git
 
-`.gitignore` lists `data/`, so no file in it appears in `git status` or is staged by
-`git add -A`. Branch switches and merges leave it unchanged. Every user data path derives
-from `config.DATA_DIR`; `config.EVALS_DATA_DIR` is `DATA_DIR/evals`.
+`.gitignore` lists `/data/`, the root `data/` only, so no file in it appears in
+`git status` or is staged by `git add -A`. Branch switches and merges leave it unchanged.
+Every user data path derives from `config.DATA_DIR`; `config.EVALS_DATA_DIR` is
+`DATA_DIR/evals`.
 
 `data.example/` holds the committed sample candidate. No pipeline or eval command reads it.
 A user creates `data/` with `cp -r data.example data`. Each entry point calls

@@ -68,7 +68,8 @@ Outcomes: see proposal.md, What Changes.
   evals/                eval code
 ```
 
-`.gitignore` lists `data/`. Copying `data/` copies all of a user's data.
+`.gitignore` lists `/data/`, which matches the root `data/` only. Copying `data/` copies all
+of a user's data.
 
 Alternative considered: two data directories in one checkout, one per user, selected by a
 command-line flag. Rejected: every entry point registers the flag, path resolution waits

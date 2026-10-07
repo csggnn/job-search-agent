@@ -3,7 +3,7 @@
 
 # User data: resume, job preferences, generated files, evaluations database and eval set.
 # Created from data.example/. Not regenerable.
-data/
+/data/
 
 # Python
 __pycache__/
