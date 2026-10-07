@@ -9,6 +9,7 @@ Unit tests run with `podman-compose exec job-search python3 -m unittest discover
 ## 1. Keys
 
 - [x] 1.1 Commit `.env.example` holding the key names of the current `.env` template with no values. Remove `.env` from the index (`git rm --cached .env`). Scenario "Fresh clone" (personal-data-protection): verified in 6.2.
+  - Key migration, checked on 2026-10-07: `~/.config/job-search-agent/.env` holds a value for every key in `config.API_KEYS`, with mode 600. No checkout of the repository holds a `.env`.
 - [x] 1.2 In `docker-compose.yml`, remove `env_file` and mount `${HOME}/.config/job-search-agent` read-only at `/config`. Make `config.py` call `load_dotenv("/config/.env")`, which does nothing when the file is absent. Verify that `podman-compose up -d` starts when the directory exists without `.env`, that it creates the directory empty and starts when the directory is missing, that an edited `.env` applies to the next command without recreating the container, and that writing `/config/.env` from inside the container fails because the mount is read-only. Record the results. Scenario "Key directory is missing" (personal-data-protection): the recorded start and `require_env` error.
   - Versions: podman-compose 1.0.6, podman 4.9.3.
   - Directory present, no `.env`: the container starts. `config.require_env("TAVILY_API_KEY")` raises `RuntimeError: required environment variable 'TAVILY_API_KEY' is not set: add it to ~/.config/job-search-agent/.env`.
