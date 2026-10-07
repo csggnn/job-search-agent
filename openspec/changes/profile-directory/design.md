@@ -6,9 +6,10 @@ The checkout holds one user's data:
 
 ```
 <checkout>/
+  .env                  tracked template; real keys hidden by skip-worktree
   data/
-    resume.md           tracked sample; real content hidden by skip-worktree
-    job_preferences.md  tracked sample; real content hidden by skip-worktree
+    resume.md           tracked template; real content hidden by skip-worktree
+    job_preferences.md  tracked template; real content hidden by skip-worktree
     evaluations.db      gitignored
     compatibility_rubric.json, search_queries.json   gitignored
   evals/
@@ -17,29 +18,35 @@ The checkout holds one user's data:
 ```
 
 Each part of this layout constrains the design:
-- `resume.md` and `job_preferences.md` are tracked. Untracking them requires a committed
-  template elsewhere. Migration must handle the risk of these files being deleted.
-- The eval set sits beside the eval code in `evals/`, while all other user data is in `data/`.
-- A checkout has one single `data/`, so it can work on a single example or personal user data set at a time.
+- `.env` is a tracked template holding key names with no values. The user is instructed to
+  set skip-worktree on it before adding real keys. Each checkout holds its own copy of the
+  keys.
+- `resume.md` and `job_preferences.md` are tracked templates holding the example data. The
+  user is instructed to set skip-worktree on them before editing. Removing them from the
+  index deletes the user's edited copy in each checkout that pulls the removal.
+- The skip-worktree bit is stored in each checkout's index. A clone or a new worktree
+  starts without it.
+- The eval set sits beside the eval code in `evals/`, while all other user data is in
+  `data/`.
+- A checkout has one `data/`, so it holds either the example data or personal data at a
+  time.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- One directory holds every file of a user's data. Git tracks none of it.
-- Every path to user data derives from `config.DATA_DIR`.
-- The example user's data is a committed template.
-- A run on incomplete user data fails before any API call or write, and the error states how to create
-  the data.
-- Keys are read from `~/.config/job-search-agent/.env`.
+Outcomes: see proposal.md, What Changes.
+
+- Migration preserves every existing user file, database row and eval case.
+- The user-data check runs before any API call or write.
+- Working on another user's data needs no code change and no new command argument.
+- One setting determines every user data path.
+- Pipeline code cannot modify API keys.
+- The documented key list cannot drift from the keys the code reads.
 
 **Non-Goals:**
 
-- More than one user's data in a checkout, or a flag that selects it.
-- A configurable data directory. `config.DATA_DIR` is the value a later change sets.
-- An init tool that creates user data from the template and sets up keys.
-- Backup and restore commands.
-- Detecting or handling database rows evaluated against different user data.
+- More than one user's data in a checkout.
 - Committing an example eval set.
 - Re-scoring stale rows (CSG-48, second half).
 
@@ -62,8 +69,6 @@ Each part of this layout constrains the design:
 ```
 
 `.gitignore` lists `data/`. Copying `data/` copies all of a user's data.
-Documentation clarifies the implications: different checkouts work on separate data folders,
-backing up data before a checkout wipe is responsibility of the user.
 
 Alternative considered: two data directories in one checkout, one per user, selected by a
 command-line flag. Rejected: every entry point registers the flag, path resolution waits
@@ -77,6 +82,7 @@ writes the personal data.
 **Every user data path derives from `config.DATA_DIR`.**
 `config.EVALS_DATA_DIR` is `DATA_DIR/evals`. `evals/dataset.py` derives `CASES_PATH`,
 `BACKUP_PATH`, `ADS_DIR` and `RUNS_DIR` from it. No other module names the directory.
+A later change that makes the data directory configurable sets `config.DATA_DIR`.
 
 **The example data is a committed template in `data.example/`.**
 The name follows `.env.example`. No pipeline command reads it. A user creates `data/` with
@@ -86,7 +92,7 @@ The name follows `.env.example`. No pipeline command reads it. A user creates `d
 Alternative considered: reading `data.example/` when `data/` has no resume. Rejected: a run
 whose personal data is missing would run on the example data without notice.
 
-**Each entry point checks user data before any API call.**
+**Each entry point checks user data before any API call or write.**
 `config.require_data()` raises when `RESUME_PATH` or `JOB_PREFERENCES_PATH` is missing. The
 error names each missing file and the `cp -r data.example data` command. `evaluate_job_post.py`,
 `discover_jobs.py`, `propose_jobs.py`, `scripts/recompile_rubric.py`, `evals/capture.py`,
