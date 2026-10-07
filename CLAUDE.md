@@ -37,6 +37,12 @@ stay accurate, not aspirational.
 
 **Do not cite line numbers** in documentation or issues. Name the file and the function.
 
+**OpenSpec artifact edits run the level check.** After writing or revising a file
+under `openspec/changes/`, run `openspec instructions <artifact-id> --change <name> --json`
+and test each statement against its `rules`. Report each statement that fails.
+Note: this instruction replaces OpenSpec per-operation guidance in `openspec/config.yaml`,
+which at the moment only supports `apply` and `archive`, not `propose` or `update`.
+
 ## Invariants
 
 **Pre-selection makes one LLM call regardless of L.** `select_batch` must never be chunked.
