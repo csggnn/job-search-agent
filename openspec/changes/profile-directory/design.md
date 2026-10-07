@@ -98,8 +98,8 @@ whose personal data is missing would run on the example data without notice.
 error names each missing file and the `cp -r data.example data` command. `evaluate_job_post.py`,
 `discover_jobs.py`, `propose_jobs.py`, `scripts/recompile_rubric.py`, `evals/capture.py`,
 `evals/draft.py` and `evals/run_evals.py` call it after parsing arguments and before any
-other work. `scripts/check_setup.py` reports missing data instead of raising, and continues
-with its key checks.
+other work. `scripts/check_setup.py` reports missing data instead of raising, continues
+with its key checks, and exits before any API call when either check fails.
 
 Alternative considered: calling the check in `storage` and in the resume and preferences
 readers. Rejected: each command reaches those reads by a different path, so the guarantee

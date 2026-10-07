@@ -2,8 +2,8 @@
 Environment smoke-check (not a unit test): reports missing user data files, missing or empty
 job preferences sections and API keys missing from the environment, then confirms API keys
 and aisuite/Tavily wiring work by running a Tavily search and sending the same context to
-Anthropic and Groq. Exits 1 when a key is missing, before any API call, or after the API
-calls when user data is incomplete.
+Anthropic and Groq. Exits 1 before any API call when a key is missing or user data is
+incomplete.
 Run with: python scripts/check_setup.py
 """
 
@@ -75,7 +75,7 @@ def check_keys():
 if __name__ == "__main__":
     print("=== Setup ===")
     data_ok = check_data()
-    if not check_keys():
+    if not check_keys() or not data_ok:
         sys.exit(1)
     print()
 
@@ -89,6 +89,3 @@ if __name__ == "__main__":
         print(f"=== {model} ===")
         answer = ask(client, model, context, QUERY)
         print(answer, "\n")
-
-    if not data_ok:
-        sys.exit(1)
