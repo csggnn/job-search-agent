@@ -395,27 +395,8 @@ and `scripts/check_setup.py` reports each one that is unset.
 
 ## User data stays out of git
 
-`.gitignore` lists `/data/`, the root `data/` only, so no file in it appears in
-`git status` or is staged by `git add -A`. Branch switches and merges leave it unchanged.
-Every user data path derives from `config.DATA_DIR`; `config.EVALS_DATA_DIR` is
-`DATA_DIR/evals`.
-
-`data.example/` holds the committed sample candidate. No pipeline or eval command reads it.
-A user creates `data/` with `cp -r data.example data`. Each entry point calls
-`config.require_data()` after parsing arguments and before any other work. It raises when
-`data/resume.md` or `data/job_preferences.md` is missing, naming each missing file, so a run
-without user data fails before any API call or write. When `data/` does not exist, the
-error gives the `cp` command. When `data/` exists, it directs the user to restore the
-missing file or to remove `data/` and create it again from the template. No message copies
-template files into an existing `data/`, so its contents come from one source.
-`scripts/check_setup.py` reports the same missing files and each of `## Location`,
-`## Home Address` and `## Scoring Notes` that is missing or empty, without raising.
-
-`DefaultDataTest` in `tests/unit/test_units.py` reads `config.SAMPLE_DIR`, so the unit
-suite checks the committed template whatever `data/` holds.
-
-Each checkout, a clone or a worktree, has its own `data/`. A new checkout starts without
-it. Copying `data/` to another checkout copies all of a user's data.
+`.gitignore` lists `/data/`. Files in `data/` are never staged, and branch switches and
+merges leave them unchanged.
 
 ## Cost and caching
 
