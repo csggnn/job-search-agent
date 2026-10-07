@@ -18,6 +18,17 @@ schema: spec-driven
 #       - Always include a "Non-goals" section
 #     tasks:
 #       - Break tasks into chunks of max 2 hours
+rules:
+  proposal:
+    - State problems and outcomes.
+    - What Changes describes observable outcomes, not the mechanism that produces them.
+    - The proposal precedes the design. It contains nothing derived from a design decision.
+  design:
+    - Goals state properties the solution must have that the proposal does not state, such as safety, compatibility, ordering or testability. Goals refer to the proposal for its outcomes instead of restating them.
+    - A goal constrains the solution without selecting it. More than one design could meet it. A statement that selects a path, module, function or tool belongs in Decisions.
+    - Non-Goals list design-level exclusions. Scope the proposal already defers is not restated.
+    - Each Decision serves a goal, a Context constraint or a proposal outcome. A Decision that serves none is removed.
+    - Rejected alternatives belong under the Decision they relate to.
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
