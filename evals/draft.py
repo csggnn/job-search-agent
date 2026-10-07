@@ -26,6 +26,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import capture, dataset
+from jobsearch import config
 from jobsearch.commute import commute_score
 from jobsearch.config import FULLY_REMOTE
 from jobsearch.evaluation import compatibility_score
@@ -154,6 +155,7 @@ def main():
 
     if not args.target and not args.all:
         parser.error("give a case NAME, a url, or --all")
+    config.require_data()
 
     rubric = load_rubric()
     if rubric is None:

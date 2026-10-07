@@ -10,9 +10,13 @@ query validation, JSON-reply parsing):
 
 import os
 import re
+import shutil
+import sys
+import tempfile
 import unittest
 from unittest import mock
 
+import evaluate_job_post
 from jobsearch import config, storage
 from jobsearch.config import extract_section
 from jobsearch.rubric import evaluate_rubric, match_text, test_regex
@@ -288,6 +292,51 @@ class DefaultDataTest(unittest.TestCase):
                            (self.PREFERENCES_PATH, self.preferences)):
             match = self.PLACEHOLDER.search(text)
             self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
+
+
+class RequireDataTest(unittest.TestCase):
+    # config.require_data() raises when the resume or the job preferences is missing
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir)
+        self.resume = os.path.join(self.dir, "resume.md")
+        self.preferences = os.path.join(self.dir, "job_preferences.md")
+        for name, value in (("RESUME_PATH", self.resume),
+                            ("JOB_PREFERENCES_PATH", self.preferences)):
+            patcher = mock.patch.object(config, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def _write_resume(self):
+        with open(self.resume, "w") as f:
+            f.write("# Resume\n")
+
+    def test_fresh_clone(self):
+        with self.assertRaises(RuntimeError) as ctx:
+            config.require_data()
+        message = str(ctx.exception)
+        self.assertIn(self.resume, message)
+        self.assertIn(self.preferences, message)
+        self.assertIn("cp -r data.example data", message)
+
+    def test_one_file_is_missing(self):
+        self._write_resume()
+        with self.assertRaises(RuntimeError) as ctx:
+            config.require_data()
+        message = str(ctx.exception)
+        self.assertIn(self.preferences, message)
+        self.assertNotIn(self.resume, message)
+
+    @mock.patch("jobsearch.evaluation.load_or_compile_rubric")
+    @mock.patch("jobsearch.evaluation.scrape_post")
+    def test_one_file_is_missing_makes_no_api_call(self, scrape_post, load_or_compile_rubric):
+        self._write_resume()
+        with mock.patch.object(sys, "argv", ["evaluate_job_post.py", "https://example.com/1"]):
+            with self.assertRaises(RuntimeError):
+                evaluate_job_post.main()
+        scrape_post.assert_not_called()
+        load_or_compile_rubric.assert_not_called()
 
 
 class EnvExampleTest(unittest.TestCase):

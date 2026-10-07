@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from evals import dataset, scoring
 from evals.capture import looks_truncated
-from jobsearch import storage
+from jobsearch import config, storage
 from jobsearch.commute import commute_score as commute_score_fn, figure_days_on_office
 from jobsearch.evaluation import compatibility_score
 from jobsearch.llm import EXTRACTION_MODEL, RUBRIC_MODEL
@@ -258,6 +258,7 @@ def main():
     parser.add_argument("--compare", nargs="?", const=True, metavar="PATH",
                         help="diff against a run snapshot (default: the previous run)")
     args = parser.parse_args()
+    config.require_data()
 
     tier = "criteria-only" if args.criteria_only else "no-commute" if args.no_commute else "full"
     tolerances = {"score": args.tolerance_score, "commute": args.tolerance_commute}

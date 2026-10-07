@@ -23,6 +23,10 @@ What it exercises, end to end:
     scrape_post -> commute_score -> compatibility_score (rubric compile+apply) ->
     summarize_evaluation -> storage.save_evaluation -> cache-hit read.
 
+The test writes to the checkout's data/: the evaluations database, the compiled rubric and
+the search queries. Run it in a checkout whose data/ holds the example data, created with
+`cp -r data.example data`. Setup fails when data/resume.md is missing.
+
 Configuration lives in the constants near the top of this file: set TARGET_URL to a
 currently-live job posting (the pipeline really scrapes it) and flip RUN_DISCOVERY_SMOKE
 to include the discovery test. If TARGET_URL stops resolving, the test FAILS with a
@@ -39,6 +43,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]  # tests/e2e/<file> -> repo root
 DB_PATH = REPO_ROOT / "data" / "evaluations.db"
+RESUME_PATH = REPO_ROOT / "data" / "resume.md"
 ENV_PATH = Path("/config/.env")  # ~/.config/job-search-agent/.env, mounted
 
 # env keys the pipeline needs to run for real; GROQ_API_KEY is only used by check_setup.py
@@ -100,6 +105,11 @@ class PipelineEndToEndTest(unittest.TestCase):
             raise unittest.SkipTest(
                 f"missing required config for an end-to-end run: {', '.join(missing)} "
                 f"(set them in {ENV_PATH} or the environment)"
+            )
+        if not RESUME_PATH.exists():
+            raise RuntimeError(
+                f"{RESUME_PATH} does not exist: create data/ from the template, in the checkout "
+                "root: cp -r data.example data"
             )
         if not TARGET_URL:
             raise ValueError(

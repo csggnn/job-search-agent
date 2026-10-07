@@ -55,6 +55,24 @@ def require_env(name):
                            f"{KEYS_FILE}")
 
 
+CREATE_DATA_COMMAND = "cp -r data.example data"
+
+
+def missing_data_files():
+    """ the resume and job preferences paths that do not exist, in that order """
+    return [path for path in (RESUME_PATH, JOB_PREFERENCES_PATH) if not os.path.exists(path)]
+
+
+def require_data():
+    """ raise if the resume or the job preferences is missing. Entry points call it before
+        any API call or write. The template in SAMPLE_DIR is not read in their place.
+    """
+    missing = missing_data_files()
+    if missing:
+        raise RuntimeError(f"missing user data: {', '.join(missing)}. Create data/ from the "
+                           f"template, in the checkout root: {CREATE_DATA_COMMAND}")
+
+
 def home_address(preferences=None):
     """ the candidate's home address, from the "## Home Address" section of
         job_preferences.md, which commute times are measured from. `preferences` is the job
