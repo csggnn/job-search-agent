@@ -7,7 +7,7 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 
 | Module | Concern |
 |--------|---------|
-| `jobsearch/config.py` | Filesystem paths derived from `DATA_DIR` (`EVALS_DATA_DIR`) and `SAMPLE_DIR`, the user-data check (`require_data`, `data_problems`), personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md` or of a given preferences text. |
+| `jobsearch/config.py` | Filesystem paths derived from `DATA_DIR` (`EVALS_DATA_DIR`) and `SAMPLE_DIR`, the user-data checks (`require_data`, `missing_data_message`, `empty_preferences_sections`), personalization-file access (`read_resume`, `read_job_preferences`, `file_hash`, `extract_section`), the `FULLY_REMOTE` sentinel, `API_KEYS`, lazy env access (`require_env`) so modules import without any keys, and `home_address()` which reads the `## Home Address` section of `job_preferences.md` or of a given preferences text. |
 | `jobsearch/llm.py` | aisuite wrapper: one-shot JSON calls and a bounded agentic tool-call loop. |
 | `jobsearch/storage.py` | SQLite persistence, URL normalization, cache-hash helpers. |
 | `jobsearch/scrape.py` | Content acquisition for a URL: `public_posting_url`, `fetch_page_text`, `extract_post`, `validate_post`, `scrape_post`, `ScrapeError`. |

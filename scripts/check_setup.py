@@ -51,10 +51,14 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
 
 def check_data():
     """ print the missing user data files and job preferences sections. returns True if none """
-    missing = config.missing_data_files()
-    preferences = (None if config.JOB_PREFERENCES_PATH in missing
-                   else config.read_job_preferences())
-    problems = config.data_problems(missing, preferences, os.path.isdir(config.DATA_DIR))
+    problems = []
+    message = config.missing_data_message()
+    if message:
+        problems.append(message)
+    if os.path.exists(config.JOB_PREFERENCES_PATH):
+        empty = config.empty_preferences_sections(config.read_job_preferences())
+        problems += [f"## {heading} is missing or empty in {config.JOB_PREFERENCES_PATH}"
+                     for heading in empty]
     for problem in problems:
         print(f"MISSING: {problem}")
     if not problems:

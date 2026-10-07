@@ -110,11 +110,11 @@ class PipelineEndToEndTest(unittest.TestCase):
             )
         missing = [str(path) for path in USER_DATA_PATHS if not path.exists()]
         if missing:
-            guidance = ("Restore the missing file in data/, or remove data/ and create it again"
-                        if DATA_DIR.is_dir() else "Create data/")
+            fix = ("restore the missing file, or remove data/ and create it again from the "
+                   "template" if DATA_DIR.is_dir() else "create data/ from the template")
             raise RuntimeError(
-                f"missing user data: {', '.join(missing)}. {guidance} from the template, in "
-                "the checkout root: cp -r data.example data"
+                f"missing user data: {', '.join(missing)}. In the checkout root, {fix}: "
+                "cp -r data.example data"
             )
         if not TARGET_URL:
             raise ValueError(

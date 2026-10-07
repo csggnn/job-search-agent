@@ -295,7 +295,8 @@ class DefaultDataTest(unittest.TestCase):
 
 
 class RequireDataTest(unittest.TestCase):
-    # config.require_data() raises when the resume or the job preferences is missing
+    # config.require_data() raises when the resume or the job preferences is missing, with
+    # the message of config.missing_data_message()
 
     def setUp(self):
         root = tempfile.mkdtemp()
@@ -320,8 +321,7 @@ class RequireDataTest(unittest.TestCase):
         message = str(ctx.exception)
         self.assertIn(self.resume, message)
         self.assertIn(self.preferences, message)
-        self.assertIn("Create data/ from the template", message)
-        self.assertIn("cp -r data.example data", message)
+        self.assertIn("create data/ from the template: cp -r data.example data", message)
 
     def test_one_file_is_missing(self):
         self._write_resume()
@@ -330,8 +330,7 @@ class RequireDataTest(unittest.TestCase):
         message = str(ctx.exception)
         self.assertIn(self.preferences, message)
         self.assertNotIn(self.resume, message)
-        self.assertIn("Restore the missing file in data/, or remove data/ and create it again",
-                      message)
+        self.assertIn("restore the missing file, or remove data/ and create it again", message)
 
     @mock.patch("jobsearch.evaluation.load_or_compile_rubric")
     @mock.patch("jobsearch.evaluation.scrape_post")
@@ -343,53 +342,47 @@ class RequireDataTest(unittest.TestCase):
         scrape_post.assert_not_called()
         load_or_compile_rubric.assert_not_called()
 
+    def test_no_user_data(self):
+        message = config.missing_data_message()
+        self.assertIn(self.resume, message)
+        self.assertIn(self.preferences, message)
+        self.assertIn("cp -r data.example data", message)
 
-class DataProblemsTest(unittest.TestCase):
-    # config.data_problems() reports missing user data files and preferences sections
+    def test_complete_data(self):
+        self._write_resume()
+        with open(self.preferences, "w") as f:
+            f.write("# Job Preferences\n")
+        self.assertIsNone(config.missing_data_message())
+
+
+class EmptyPreferencesSectionsTest(unittest.TestCase):
+    # config.empty_preferences_sections() names the sections the pipeline reads that are
+    # missing or empty
 
     PREFERENCES = ("## Location\n- Metropolis, Freedonia\n\n"
                    "## Home Address\n1 Riverside Dr, Metropolis\n\n"
                    "## Scoring Notes\nweigh A\n")
 
-    def test_complete_data(self):
-        self.assertEqual(config.data_problems([], self.PREFERENCES, True), [])
+    def test_complete_preferences(self):
+        self.assertEqual(config.empty_preferences_sections(self.PREFERENCES), [])
 
     def test_preferences_lack_a_section(self):
         preferences = self.PREFERENCES.replace("## Home Address\n1 Riverside Dr, Metropolis\n\n", "")
-        [problem] = config.data_problems([], preferences, True)
-        self.assertIn("## Home Address", problem)
-        self.assertIn(config.JOB_PREFERENCES_PATH, problem)
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_preferences_section_is_empty(self):
         preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis\n", "")
-        [problem] = config.data_problems([], preferences, True)
-        self.assertIn("## Home Address", problem)
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_preferences_section_holds_the_placeholder(self):
         preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
                                                "(fill in: full street address)")
-        [problem] = config.data_problems([], preferences, True)
-        self.assertIn("## Home Address", problem)
+        self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_section_starting_with_a_subheading_has_content(self):
         preferences = self.PREFERENCES.replace("## Scoring Notes\nweigh A\n",
                                                "## Scoring Notes\n### Must-haves\n- weigh A\n")
-        self.assertEqual(config.data_problems([], preferences, True), [])
-
-    def test_no_user_data(self):
-        missing = [config.RESUME_PATH, config.JOB_PREFERENCES_PATH]
-        problems = config.data_problems(missing, None, False)
-        self.assertEqual(len(problems), 2)
-        for path, problem in zip(missing, problems):
-            self.assertIn(path, problem)
-            self.assertIn("Create data/ from the template", problem)
-            self.assertIn("cp -r data.example data", problem)
-
-    def test_file_missing_from_existing_data(self):
-        [problem] = config.data_problems([config.JOB_PREFERENCES_PATH], None, True)
-        self.assertIn(config.JOB_PREFERENCES_PATH, problem)
-        self.assertIn("Restore the missing file in data/, or remove data/ and create it again",
-                      problem)
+        self.assertEqual(config.empty_preferences_sections(preferences), [])
 
 
 class EnvExampleTest(unittest.TestCase):

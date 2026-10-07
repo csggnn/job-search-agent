@@ -55,50 +55,37 @@ def require_env(name):
                            f"{KEYS_FILE}")
 
 
-CREATE_DATA_COMMAND = "cp -r data.example data"
-
 # the job preferences sections the pipeline reads
 PREFERENCES_SECTIONS = ("Location", "Home Address", "Scoring Notes")
 
 
-def missing_data_files():
-    """ the resume and job preferences paths that do not exist, in that order """
-    return [path for path in (RESUME_PATH, JOB_PREFERENCES_PATH) if not os.path.exists(path)]
-
-
-def missing_data_guidance(data_dir_exists):
-    """ how to resolve missing user data files. With DATA_DIR present, the user restores the
-        files or recreates DATA_DIR from the template. No template file is copied into an
-        existing DATA_DIR, so its contents come from one source.
+def missing_data_message():
+    """ None if the resume and the job preferences exist; otherwise a message naming each
+        missing file and how to restore it. With DATA_DIR present, the message does not
+        suggest copying template files into it.
     """
-    if not data_dir_exists:
-        return f"Create data/ from the template, in the checkout root: {CREATE_DATA_COMMAND}"
-    return ("Restore the missing file in data/, or remove data/ and create it again from the "
-            f"template, in the checkout root: {CREATE_DATA_COMMAND}")
+    missing = [path for path in (RESUME_PATH, JOB_PREFERENCES_PATH) if not os.path.exists(path)]
+    if not missing:
+        return None
+    fix = ("restore the missing file, or remove data/ and create it again from the template"
+           if os.path.isdir(DATA_DIR) else "create data/ from the template")
+    return (f"missing user data: {', '.join(missing)}. In the checkout root, {fix}: "
+            "cp -r data.example data")
 
 
 def require_data():
     """ raise if the resume or the job preferences is missing. Entry points call it before
-        any API call or write. The template in SAMPLE_DIR is not read in their place.
+        any API call or write.
     """
-    missing = missing_data_files()
-    if missing:
-        raise RuntimeError(f"missing user data: {', '.join(missing)}. "
-                           f"{missing_data_guidance(os.path.isdir(DATA_DIR))}")
+    message = missing_data_message()
+    if message:
+        raise RuntimeError(message)
 
 
-def data_problems(missing_files, preferences_text, data_dir_exists):
-    """ one message per missing user data file and per section of PREFERENCES_SECTIONS that is
-        missing or empty in `preferences_text`. `preferences_text` is None when the job
-        preferences file is missing. An empty list means the data is complete.
-    """
-    guidance = missing_data_guidance(data_dir_exists)
-    problems = [f"{path} does not exist. {guidance}" for path in missing_files]
-    if preferences_text is not None:
-        for heading in PREFERENCES_SECTIONS:
-            if not _section_has_content(extract_section(preferences_text, heading)):
-                problems.append(f"## {heading} is missing or empty in {JOB_PREFERENCES_PATH}")
-    return problems
+def empty_preferences_sections(preferences):
+    """ the headings of PREFERENCES_SECTIONS that are missing or empty in `preferences` """
+    return [heading for heading in PREFERENCES_SECTIONS
+            if not _section_has_content(extract_section(preferences, heading))]
 
 
 def _section_has_content(section):
