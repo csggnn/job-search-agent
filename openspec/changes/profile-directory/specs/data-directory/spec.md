@@ -62,7 +62,9 @@ The README SHALL give the command that creates `data/` from the template. It SHA
 describe working on the example data and on personal data in separate checkouts, each a
 clone or a worktree. It SHALL give the command that copies `data/` from one checkout to
 another, and SHALL state that changes to one checkout's user data do not reach another
-checkout.
+checkout. It SHALL state that deleting a checkout or running `git clean -x` in it deletes
+its `data/`, and that backing up `data/` beforehand is the user's responsibility. It SHALL
+give the command that copies `data/` to a backup location.
 
 #### Scenario: Developer sets up a checkout for the example data
 - **WHEN** a developer with personal data in one checkout reads the README to test on the
@@ -75,3 +77,10 @@ checkout.
 #### Scenario: Developer moves personal data to another checkout
 - **WHEN** a developer reads the README to run personal data in a new checkout
 - **THEN** it gives the command that copies `data/` into the new checkout
+
+#### Scenario: Developer wipes a checkout
+- **WHEN** a developer reads the README before deleting a checkout or running `git clean -x`
+  in it
+- **THEN** it states that this deletes the checkout's `data/` and that backing it up is the
+  user's responsibility
+- **AND** it gives the command that copies `data/` to a backup location

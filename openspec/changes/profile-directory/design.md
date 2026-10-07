@@ -62,6 +62,8 @@ Each part of this layout constrains the design:
 ```
 
 `.gitignore` lists `data/`. Copying `data/` copies all of a user's data.
+Documentation clarifies the implications: different checkouts work on separate data folders,
+backing up data before a checkout wipe is responsibility of the user.
 
 Alternative considered: two data directories in one checkout, one per user, selected by a
 command-line flag. Rejected: every entry point registers the flag, path resolution waits
