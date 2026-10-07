@@ -360,6 +360,17 @@ class DataProblemsTest(unittest.TestCase):
         [problem] = config.data_problems([], preferences)
         self.assertIn("## Home Address", problem)
 
+    def test_preferences_section_holds_the_placeholder(self):
+        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
+                                               "(fill in: full street address)")
+        [problem] = config.data_problems([], preferences)
+        self.assertIn("## Home Address", problem)
+
+    def test_section_starting_with_a_subheading_has_content(self):
+        preferences = self.PREFERENCES.replace("## Scoring Notes\nweigh A\n",
+                                               "## Scoring Notes\n### Must-haves\n- weigh A\n")
+        self.assertEqual(config.data_problems([], preferences), [])
+
     def test_no_user_data(self):
         missing = [config.RESUME_PATH, config.JOB_PREFERENCES_PATH]
         problems = config.data_problems(missing, None)

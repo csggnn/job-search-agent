@@ -85,11 +85,23 @@ def data_problems(missing_files, preferences_text):
                 f"root: {CREATE_DATA_COMMAND}" for path in missing_files]
     if preferences_text is not None:
         for heading in PREFERENCES_SECTIONS:
-            section = extract_section(preferences_text, heading)
-            # a section starting with a heading is empty: extract_section ran into the next one
-            if not section or section.startswith("#"):
+            if not _section_has_content(extract_section(preferences_text, heading)):
                 problems.append(f"## {heading} is missing or empty in {JOB_PREFERENCES_PATH}")
     return problems
+
+
+def _section_has_content(section):
+    """ True if `section` holds a line other than a "(fill in ...)" placeholder. A section
+        whose first such line is a "## " heading is empty: extract_section() ran into the
+        next section.
+    """
+    if not section:
+        return False
+    for line in section.splitlines():
+        line = line.strip()
+        if line and not line.startswith("(fill in"):
+            return re.match(r"##\s", line) is None
+    return False
 
 
 def home_address(preferences=None):
