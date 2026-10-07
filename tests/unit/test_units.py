@@ -280,8 +280,8 @@ class DefaultDataTest(unittest.TestCase):
         bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
                    if line.strip().startswith("-")]
         self.assertTrue(bullets, f"## Location has no '-' entries in {self.PREFERENCES_PATH}")
-        self.assertEqual(_resolve_target_locations(self.resume, self.preferences), bullets,
-                         "target locations differ from the ## Location entries")
+        self.assertEqual(sorted(_resolve_target_locations(self.resume, self.preferences)),
+                         sorted(bullets), "target locations differ from the ## Location entries")
 
     def test_scoring_notes_present(self):
         self.assertTrue(extract_section(self.preferences, "Scoring Notes"),

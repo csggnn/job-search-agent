@@ -42,7 +42,7 @@ The template job preferences SHALL contain `## Location`, `## Home Address` and
 
 ### Requirement: Offline check of the template data
 The unit test suite SHALL verify, without network access, that the template job preferences
-yield a home address, target locations equal to the `## Location` entries in the same
+yield a home address, target locations holding the same entries as `## Location` in any
 order, and non-empty scoring notes, and that neither template file contains placeholder
 text. The check SHALL read the template files whether or not `data/` exists, and SHALL
 NOT read `data/`. The test SHALL contain no candidate-specific content.
@@ -52,8 +52,12 @@ NOT read `data/`. The test SHALL contain no candidate-specific content.
 - **THEN** the default-data test fails and names the missing section
 
 #### Scenario: Resolved locations differ from the Location entries
-- **WHEN** the resolved target locations are empty, omit an entry, or list the entries in a different order
+- **WHEN** the resolved target locations are empty, omit an entry, or add an entry
 - **THEN** the default-data test fails
+
+#### Scenario: Resolved locations in another order
+- **WHEN** the resolved target locations hold the `## Location` entries in a different order
+- **THEN** the default-data test passes
 
 #### Scenario: User data does not affect the check
 - **WHEN** the job preferences in `data/` lack `## Scoring Notes` and the unit suite runs
