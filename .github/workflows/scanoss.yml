@@ -1,0 +1,29 @@
+name: SCANOSS
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  # The Action posts its summary comment and inline snippet annotations through
+  # these scopes. The raw result.json carries no severity or pass/fail field, so
+  # the comment and annotations are the only report of a match.
+  pull-requests: write
+  checks: write
+  actions: read
+
+jobs:
+  scanoss:
+    name: SCANOSS Code Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run SCANOSS Code Scan
+        id: scan
+        # Warn-only: a policy violation is reported but does not fail the check.
+        continue-on-error: true
+        uses: scanoss/gha-code-scan@v1
+        with:
+          policies: copyleft
