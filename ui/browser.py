@@ -19,7 +19,7 @@ from ui import columns
 
 STATUSES = ("new", "applied", "discarded")
 REVIEWED = {"yes": 1, "no": 0}
-DIRECTIONS = ("asc", "desc")
+SORT_DIRECTIONS = {"asc": "ASC", "desc": "DESC"}
 
 EVALUATION_LABELS = dict(columns.EVALUATION_COLUMNS)
 CRITERION_LABELS = dict(columns.CRITERION_COLUMNS)
@@ -147,10 +147,12 @@ def _list_view(cols, args):
         where.append(f"({' OR '.join(keep)})")
         params.append(max_commute)
 
-    sort = args.get("sort") if args.get("sort") in shown else None
-    direction = args.get("dir") if args.get("dir") in DIRECTIONS else "asc"
+    # sort and direction are taken from the constants they match, never from the request,
+    # so no request text enters ORDER BY
+    sort = next((c for c in shown if c == args.get("sort")), None)
+    direction = next((d for d in SORT_DIRECTIONS if d == args.get("dir")), "asc")
     if sort:
-        order = f"{sort} {direction}"
+        order = f"{sort} {SORT_DIRECTIONS[direction]}"
     elif "compatibility_score" in cols:
         order = "compatibility_score DESC"
     else:

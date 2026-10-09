@@ -169,8 +169,9 @@ less code to read.
 The list route builds one `SELECT` from the query parameters. `status`, `reviewed` and
 `max_commute` become `WHERE` clauses with bound parameters. `max_commute` is
 `commute_score <= ? OR commute_score IS NULL`, which keeps unknown commutes. Remote rows have
-`commute_score` 0 and pass. `sort` is checked against the present shown columns and `dir`
-against `asc` and `desc` before they enter `ORDER BY`. A value outside the allowed set, or a
+`commute_score` 0 and pass. `ORDER BY` is built from constants only: the present shown
+column equal to `sort`, and the SQL keyword mapped from `dir`. No request text enters the
+SQL. A value outside the allowed set, or a
 `max_commute` that is not a number, is ignored. A filter whose column is absent is ignored.
 When `compatibility_score` is absent, the default order is the order SQLite returns.
 
