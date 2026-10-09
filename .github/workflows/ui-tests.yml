@@ -1,0 +1,32 @@
+name: UI tests
+
+on:
+  pull_request:
+    paths:
+      - "ui/**"
+      - "tests/ui/**"
+      - "docker-compose.yml"
+
+jobs:
+  ui-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+        with:
+          # The checkout is bind-mounted into the test container, so a persisted
+          # token would be readable from inside it. Nothing here writes to git.
+          persist-credentials: false
+
+      - name: Build the ui image
+        run: podman build -t job-search-agent-ui:ci -f ui/Dockerfile .
+
+      - name: Run the UI browser tests in the container
+        run: >
+          podman run --rm
+          -v "$PWD:/workspace:ro"
+          -w /workspace
+          job-search-agent-ui:ci
+          python3 -m unittest discover -s tests/ui
