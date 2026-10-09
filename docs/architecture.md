@@ -1,7 +1,9 @@
 # Architecture
 
 The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_job_post.py`,
-`discover_jobs.py` and `propose_jobs.py`, that parse arguments and delegate into it.
+`discover_jobs.py` and `propose_jobs.py`, that parse arguments and delegate into it. A
+read-only web UI over the evaluations database is a separate component in `ui/` (see
+[Database UI](#database-ui)).
 
 ## Modules
 
@@ -340,16 +342,60 @@ those inputs at rank time; it is not a stored column (see [Ranking](#ranking)).
 
 ### Querying the database
 
-CLI wrappers already cover evaluating, discovering and ranking jobs. Ad-hoc database queries
-and review-status updates have no dedicated CLI command yet (see [roadmap.md](roadmap.md)), so
-these use raw SQL and one Python call:
+CLI wrappers cover evaluating, discovering and ranking jobs. The [Database UI](#database-ui)
+lists, filters and shows saved jobs. Queries the UI does not cover use raw SQL. Review-status
+updates have no dedicated command yet and use one Python call:
 
 | Task | Command |
 |------|---------|
+| Browse, filter and sort saved jobs | `podman-compose exec ui python3 -m ui.browse_db --db data/evaluations.db`, then http://localhost:8000 |
 | List the top-ranked saved jobs | `propose_jobs.py 5 --no-discover` (ranks the saved evaluations on the combined score without searching or evaluating) |
 | Show everything saved for one job | `sqlite3 data/evaluations.db "SELECT * FROM evaluations WHERE url = '<url>';"` |
 | Filter saved jobs | `sqlite3 data/evaluations.db "SELECT job_title, company FROM evaluations WHERE is_remote = 1 AND compatibility_score > 75;"` |
 | Mark a job reviewed, applied or discarded | `storage.update_review(url, reviewed=True, application_status="applied", notes="...")` |
+
+## Database UI
+
+`ui/` holds a read-only Flask UI over one evaluations database: a list page (`/`) and a
+detail page per job (`/job/<id>`).
+
+```
+ui/columns.py      the columns the UI reads, with labels; imports nothing
+ui/browser.py      create_app(db_path), the only public name
+ui/browse_db.py    entry point: python3 -m ui.browse_db --db PATH [--port 8000]
+ui/templates/      base.html (schema warning), list.html, detail.html, _fields.html
+ui/Dockerfile      the ui image: Flask, Playwright, Chromium
+```
+
+**No pipeline imports.** No module in `ui/` imports from `jobsearch`. The UI shows stored
+values only and computes no score, so it has no `combined_score`. The list's default order is
+`compatibility_score` descending. The database path is a command-line argument, so the UI
+never imports `config` and never loads the API keys. It does not call `config.require_data()`:
+it reads neither the resume nor the job preferences.
+
+**Read-only.** The connection uses SQLite's `mode=ro`, which rejects writes and does not
+create a missing file. A missing file renders "no saved evaluations".
+
+**Schema contract.** `ui/columns.py` lists the columns of `evaluations` and
+`evaluation_criteria` the UI reads. On each request the UI intersects them with
+`PRAGMA table_info`. The `SELECT` names only present columns, so added columns are never
+read. A missing column hides its field, its filter and its sort, and every page names it in a
+warning. The keys `evaluations.id` and `evaluation_criteria.evaluation_id` are mandatory: a
+table without its key is treated as absent. `tests/unit/test_ui_contract.py` fails when
+`storage._SCHEMA` lacks a column in `ui/columns.py`.
+
+**Filters and sorting.** `status`, `reviewed`, `max_commute`, `sort` and `dir` are query
+parameters, so each view is a URL. `max_commute` keeps rows at or below it, unknown commutes
+and remote jobs. Values outside the allowed set are ignored.
+
+**Container.** The `ui` compose service builds `ui/Dockerfile`, mounts the checkout
+read-only, does not mount the API key directory and publishes `127.0.0.1:8000:8000`. The
+pipeline image does not contain the UI's packages.
+
+**Tests and CI.** `tests/ui/test_browser_ui.py` drives the UI with headless Chromium against
+databases it builds from `ui/columns.py` under a temporary directory. It reads no user data.
+`.github/workflows/ui-tests.yml` runs it on pull requests that change `ui/**`, `tests/ui/**`
+or `docker-compose.yml`. The contract test runs in `unit-tests.yml` on every pull request.
 
 ## Files on disk
 
@@ -359,8 +405,9 @@ discover_jobs.py        CLI entrypoint: find, pre-select and optionally score ne
 propose_jobs.py         CLI entrypoint: evaluate 3N job ads, propose the top N by combined score
 jobsearch/              the package: scrape, commute, rubric, evaluation, discovery,
                         pre-selection, ranking, storage, LLM wrapper, config
+ui/                     read-only web UI over the evaluations database, its own container
 evals/                  the eval harness
-tests/                  unit/ (offline) and e2e/ (live, needs keys)
+tests/                  unit/ (offline), e2e/ (live, needs keys) and ui/ (browser, ui container)
 scripts/                check_setup.py, recompile_rubric.py
 data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,

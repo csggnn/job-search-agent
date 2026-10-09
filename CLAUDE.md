@@ -121,9 +121,17 @@ podman-compose exec job-search python3 evals/run_evals.py --verified-only
 podman-compose exec job-search python3 evals/run_evals.py --compare
 ```
 
-Ad-hoc querying of saved evaluations has no dedicated script; use `sqlite3` directly
-against `data/evaluations.db`. Marking a job reviewed, applied or discarded is a direct
-call to `storage.update_review(url, ...)`, also with no CLI wrapper yet.
+The read-only UI in `ui/` runs in its own `ui` container:
+
+```
+podman-compose exec ui python3 -m ui.browse_db --db data/evaluations.db   # http://localhost:8000
+podman-compose exec ui python3 -m unittest discover -s tests/ui            # browser tests
+```
+
+UI changes can be checked in a browser through the Playwright MCP when it is registered.
+Queries the UI does not cover use `sqlite3` directly against `data/evaluations.db`.
+Marking a job reviewed, applied or discarded is a direct call to
+`storage.update_review(url, ...)`, with no CLI wrapper yet.
 
 ## API keys
 
@@ -146,11 +154,12 @@ Every user data path derives from `config.DATA_DIR`. `config.EVALS_DATA_DIR` is
 module names the directory.
 
 No pipeline or eval command reads `data.example/`. A user creates `data/` with
-`cp -r data.example data`. Every entry point calls `config.require_data()` after parsing
-arguments and before any other work, so a run without a resume or job preferences fails
-before any API call or write. A new entry point must do the same. No message suggests
-copying template files into an existing `data/`: the user restores the file or recreates
-`data/` from the template.
+`cp -r data.example data`. Every pipeline and eval entry point calls `config.require_data()`
+after parsing arguments and before any other work, so a run without a resume or job
+preferences fails before any API call or write. A new pipeline or eval entry point must do
+the same. The UI in `ui/` reads neither file, makes no API call and writes nothing, and does
+not call it. No message suggests copying template files into an existing `data/`: the user
+restores the file or recreates `data/` from the template.
 
 The example data must keep every section the code parses (`## Location`,
 `## Home Address`, `## Scoring Notes`) filled in, with a geocodable home address and no
