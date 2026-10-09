@@ -80,7 +80,7 @@
 
 ## 6. Continuous integration
 
-- [ ] 6.1 Create `.github/workflows/ui-tests.yml`: on pull requests changing `ui/**`,
+- [x] 6.1 Create `.github/workflows/ui-tests.yml`: on pull requests changing `ui/**`,
   `tests/ui/**` or `docker-compose.yml`, build `ui/Dockerfile` with podman and run
   `python3 -m unittest discover -s tests/ui` with the checkout mounted read-only and
   `persist-credentials: false`. Verify the workflow runs on this change's pull request and
