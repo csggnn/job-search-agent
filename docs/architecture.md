@@ -362,7 +362,7 @@ detail page per job (`/job/<id>`).
 ```
 ui/columns.py      the columns the UI reads, with labels; imports nothing
 ui/browser.py      create_app(db_path), the only public name
-ui/browse_db.py    entry point: python3 -m ui.browse_db --db PATH [--port 8000]
+ui/browse_db.py    entry point: python3 -m ui.browse_db --db PATH [--host HOST] [--port 8000]
 ui/templates/      base.html (schema warning), list.html, detail.html, _fields.html
 ui/Dockerfile      the ui image: Flask, Playwright, Chromium
 ```
@@ -388,8 +388,10 @@ table without its key is treated as absent. `tests/unit/test_ui_contract.py` fai
 parameters, so each view is a URL. `max_commute` keeps rows at or below it, unknown commutes
 and remote jobs. Values outside the allowed set are ignored.
 
-**Container.** The `ui` compose service builds `ui/Dockerfile`, mounts the checkout
-read-only, does not mount the API key directory and publishes `127.0.0.1:8000:8000`. The
+**Container.** The `ui` compose service builds `ui/Dockerfile`, runs as a non-root user,
+mounts the checkout read-only, does not mount the API key directory and publishes
+`127.0.0.1:8000:8000`. `ui.browse_db` listens on `127.0.0.1` unless `--host` or `UI_HOST`
+says otherwise; the service sets `UI_HOST=0.0.0.0` so the published port reaches it. The
 pipeline image does not contain the UI's packages.
 
 **Tests and CI.** `tests/ui/test_browser_ui.py` drives the UI with headless Chromium against

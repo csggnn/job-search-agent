@@ -59,8 +59,8 @@
 - [x] 4.3 Implement the detail route and `ui/templates/detail.html`: a loop over present
   columns, the criteria table when `evaluation_criteria` is present, and a 404 for an
   unknown id. Verify the detail and missing-evaluation tests pass.
-- [x] 4.4 Create `ui/browse_db.py`: required `--db`, `--port` (default 8000), serve on
-  `0.0.0.0`, no `config` import. Verify that
+- [x] 4.4 Create `ui/browse_db.py`: required `--db`, `--host` (default `$UI_HOST`, else
+  `127.0.0.1`), `--port` (default 8000), no `config` import. Verify that
   `podman-compose exec ui python3 -m unittest discover -s tests/ui` passes in full, and that
   `python3 -m ui.browse_db --db <path>` serves the list for a database in a directory that
   holds no resume or job preferences.

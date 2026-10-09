@@ -100,8 +100,11 @@ check exists for. CLAUDE.md's rule is narrowed to pipeline and eval entry points
 
 ### Database path on the command line
 
-`python3 -m ui.browse_db --db PATH [--port 8000]` takes the database path as a required
-argument. The documented command passes `data/evaluations.db`. No UI module names `data/`.
+`python3 -m ui.browse_db --db PATH [--host HOST] [--port 8000]` takes the database path as
+a required argument. The documented command passes `data/evaluations.db`. No UI module names
+`data/`. `--host` defaults to `$UI_HOST`, else `127.0.0.1`, so a launch outside the container
+listens on loopback only. The `ui` compose service sets `UI_HOST=0.0.0.0`, which the
+published port needs.
 
 Alternative: `storage.DB_PATH`. Rejected because importing `storage` imports `config`, which
 loads the API keys.
@@ -176,9 +179,10 @@ a `NULL` commute needs a custom key, which SQL's `ORDER BY` handles.
 
 ### Separate `ui` image and compose service
 
-`ui/Dockerfile` builds from `python:3.11-slim`, installs `ui/requirements.txt` (`flask`,
-`playwright`) and runs `playwright install --with-deps chromium`. It sets
-`PYTHONDONTWRITEBYTECODE=1`. The pipeline's `Dockerfile` and `requirements.txt` are
+`ui/Dockerfile` builds from `python:3.11-slim`, installs `ui/requirements.txt` (pinned
+`flask` and `playwright`) and runs `playwright install --with-deps chromium` into a shared
+`PLAYWRIGHT_BROWSERS_PATH`. It sets `PYTHONDONTWRITEBYTECODE=1` and runs as a non-root
+`ui` user. The pipeline's `Dockerfile` and `requirements.txt` are
 unchanged.
 
 `docker-compose.yml` adds a `ui` service:
@@ -187,6 +191,7 @@ unchanged.
 - mounts the checkout read-only at `/workspace`
 - does not mount the API key directory
 - publishes `127.0.0.1:8000:8000`
+- sets `UI_HOST=0.0.0.0`
 - runs `sleep infinity`, like `job-search`
 
 `podman-compose up -d` starts both containers. The UI is started on demand with
