@@ -77,6 +77,21 @@ search and commute-routing calls; it is currently configured to work with Anthro
    The search queries and the scoring rubric are rebuilt from your files on this run.
    Repeat this command whenever you want new proposals.
 
+## Browsing saved jobs
+
+A read-only web UI lists every saved evaluation. The list filters by application status,
+reviewed state and maximum commute, and sorts by any column. Each job has a page with its
+scores, criteria, notes and a link to the ad. The UI runs in its own container, reads no API
+keys and does not change the database.
+```
+podman-compose up -d
+podman-compose exec ui python3 -m ui.browse_db --db data/evaluations.db
+```
+Then open http://localhost:8000. The UI tests run in the same container:
+```
+podman-compose exec ui python3 -m unittest discover -s tests/ui
+```
+
 ## Your data
 
 `data/` holds your resume, your preferences, every evaluation and the eval set. It is

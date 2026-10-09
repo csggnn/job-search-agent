@@ -1,0 +1,3 @@
+# Dependencies of the ui container only. The pipeline image does not install them.
+flask==3.1.3
+playwright==1.63.0

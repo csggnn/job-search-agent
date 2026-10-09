@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Saved jobs{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 1.5rem; color: #222; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { text-align: left; padding: 0.3rem 0.6rem; border-bottom: 1px solid #ddd;
+             vertical-align: top; }
+    th a { color: inherit; }
+    form#filters { display: flex; gap: 1rem; align-items: end; margin-bottom: 1rem; }
+    #schema-warning { background: #fff4d6; border: 1px solid #e0b84d; padding: 0.6rem;
+                      margin-bottom: 1rem; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.3rem 1rem; }
+    dt { font-weight: 600; }
+    dd { margin: 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  {% if warnings %}
+  <div id="schema-warning">
+    The database lacks columns the UI expects: {{ warnings | join(", ") }}.
+    These fields and their filters are not shown.
+  </div>
+  {% endif %}
+  {% block content %}{% endblock %}
+</body>
+</html>

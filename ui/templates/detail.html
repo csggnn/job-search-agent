@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_fields.html" as fields %}
+{% block title %}{{ row.get("job_title") or "(untitled)" }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('job_list') }}">All jobs</a></p>
+<h1>{{ row.get("job_title") or "(untitled)" }}</h1>
+<dl>
+  {% for c in detail_fields %}
+  <dt>{{ labels[c] }}</dt>
+  <dd class="field-{{ c }}">{{ fields.value(c, row) }}</dd>
+  {% endfor %}
+</dl>
+{% if criteria is not none %}
+<h2>Criteria</h2>
+<table id="criteria">
+  <thead>
+    <tr>{% for c in criterion_cols %}<th>{{ criterion_labels[c] }}</th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+    {% for r in criteria %}
+    <tr class="criterion">{% for c in criterion_cols %}<td>{{ fields.value(c, r) }}</td>{% endfor %}</tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
