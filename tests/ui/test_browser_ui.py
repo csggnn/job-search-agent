@@ -25,13 +25,13 @@ AD_HOST = "https://jobs.example.com"
 
 # id, title, company, compatibility, is_remote, commute, status, reviewed
 EVALUATIONS = [
-    dict(id=1, job_title="ML Engineer", company="Acme", compatibility_score=82, is_remote=0,
+    dict(id=1, job_title="Job A", company="Acme", compatibility_score=82, is_remote=0,
          commute_score=20, application_status="new", reviewed=0),
-    dict(id=2, job_title="Data Scientist", company="Beta", compatibility_score=60, is_remote=0,
+    dict(id=2, job_title="Job B", company="Beta", compatibility_score=60, is_remote=0,
          commute_score=45, application_status="applied", reviewed=1),
-    dict(id=3, job_title="Robotics Lead", company="Gamma", compatibility_score=75, is_remote=0,
+    dict(id=3, job_title="Job C", company="Gamma", compatibility_score=75, is_remote=0,
          commute_score=None, application_status="new", reviewed=1),
-    dict(id=4, job_title="AI Engineer", company="Delta", compatibility_score=70, is_remote=1,
+    dict(id=4, job_title="Job D", company="Delta", compatibility_score=70, is_remote=1,
          commute_score=0, application_status="discarded", reviewed=0),
     dict(id=5, job_title=None, company="Epsilon", compatibility_score=50, is_remote=0,
          commute_score=25, application_status="new", reviewed=0),
@@ -39,7 +39,7 @@ EVALUATIONS = [
 for _row in EVALUATIONS:
     _row.update(
         url=f"{AD_HOST}/{_row['id']}",
-        commute_address=None if _row["is_remote"] else f"Street {_row['id']}, Leuven",
+        commute_address=None if _row["is_remote"] else f"Street {_row['id']}, Town",
         days_on_office=None if _row["is_remote"] else 2,
         status_reason=None,
         evaluated_at=f"2026-10-0{_row['id']}T10:00:00+00:00",
@@ -50,12 +50,12 @@ for _row in EVALUATIONS:
     )
 
 CRITERIA = [
-    dict(evaluation_id=1, name="Python", type="skill", weight=3, matched=1, score=3,
-         rationale="listed in requirements"),
-    dict(evaluation_id=1, name="Computer vision", type="domain", weight=2, matched=1, score=2,
-         rationale="core of the role"),
-    dict(evaluation_id=1, name="Defense", type="penalty", weight=-3, matched=0, score=0,
-         rationale="not a defense company"),
+    dict(evaluation_id=1, name="Criterion A", type="skill", weight=3, matched=1, score=3,
+         rationale="rationale A"),
+    dict(evaluation_id=1, name="Criterion B", type="field", weight=2, matched=1, score=2,
+         rationale="rationale B"),
+    dict(evaluation_id=1, name="Criterion C", type="role", weight=-3, matched=0, score=0,
+         rationale="rationale C"),
 ]
 
 EXTRA_COLUMN = "ad_text"
@@ -251,17 +251,17 @@ class DetailPageTest(UiTestCase):
         self.open()
         self.cell(1, "job_title").locator("a").click()
         self.assertTrue(self.page.url.endswith("/job/1"))
-        self.assertIn("ML Engineer", self.page.locator("h1").inner_text())
+        self.assertIn("Job A", self.page.locator("h1").inner_text())
         for column, text in [("company", "Acme"), ("notes", "note for job 1"),
                              ("compatibility_rationale", "rationale for job 1"),
                              ("works_well", "works well for job 1"),
                              ("does_not_work", "does not work for job 1"),
-                             ("commute_address", "Street 1, Leuven")]:
+                             ("commute_address", "Street 1, Town")]:
             self.assertIn(text, self.page.locator(f"dd.field-{column}").inner_text())
         ad = self.page.locator("dd.field-url a")
         self.assertEqual(f"{AD_HOST}/1", ad.get_attribute("href"))
         self.assertEqual(3, self.page.locator("#criteria tr.criterion").count())
-        self.assertIn("Computer vision", self.page.locator("#criteria").inner_text())
+        self.assertIn("Criterion B", self.page.locator("#criteria").inner_text())
 
     def test_missing_evaluation(self):
         response = self.open("/job/999")
@@ -339,7 +339,7 @@ class CriteriaTableMissingTest(UiTestCase):
 
     def test_detail_without_criteria(self):
         self.open("/job/1")
-        self.assertIn("ML Engineer", self.page.locator("h1").inner_text())
+        self.assertIn("Job A", self.page.locator("h1").inner_text())
         self.assertEqual(0, self.page.locator("#criteria").count())
         self.assertIn(columns.CRITERIA_TABLE, self.warning_text())
         self.open()
