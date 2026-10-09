@@ -22,3 +22,5 @@ services:
       - "127.0.0.1:8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
+      # ui.browse_db listens on 127.0.0.1 unless told otherwise; the published port needs 0.0.0.0
+      - UI_HOST=0.0.0.0
