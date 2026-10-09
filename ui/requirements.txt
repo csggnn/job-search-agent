@@ -1,0 +1,3 @@
+# Dependencies of the ui container only. The pipeline image does not install them.
+flask
+playwright

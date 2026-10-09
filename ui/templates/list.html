@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% import "_fields.html" as fields %}
+{% block content %}
+<h1>Saved jobs</h1>
+{% if rows is none %}
+<p id="empty">There are no saved evaluations.</p>
+{% else %}
+<form id="filters" method="get" action="{{ url_for('job_list') }}">
+  {% if "application_status" in cols %}
+  <label>Status
+    <select name="status">
+      <option value="">all</option>
+      {% for s in statuses %}
+      <option value="{{ s }}" {% if filters.status == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  {% if "reviewed" in cols %}
+  <label>Reviewed
+    <select name="reviewed">
+      <option value="">all</option>
+      <option value="yes" {% if filters.reviewed == "yes" %}selected{% endif %}>reviewed</option>
+      <option value="no" {% if filters.reviewed == "no" %}selected{% endif %}>not reviewed</option>
+    </select>
+  </label>
+  {% endif %}
+  {% if "commute_score" in cols %}
+  <label>Max commute (min)
+    <input type="number" name="max_commute" min="0" step="any" value="{{ filters.max_commute or '' }}">
+  </label>
+  {% endif %}
+  {% if sort %}
+  <input type="hidden" name="sort" value="{{ sort }}">
+  <input type="hidden" name="dir" value="{{ direction }}">
+  {% endif %}
+  <button type="submit">Apply</button>
+</form>
+<p><span id="row-count">{{ rows | length }}</span> jobs</p>
+<table>
+  <thead>
+    <tr>
+      {% for c in shown %}
+      <th class="col-{{ c }}">
+        <a href="{{ url_for('job_list', **sort_args[c]) }}">{{ labels[c] }}</a>
+        {%- if sort == c %} {{ "▲" if direction == "asc" else "▼" }}{% endif %}
+      </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr class="job" data-id="{{ row['id'] }}">
+      {% for c in shown %}
+      <td class="col-{{ c }}">{{ fields.value(c, row) }}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

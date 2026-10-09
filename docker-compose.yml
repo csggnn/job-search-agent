@@ -7,3 +7,18 @@ services:
       - ${HOME}/.config/job-search-agent:/config:ro
     environment:
       - PYTHONUNBUFFERED=1
+
+  # Read-only database UI (ui/). Started on demand:
+  #   podman-compose exec ui python3 -m ui.browse_db --db data/evaluations.db
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    volumes:
+      # Read-only: the UI cannot write the database or the checkout. No API key mount.
+      - .:/workspace:ro
+    ports:
+      # Host side bound to 127.0.0.1, so the UI is not reachable from other machines.
+      - "127.0.0.1:8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1

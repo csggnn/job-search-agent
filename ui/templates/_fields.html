@@ -1,0 +1,17 @@
+{# value(column, row): one stored value as shown on the list and detail pages #}
+{% macro value(column, row) -%}
+  {%- set v = row[column] -%}
+  {%- if column == "job_title" -%}
+    <a href="{{ url_for('job_detail', job_id=row['id']) }}">{{ v or "(untitled)" }}</a>
+  {%- elif column == "url" -%}
+    {%- if ad_href(v) %}<a href="{{ ad_href(v) }}" target="_blank" rel="noopener noreferrer">open ad</a>{% endif -%}
+  {%- elif column == "commute_score" -%}
+    {{ commute(row) }}
+  {%- elif column in ("reviewed", "matched") -%}
+    {{ "yes" if v else "no" }}
+  {%- elif column == "evaluated_at" -%}
+    {{ (v | string)[:10] if v else "" }}
+  {%- else -%}
+    {{ "" if v is none else v }}
+  {%- endif -%}
+{%- endmacro %}
