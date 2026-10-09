@@ -186,14 +186,14 @@ def _number(value):
 
 
 def _commute(row):
-    """ the commute as shown: remote, unknown, or the stored value in minutes """
+    """ the commute as shown: remote, unknown, or the stored value in minutes to one decimal """
     if row.get("is_remote"):
         return "remote"
     value = row.get("commute_score")
     if value is None:
         return "unknown"
     if isinstance(value, (int, float)):
-        return f"{value:.0f} min"
+        return f"{value:.1f} min"
     return str(value)
 
 

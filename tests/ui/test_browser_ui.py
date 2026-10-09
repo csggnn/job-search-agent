@@ -26,7 +26,7 @@ AD_HOST = "https://jobs.example.com"
 # id, title, company, compatibility, is_remote, commute, status, reviewed
 EVALUATIONS = [
     dict(id=1, job_title="Job A", company="Acme", compatibility_score=82, is_remote=0,
-         commute_score=20, application_status="new", reviewed=0),
+         commute_score=19.5, application_status="new", reviewed=0),
     dict(id=2, job_title="Job B", company="Beta", compatibility_score=60, is_remote=0,
          commute_score=45, application_status="applied", reviewed=1),
     dict(id=3, job_title="Job C", company="Gamma", compatibility_score=75, is_remote=0,
@@ -172,6 +172,10 @@ class ListPageTest(UiTestCase):
     def test_unknown_commute(self):
         self.open()
         self.assertEqual("unknown", self.cell(3, "commute_score").inner_text().strip())
+
+    def test_commute_minutes(self):
+        self.open()
+        self.assertEqual("19.5 min", self.cell(1, "commute_score").inner_text().strip())
 
     def test_remote_job(self):
         self.open()
