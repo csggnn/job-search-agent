@@ -29,6 +29,10 @@ rules:
     - Non-Goals list design-level exclusions. Scope the proposal already defers is not restated.
     - Each Decision serves a goal, a Context constraint or a proposal outcome. A Decision that serves none is removed.
     - Rejected alternatives belong under the Decision they relate to.
+    - Context names the containers, data stores and external systems the change touches, and their relationships, as listed in docs/structurizr/workspace.dsl.
+    - A Decision that adds, removes or changes a relationship listed in docs/structurizr/workspace.dsl names that relationship.
+  tasks:
+    - A change that adds, removes or changes a relationship listed in docs/structurizr/workspace.dsl includes a task to update the DSL.
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.

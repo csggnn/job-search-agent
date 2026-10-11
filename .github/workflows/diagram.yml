@@ -1,0 +1,29 @@
+name: Diagram
+
+on:
+  pull_request:
+    paths:
+      - "docs/structurizr/workspace.dsl"
+      - "docs/structurizr/workspace.json"
+
+jobs:
+  png-updated:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # scripts/export_diagram.sh renders the PNG locally; the .githooks/pre-commit hook
+      # runs it on commit.
+      - name: Fail if the diagram source changed without a new PNG
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if ! grep -qx "docs/structurizr/containers.png" <<< "$changed"; then
+            echo "::error::workspace.dsl or workspace.json changed but containers.png did not. Run scripts/export_diagram.sh and commit the result."
+            exit 1
+          fi

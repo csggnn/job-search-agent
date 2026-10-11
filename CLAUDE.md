@@ -4,7 +4,8 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 
 Descriptive architecture lives in [docs/architecture.md](docs/architecture.md) and
 [docs/evals.md](docs/evals.md). This file holds the rules and invariants that constrain
-changes.
+changes. `docs/structurizr/workspace.dsl` lists every container, data store and external
+system, and which of them accesses which.
 
 ## What this is
 
@@ -34,6 +35,20 @@ must never be inlined into a `.py` file.
 `README.md`, `docs/architecture.md` or `docs/evals.md` documents that behavior and update it
 in the same change. The pipeline diagrams, cost tables and metric descriptions are meant to
 stay accurate, not aspirational.
+
+**Design against the system diagram.** Before designing a change, read
+`docs/structurizr/workspace.dsl` and the omitted relationships listed under "System
+overview" in `docs/architecture.md`. New behavior goes in the container that already owns
+its concern. A design states each container, data store, external system or relationship
+it adds or removes. A design that introduces an omitted relationship is confirmed with the
+user before implementation.
+
+**Keep the system diagram current.** When a change adds or removes a container, a data
+store, an external system, or an access between any of them, update
+`docs/structurizr/workspace.dsl` in the same change and run `scripts/export_diagram.sh`
+to re-render `docs/structurizr/containers.png`. The pre-commit hook in `.githooks/` does
+this on commit when enabled. If the change affects a relationship listed in
+`docs/architecture.md` as omitted, update that list too.
 
 **Do not cite line numbers** in documentation or issues. Name the file and the function.
 
