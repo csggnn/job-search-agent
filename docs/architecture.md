@@ -5,6 +5,47 @@ The code is a `jobsearch/` package with three root CLI entrypoints, `evaluate_jo
 read-only web UI over the evaluations database is a separate component in `ui/` (see
 [Database UI](#database-ui)).
 
+## System overview
+
+![C4 container diagram](structurizr/containers.png)
+
+The C4 container diagram shows two roles (job seeker, developer), three containers (job
+search engine, eval harness, UI), four data stores (user profile, derived profile,
+evaluations database, eval dataset) and the external systems each container calls.
+
+The diagram omits these relationships because they do not exist:
+
+- The eval harness neither reads nor writes the evaluations database.
+- The UI calls no external system and reads neither profile store.
+- The eval harness and the job search engine share the `jobsearch` package but do not
+  call each other at runtime.
+
+### Editing the diagram
+
+| File | Content | Written by |
+|------|---------|------------|
+| `docs/structurizr/workspace.dsl` | Model: elements, relationships, styles (Structurizr DSL) | hand |
+| `docs/structurizr/workspace.json` | Layout: element positions in the view | Structurizr, on save |
+| `docs/structurizr/containers.png` | Rendered view embedded above | Structurizr, PNG export |
+
+Structurizr local mode renders the workspace at http://localhost:8080:
+
+```
+podman run -it --rm --userns=keep-id --user "$(id -u):$(id -g)" -p 8080:8080 \
+    -v ./docs/structurizr:/usr/local/structurizr:Z docker.io/structurizr/structurizr local
+```
+
+The `--userns` and `--user` flags let the container write to the mounted directory as the
+host user. `validate` in place of `local` checks the DSL without starting a server.
+`inspect` in place of `local` lists Structurizr's modelling recommendations.
+
+Local mode reloads `workspace.dsl` on each page load. The view has no `autoLayout`.
+Element positions are set by dragging in the diagram editor and saved to
+`workspace.json`. Positions are keyed by element, so renaming an element in the DSL resets
+its position. `containers.png` is exported from the diagram page and replaced after every
+change to the DSL or the layout. Local mode also writes a search index and logs to
+`docs/structurizr/.structurizr/`, which is gitignored.
+
 ## Modules
 
 | Module | Concern |
@@ -414,7 +455,7 @@ scripts/                check_setup.py, recompile_rubric.py
 data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,
                         the evaluations database and the eval set
-docs/                   architecture, evals, roadmap
+docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
 .env.example            template for ~/.config/job-search-agent/.env
 ```
 

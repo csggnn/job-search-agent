@@ -1,0 +1,504 @@
+{
+  "configuration" : {
+    "scope" : "SoftwareSystem"
+  },
+  "description" : "Container view of the job search evaluation pipeline",
+  "documentation" : { },
+  "id" : 1,
+  "lastModifiedAgent" : "structurizr/diagrams/96f7c4a8-d153-4fee-822a-dc3c3ad5afae",
+  "lastModifiedDate" : "2026-10-11T11:15:23Z",
+  "lastModifiedUser" : "1523790450",
+  "model" : {
+    "people" : [ {
+      "description" : "Changes the code, curates and runs evals",
+      "id" : "1",
+      "name" : "Developer",
+      "properties" : {
+        "structurizr.dsl.identifier" : "dev"
+      },
+      "relationships" : [ {
+        "description" : "Captures cases, drafts labels, runs evals",
+        "destinationId" : "4",
+        "id" : "19",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "CLI"
+      }, {
+        "description" : "Captures cases, drafts labels, runs evals",
+        "destinationId" : "3",
+        "id" : "20",
+        "linkedRelationshipId" : "19",
+        "sourceId" : "1",
+        "technology" : "CLI"
+      }, {
+        "description" : "Verifies ground truth",
+        "destinationId" : "10",
+        "id" : "21",
+        "sourceId" : "1",
+        "tags" : "Relationship",
+        "technology" : "Text editor"
+      } ],
+      "tags" : "Element,Person"
+    }, {
+      "description" : "Maintains the profile, runs the pipeline, reviews results",
+      "id" : "2",
+      "name" : "Job seeker",
+      "properties" : {
+        "structurizr.dsl.identifier" : "seeker"
+      },
+      "relationships" : [ {
+        "description" : "Browses evaluations",
+        "destinationId" : "6",
+        "id" : "15",
+        "sourceId" : "2",
+        "tags" : "Relationship",
+        "technology" : "HTTP, localhost"
+      }, {
+        "description" : "Browses evaluations",
+        "destinationId" : "3",
+        "id" : "16",
+        "linkedRelationshipId" : "15",
+        "sourceId" : "2",
+        "technology" : "HTTP, localhost"
+      }, {
+        "description" : "Runs discovery, evaluation, proposals",
+        "destinationId" : "5",
+        "id" : "17",
+        "sourceId" : "2",
+        "tags" : "Relationship",
+        "technology" : "CLI"
+      }, {
+        "description" : "Edits resume and preferences",
+        "destinationId" : "7",
+        "id" : "18",
+        "sourceId" : "2",
+        "tags" : "Relationship",
+        "technology" : "Text editor"
+      } ],
+      "tags" : "Element,Person"
+    } ],
+    "softwareSystems" : [ {
+      "containers" : [ {
+        "description" : "Scores stored ads against verified ground truth, per pipeline step",
+        "documentation" : { },
+        "id" : "4",
+        "name" : "Eval harness",
+        "properties" : {
+          "structurizr.dsl.identifier" : "evals"
+        },
+        "relationships" : [ {
+          "description" : "Reads",
+          "destinationId" : "7",
+          "id" : "34",
+          "sourceId" : "4",
+          "tags" : "Relationship",
+          "technology" : "File read"
+        }, {
+          "description" : "Reads rubric, no recompile",
+          "destinationId" : "8",
+          "id" : "35",
+          "sourceId" : "4",
+          "tags" : "Relationship",
+          "technology" : "File read"
+        }, {
+          "description" : "Reads cases and ads, writes runs",
+          "destinationId" : "10",
+          "id" : "36",
+          "sourceId" : "4",
+          "tags" : "Relationship",
+          "technology" : "File I/O"
+        }, {
+          "description" : "Extraction, scoring",
+          "destinationId" : "11",
+          "id" : "37",
+          "sourceId" : "4",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Posting extract (capture), office-address search",
+          "destinationId" : "12",
+          "id" : "38",
+          "sourceId" : "4",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Geocoding, routing (unless --no-commute)",
+          "destinationId" : "13",
+          "id" : "39",
+          "sourceId" : "4",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Python CLI"
+      }, {
+        "description" : "Discovers, pre-selects, evaluates and ranks job postings",
+        "documentation" : { },
+        "id" : "5",
+        "name" : "Job search engine",
+        "properties" : {
+          "structurizr.dsl.identifier" : "engine"
+        },
+        "relationships" : [ {
+          "description" : "Reads",
+          "destinationId" : "7",
+          "id" : "23",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "File read"
+        }, {
+          "description" : "Compiles and reads rubric and search queries",
+          "destinationId" : "8",
+          "id" : "24",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "File I/O"
+        }, {
+          "description" : "Reads and writes evaluations",
+          "destinationId" : "9",
+          "id" : "25",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "SQLite"
+        }, {
+          "description" : "Extraction, rubric, scoring, summary",
+          "destinationId" : "11",
+          "id" : "26",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Posting extract (manual URL), office-address search",
+          "destinationId" : "12",
+          "id" : "28",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Geocoding, routing",
+          "destinationId" : "13",
+          "id" : "30",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "HTTPS"
+        }, {
+          "description" : "Searches postings",
+          "destinationId" : "14",
+          "id" : "32",
+          "sourceId" : "5",
+          "tags" : "Relationship",
+          "technology" : "JobSpy"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Python CLI"
+      }, {
+        "description" : "Read-only browser over saved evaluations",
+        "documentation" : { },
+        "id" : "6",
+        "name" : "UI",
+        "properties" : {
+          "structurizr.dsl.identifier" : "ui"
+        },
+        "relationships" : [ {
+          "description" : "Reads",
+          "destinationId" : "9",
+          "id" : "22",
+          "sourceId" : "6",
+          "tags" : "Relationship",
+          "technology" : "SQLite, read-only mount"
+        } ],
+        "tags" : "Element,Container",
+        "technology" : "Python, Flask"
+      }, {
+        "description" : "resume.md, job_preferences.md",
+        "documentation" : { },
+        "id" : "7",
+        "name" : "User profile",
+        "properties" : {
+          "structurizr.dsl.identifier" : "profile"
+        },
+        "tags" : "Element,Container,Store",
+        "technology" : "Markdown files"
+      }, {
+        "description" : "compatibility_rubric.json, search_queries.json",
+        "documentation" : { },
+        "id" : "8",
+        "name" : "Derived profile",
+        "properties" : {
+          "structurizr.dsl.identifier" : "derived"
+        },
+        "tags" : "Element,Container,Store",
+        "technology" : "JSON files"
+      }, {
+        "description" : "Evaluations, criteria matches, review status",
+        "documentation" : { },
+        "id" : "9",
+        "name" : "Evaluations DB",
+        "properties" : {
+          "structurizr.dsl.identifier" : "db"
+        },
+        "tags" : "Element,Container,Store",
+        "technology" : "SQLite"
+      }, {
+        "description" : "cases.json, ads/, runs/",
+        "documentation" : { },
+        "id" : "10",
+        "name" : "Eval dataset",
+        "properties" : {
+          "structurizr.dsl.identifier" : "evalset"
+        },
+        "tags" : "Element,Container,Store",
+        "technology" : "JSON files"
+      } ],
+      "description" : "Scrapes, scores and ranks job postings against a candidate profile",
+      "documentation" : { },
+      "id" : "3",
+      "name" : "Job Search Agent",
+      "properties" : {
+        "structurizr.dsl.identifier" : "jsa"
+      },
+      "relationships" : [ {
+        "description" : "Extraction, rubric, scoring, summary",
+        "destinationId" : "11",
+        "id" : "27",
+        "linkedRelationshipId" : "26",
+        "sourceId" : "3",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Posting extract (manual URL), office-address search",
+        "destinationId" : "12",
+        "id" : "29",
+        "linkedRelationshipId" : "28",
+        "sourceId" : "3",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Geocoding, routing",
+        "destinationId" : "13",
+        "id" : "31",
+        "linkedRelationshipId" : "30",
+        "sourceId" : "3",
+        "technology" : "HTTPS"
+      }, {
+        "description" : "Searches postings",
+        "destinationId" : "14",
+        "id" : "33",
+        "linkedRelationshipId" : "32",
+        "sourceId" : "3",
+        "technology" : "JobSpy"
+      } ],
+      "tags" : "Element,Software System"
+    }, {
+      "description" : "LLM API, via aisuite",
+      "documentation" : { },
+      "id" : "11",
+      "name" : "Anthropic",
+      "properties" : {
+        "structurizr.dsl.identifier" : "llm"
+      },
+      "tags" : "Element,Software System,External"
+    }, {
+      "description" : "Web extract and search",
+      "documentation" : { },
+      "id" : "12",
+      "name" : "Tavily",
+      "properties" : {
+        "structurizr.dsl.identifier" : "tavily"
+      },
+      "tags" : "Element,Software System,External"
+    }, {
+      "description" : "Geocoding and routing",
+      "documentation" : { },
+      "id" : "13",
+      "name" : "OpenRouteService",
+      "properties" : {
+        "structurizr.dsl.identifier" : "ors"
+      },
+      "tags" : "Element,Software System,External"
+    }, {
+      "description" : "Indeed, LinkedIn",
+      "documentation" : { },
+      "id" : "14",
+      "name" : "Job boards",
+      "properties" : {
+        "structurizr.dsl.identifier" : "boards"
+      },
+      "tags" : "Element,Software System,External"
+    } ]
+  },
+  "name" : "Job Search Agent",
+  "properties" : {
+    "structurizr.inspection.info" : "0",
+    "structurizr.inspection.ignore" : "0",
+    "structurizr.inspection.error" : "3",
+    "structurizr.inspection.warning" : "0",
+    "structurizr.dsl" : "d29ya3NwYWNlICJKb2IgU2VhcmNoIEFnZW50IiAiQ29udGFpbmVyIHZpZXcgb2YgdGhlIGpvYiBzZWFyY2ggZXZhbHVhdGlvbiBwaXBlbGluZSIgewoKICAgIGNvbmZpZ3VyYXRpb24gewogICAgICAgIHNjb3BlIHNvZnR3YXJlc3lzdGVtCiAgICB9CgogICAgbW9kZWwgewogICAgICAgIGRldiA9IHBlcnNvbiAiRGV2ZWxvcGVyIiAiQ2hhbmdlcyB0aGUgY29kZSwgY3VyYXRlcyBhbmQgcnVucyBldmFscyIKICAgICAgICBzZWVrZXIgPSBwZXJzb24gIkpvYiBzZWVrZXIiICJNYWludGFpbnMgdGhlIHByb2ZpbGUsIHJ1bnMgdGhlIHBpcGVsaW5lLCByZXZpZXdzIHJlc3VsdHMiCgogICAgICAgIGpzYSA9IHNvZnR3YXJlU3lzdGVtICJKb2IgU2VhcmNoIEFnZW50IiAiU2NyYXBlcywgc2NvcmVzIGFuZCByYW5rcyBqb2IgcG9zdGluZ3MgYWdhaW5zdCBhIGNhbmRpZGF0ZSBwcm9maWxlIiB7CiAgICAgICAgICAgIGV2YWxzID0gY29udGFpbmVyICJFdmFsIGhhcm5lc3MiICJTY29yZXMgc3RvcmVkIGFkcyBhZ2FpbnN0IHZlcmlmaWVkIGdyb3VuZCB0cnV0aCwgcGVyIHBpcGVsaW5lIHN0ZXAiICJQeXRob24gQ0xJIgogICAgICAgICAgICBlbmdpbmUgPSBjb250YWluZXIgIkpvYiBzZWFyY2ggZW5naW5lIiAiRGlzY292ZXJzLCBwcmUtc2VsZWN0cywgZXZhbHVhdGVzIGFuZCByYW5rcyBqb2IgcG9zdGluZ3MiICJQeXRob24gQ0xJIgogICAgICAgICAgICB1aSA9IGNvbnRhaW5lciAiVUkiICJSZWFkLW9ubHkgYnJvd3NlciBvdmVyIHNhdmVkIGV2YWx1YXRpb25zIiAiUHl0aG9uLCBGbGFzayIKCiAgICAgICAgICAgIHByb2ZpbGUgPSBjb250YWluZXIgIlVzZXIgcHJvZmlsZSIgInJlc3VtZS5tZCwgam9iX3ByZWZlcmVuY2VzLm1kIiAiTWFya2Rvd24gZmlsZXMiICJTdG9yZSIKICAgICAgICAgICAgZGVyaXZlZCA9IGNvbnRhaW5lciAiRGVyaXZlZCBwcm9maWxlIiAiY29tcGF0aWJpbGl0eV9ydWJyaWMuanNvbiwgc2VhcmNoX3F1ZXJpZXMuanNvbiIgIkpTT04gZmlsZXMiICJTdG9yZSIKICAgICAgICAgICAgZGIgPSBjb250YWluZXIgIkV2YWx1YXRpb25zIERCIiAiRXZhbHVhdGlvbnMsIGNyaXRlcmlhIG1hdGNoZXMsIHJldmlldyBzdGF0dXMiICJTUUxpdGUiICJTdG9yZSIKICAgICAgICAgICAgZXZhbHNldCA9IGNvbnRhaW5lciAiRXZhbCBkYXRhc2V0IiAiY2FzZXMuanNvbiwgYWRzLywgcnVucy8iICJKU09OIGZpbGVzIiAiU3RvcmUiCiAgICAgICAgfQoKICAgICAgICBsbG0gPSBzb2Z0d2FyZVN5c3RlbSAiQW50aHJvcGljIiAiTExNIEFQSSwgdmlhIGFpc3VpdGUiICJFeHRlcm5hbCIKICAgICAgICB0YXZpbHkgPSBzb2Z0d2FyZVN5c3RlbSAiVGF2aWx5IiAiV2ViIGV4dHJhY3QgYW5kIHNlYXJjaCIgIkV4dGVybmFsIgogICAgICAgIG9ycyA9IHNvZnR3YXJlU3lzdGVtICJPcGVuUm91dGVTZXJ2aWNlIiAiR2VvY29kaW5nIGFuZCByb3V0aW5nIiAiRXh0ZXJuYWwiCiAgICAgICAgYm9hcmRzID0gc29mdHdhcmVTeXN0ZW0gIkpvYiBib2FyZHMiICJJbmRlZWQsIExpbmtlZEluIiAiRXh0ZXJuYWwiCgogICAgICAgIHNlZWtlciAtPiB1aSAiQnJvd3NlcyBldmFsdWF0aW9ucyIgIkhUVFAsIGxvY2FsaG9zdCIKICAgICAgICBzZWVrZXIgLT4gZW5naW5lICJSdW5zIGRpc2NvdmVyeSwgZXZhbHVhdGlvbiwgcHJvcG9zYWxzIiAiQ0xJIgogICAgICAgIHNlZWtlciAtPiBwcm9maWxlICJFZGl0cyByZXN1bWUgYW5kIHByZWZlcmVuY2VzIiAiVGV4dCBlZGl0b3IiCiAgICAgICAgZGV2IC0+IGV2YWxzICJDYXB0dXJlcyBjYXNlcywgZHJhZnRzIGxhYmVscywgcnVucyBldmFscyIgIkNMSSIKICAgICAgICBkZXYgLT4gZXZhbHNldCAiVmVyaWZpZXMgZ3JvdW5kIHRydXRoIiAiVGV4dCBlZGl0b3IiCgogICAgICAgIHVpIC0+IGRiICJSZWFkcyIgIlNRTGl0ZSwgcmVhZC1vbmx5IG1vdW50IgoKICAgICAgICBlbmdpbmUgLT4gcHJvZmlsZSAiUmVhZHMiICJGaWxlIHJlYWQiCiAgICAgICAgZW5naW5lIC0+IGRlcml2ZWQgIkNvbXBpbGVzIGFuZCByZWFkcyBydWJyaWMgYW5kIHNlYXJjaCBxdWVyaWVzIiAiRmlsZSBJL08iCiAgICAgICAgZW5naW5lIC0+IGRiICJSZWFkcyBhbmQgd3JpdGVzIGV2YWx1YXRpb25zIiAiU1FMaXRlIgogICAgICAgIGVuZ2luZSAtPiBsbG0gIkV4dHJhY3Rpb24sIHJ1YnJpYywgc2NvcmluZywgc3VtbWFyeSIgIkhUVFBTIgogICAgICAgIGVuZ2luZSAtPiB0YXZpbHkgIlBvc3RpbmcgZXh0cmFjdCAobWFudWFsIFVSTCksIG9mZmljZS1hZGRyZXNzIHNlYXJjaCIgIkhUVFBTIgogICAgICAgIGVuZ2luZSAtPiBvcnMgIkdlb2NvZGluZywgcm91dGluZyIgIkhUVFBTIgogICAgICAgIGVuZ2luZSAtPiBib2FyZHMgIlNlYXJjaGVzIHBvc3RpbmdzIiAiSm9iU3B5IgoKICAgICAgICBldmFscyAtPiBwcm9maWxlICJSZWFkcyIgIkZpbGUgcmVhZCIKICAgICAgICBldmFscyAtPiBkZXJpdmVkICJSZWFkcyBydWJyaWMsIG5vIHJlY29tcGlsZSIgIkZpbGUgcmVhZCIKICAgICAgICBldmFscyAtPiBldmFsc2V0ICJSZWFkcyBjYXNlcyBhbmQgYWRzLCB3cml0ZXMgcnVucyIgIkZpbGUgSS9PIgogICAgICAgIGV2YWxzIC0+IGxsbSAiRXh0cmFjdGlvbiwgc2NvcmluZyIgIkhUVFBTIgogICAgICAgIGV2YWxzIC0+IHRhdmlseSAiUG9zdGluZyBleHRyYWN0IChjYXB0dXJlKSwgb2ZmaWNlLWFkZHJlc3Mgc2VhcmNoIiAiSFRUUFMiCiAgICAgICAgZXZhbHMgLT4gb3JzICJHZW9jb2RpbmcsIHJvdXRpbmcgKHVubGVzcyAtLW5vLWNvbW11dGUpIiAiSFRUUFMiCiAgICB9CgogICAgdmlld3MgewogICAgICAgIGNvbnRhaW5lciBqc2EgIkNvbnRhaW5lcnMiICJDb250YWluZXIgZGlhZ3JhbTogSm9iIFNlYXJjaCBBZ2VudCIgewogICAgICAgICAgICBpbmNsdWRlICoKICAgICAgICB9CgogICAgICAgIHN0eWxlcyB7CiAgICAgICAgICAgIGVsZW1lbnQgIlBlcnNvbiIgewogICAgICAgICAgICAgICAgc2hhcGUgUGVyc29uCiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICMwODQyN2IKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgICAgICBlbGVtZW50ICJDb250YWluZXIiIHsKICAgICAgICAgICAgICAgIGJhY2tncm91bmQgIzQzOGRkNQogICAgICAgICAgICAgICAgY29sb3IgI2ZmZmZmZgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIlN0b3JlIiB7CiAgICAgICAgICAgICAgICBzaGFwZSBDeWxpbmRlcgogICAgICAgICAgICB9CiAgICAgICAgICAgIGVsZW1lbnQgIkV4dGVybmFsIiB7CiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kICM5OTk5OTkKICAgICAgICAgICAgICAgIGNvbG9yICNmZmZmZmYKICAgICAgICAgICAgfQogICAgICAgIH0KICAgIH0KfQ=="
+  },
+  "views" : {
+    "configuration" : {
+      "lastSavedView" : "Containers",
+      "metadataSymbols" : "SquareBrackets",
+      "styles" : {
+        "elements" : [ {
+          "background" : "#438dd5",
+          "color" : "#ffffff",
+          "tag" : "Container"
+        }, {
+          "background" : "#999999",
+          "color" : "#ffffff",
+          "tag" : "External"
+        }, {
+          "background" : "#08427b",
+          "color" : "#ffffff",
+          "shape" : "Person",
+          "tag" : "Person"
+        }, {
+          "shape" : "Cylinder",
+          "tag" : "Store"
+        } ]
+      },
+      "terminology" : { }
+    },
+    "containerViews" : [ {
+      "description" : "Container diagram: Job Search Agent",
+      "dimensions" : {
+        "height" : 3877,
+        "width" : 2750
+      },
+      "elements" : [ {
+        "id" : "1",
+        "x" : 1955,
+        "y" : 158
+      }, {
+        "id" : "2",
+        "x" : 610,
+        "y" : 143
+      }, {
+        "id" : "4",
+        "x" : 1770,
+        "y" : 1660
+      }, {
+        "id" : "5",
+        "x" : 875,
+        "y" : 1668
+      }, {
+        "id" : "6",
+        "x" : 265,
+        "y" : 785
+      }, {
+        "id" : "7",
+        "x" : 1299,
+        "y" : 664
+      }, {
+        "id" : "8",
+        "x" : 1310,
+        "y" : 1255
+      }, {
+        "id" : "9",
+        "x" : 250,
+        "y" : 2140
+      }, {
+        "id" : "10",
+        "x" : 2050,
+        "y" : 2145
+      }, {
+        "id" : "11",
+        "x" : 1290,
+        "y" : 3280
+      }, {
+        "id" : "12",
+        "x" : 1290,
+        "y" : 2955
+      }, {
+        "id" : "13",
+        "x" : 1285,
+        "y" : 2620
+      }, {
+        "id" : "14",
+        "x" : 323,
+        "y" : 2776
+      } ],
+      "externalSoftwareSystemBoundariesVisible" : false,
+      "key" : "Containers",
+      "name" : "Container View: Job Search Agent",
+      "order" : 1,
+      "relationships" : [ {
+        "id" : "15"
+      }, {
+        "id" : "17"
+      }, {
+        "id" : "18"
+      }, {
+        "id" : "19"
+      }, {
+        "id" : "21"
+      }, {
+        "id" : "22"
+      }, {
+        "id" : "23",
+        "vertices" : [ {
+          "x" : 1080,
+          "y" : 1665
+        } ]
+      }, {
+        "id" : "24"
+      }, {
+        "id" : "25"
+      }, {
+        "id" : "26",
+        "vertices" : [ {
+          "x" : 1100,
+          "y" : 3341
+        } ]
+      }, {
+        "id" : "28",
+        "vertices" : [ {
+          "x" : 1185,
+          "y" : 1975
+        }, {
+          "x" : 1185,
+          "y" : 3056
+        } ]
+      }, {
+        "id" : "30",
+        "vertices" : [ {
+          "x" : 1260,
+          "y" : 1975
+        } ]
+      }, {
+        "id" : "32"
+      }, {
+        "id" : "34",
+        "vertices" : [ {
+          "x" : 1995,
+          "y" : 1660
+        } ]
+      }, {
+        "id" : "35"
+      }, {
+        "id" : "36"
+      }, {
+        "id" : "37",
+        "vertices" : [ {
+          "x" : 1965,
+          "y" : 3325
+        } ]
+      }, {
+        "id" : "38",
+        "vertices" : [ {
+          "x" : 1890,
+          "y" : 1960
+        }, {
+          "x" : 1855,
+          "y" : 3060
+        } ]
+      }, {
+        "id" : "39",
+        "vertices" : [ {
+          "x" : 1820,
+          "y" : 1965
+        } ]
+      } ],
+      "softwareSystemId" : "3"
+    } ]
+  }
+}

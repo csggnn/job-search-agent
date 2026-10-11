@@ -17,3 +17,6 @@ __pycache__/
 
 # Playwright MCP page snapshots and screenshots: they hold the browsed pages, including user data
 .playwright-mcp/
+
+# Structurizr local mode: search index and logs, regenerated on start
+docs/structurizr/.structurizr/

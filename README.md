@@ -198,7 +198,7 @@ Everything past basic use is documented separately:
 
 | Document | Answers |
 |----------|---------|
-| [docs/architecture.md](docs/architecture.md) | Commands and flags, the pipeline internals, the database and how to query it, file layout, and how personalization files stay out of git |
+| [docs/architecture.md](docs/architecture.md) | The C4 container diagram, commands and flags, the pipeline internals, the database and how to query it, file layout, and how personalization files stay out of git |
 | [docs/evals.md](docs/evals.md) | How the tests and eval harness work, and what the metrics mean |
 | [docs/roadmap.md](docs/roadmap.md) | Known limitations that need code changes |
 
