@@ -58,6 +58,9 @@ DSL fails the commit. Each clone enables the hook once:
 git config core.hooksPath .githooks
 ```
 
+The "Diagram" workflow fails a pull request that changes `workspace.dsl` or
+`workspace.json` without changing `containers.png`.
+
 ## Modules
 
 | Module | Concern |
