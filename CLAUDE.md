@@ -36,6 +36,13 @@ must never be inlined into a `.py` file.
 in the same change. The pipeline diagrams, cost tables and metric descriptions are meant to
 stay accurate, not aspirational.
 
+**Design against the system diagram.** Before designing a change, read
+`docs/structurizr/workspace.dsl` and the omitted relationships listed under "System
+overview" in `docs/architecture.md`. New behavior goes in the container that already owns
+its concern. A design states each container, data store, external system or relationship
+it adds or removes. A design that introduces an omitted relationship is confirmed with the
+user before implementation.
+
 **Keep the system diagram current.** When a change adds or removes a container, a data
 store, an external system, or an access between any of them, update
 `docs/structurizr/workspace.dsl` in the same change and run `scripts/export_diagram.sh`
