@@ -1,0 +1,15 @@
+#!/bin/sh
+# Re-render docs/structurizr/containers.png when the diagram source is staged, and stage
+# the result. Renders the staged versions of workspace.dsl and workspace.json.
+# Enabled per clone with: git config core.hooksPath .githooks
+set -eu
+
+git diff --cached --name-only | grep -qE '^docs/structurizr/workspace\.(dsl|json)$' || exit 0
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+git show :docs/structurizr/workspace.dsl > "$tmp/workspace.dsl"
+git show :docs/structurizr/workspace.json > "$tmp/workspace.json"
+
+scripts/export_diagram.sh "$tmp"
+git add docs/structurizr/containers.png

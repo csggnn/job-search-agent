@@ -26,7 +26,7 @@ The diagram omits these relationships because they do not exist:
 |------|---------|------------|
 | `docs/structurizr/workspace.dsl` | Model: elements, relationships, styles (Structurizr DSL) | hand |
 | `docs/structurizr/workspace.json` | Layout: element positions in the view | Structurizr, on save |
-| `docs/structurizr/containers.png` | Rendered view embedded above | Structurizr, PNG export |
+| `docs/structurizr/containers.png` | Rendered view embedded above | `scripts/export_diagram.sh` |
 
 Structurizr local mode renders the workspace at http://localhost:8080:
 
@@ -42,9 +42,21 @@ host user. `validate` in place of `local` checks the DSL without starting a serv
 Local mode reloads `workspace.dsl` on each page load. The view has no `autoLayout`.
 Element positions are set by dragging in the diagram editor and saved to
 `workspace.json`. Positions are keyed by element, so renaming an element in the DSL resets
-its position. `containers.png` is exported from the diagram page and replaced after every
-change to the DSL or the layout. Local mode also writes a search index and logs to
+its position. Local mode also writes a search index and logs to
 `docs/structurizr/.structurizr/`, which is gitignored.
+
+`scripts/export_diagram.sh` validates the DSL and renders the "Containers" view to
+`containers.png`. It runs Structurizr and headless Chromium from the `ui` image in one
+podman pod, with no host port, on a copy of the source files. Two runs on the same input
+produce identical files.
+
+The pre-commit hook in `.githooks/` runs the script on the staged `workspace.dsl` and
+`workspace.json` when either is staged, and stages the new `containers.png`. An invalid
+DSL fails the commit. Each clone enables the hook once:
+
+```
+git config core.hooksPath .githooks
+```
 
 ## Modules
 
@@ -451,11 +463,12 @@ jobsearch/              the package: scrape, commute, rubric, evaluation, discov
 ui/                     read-only web UI over the evaluations database, its own container
 evals/                  the eval harness
 tests/                  unit/ (offline), e2e/ (live, needs keys) and ui/ (browser, ui container)
-scripts/                check_setup.py, recompile_rubric.py
+scripts/                check_setup.py, recompile_rubric.py, export_diagram.sh
 data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,
                         the evaluations database and the eval set
 docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
+.githooks/              pre-commit: re-renders the system diagram
 .env.example            template for ~/.config/job-search-agent/.env
 ```
 
