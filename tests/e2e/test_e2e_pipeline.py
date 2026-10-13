@@ -67,9 +67,9 @@ RUN_DISCOVERY_SMOKE = False
 
 
 def _dotenv_values():
-    """ best-effort parse of ENV_PATH (KEY=value, ignoring blank/comment lines and trailing
-        inline comments) - only used to decide whether the required keys are available to
-        the child process, so we can skip cleanly instead of failing when they're absent
+    """best-effort parse of ENV_PATH (KEY=value, ignoring blank/comment lines and trailing
+    inline comments) - only used to decide whether the required keys are available to
+    the child process, so we can skip cleanly instead of failing when they're absent
     """
     values = {}
     if not ENV_PATH.exists():
@@ -86,14 +86,14 @@ def _dotenv_values():
 
 
 def _env_available(key, dotenv):
-    """ True if `key` has a non-empty value in the process env or in ENV_PATH """
+    """True if `key` has a non-empty value in the process env or in ENV_PATH"""
     return bool(os.environ.get(key) or dotenv.get(key))
 
 
 def _log(msg):
-    """ print a progress/summary line (unittest is silent on success, and this is a slow
-        end-to-end run, so report what was actually exercised). Goes to stderr - the same
-        stream unittest writes its own status to - so the lines stay in chronological order.
+    """print a progress/summary line (unittest is silent on success, and this is a slow
+    end-to-end run, so report what was actually exercised). Goes to stderr - the same
+    stream unittest writes its own status to - so the lines stay in chronological order.
     """
     print(f"[e2e] {msg}", file=sys.stderr, flush=True)
 
@@ -110,8 +110,11 @@ class PipelineEndToEndTest(unittest.TestCase):
             )
         missing = [str(path) for path in USER_DATA_PATHS if not path.exists()]
         if missing:
-            fix = ("restore the missing file, or remove data/ and create it again from the "
-                   "template" if DATA_DIR.is_dir() else "create data/ from the template")
+            fix = (
+                "restore the missing file, or remove data/ and create it again from the template"
+                if DATA_DIR.is_dir()
+                else "create data/ from the template"
+            )
             raise RuntimeError(
                 f"missing user data: {', '.join(missing)}. In the checkout root, {fix}: "
                 "cp -r data.example data"
@@ -124,7 +127,7 @@ class PipelineEndToEndTest(unittest.TestCase):
         cls.url = TARGET_URL
 
     def _run_evaluate(self, args):
-        """ invoke the evaluate entrypoint as a subprocess from the repo root """
+        """invoke the evaluate entrypoint as a subprocess from the repo root"""
         return subprocess.run(
             [sys.executable, "evaluate_job_post.py", *args],
             cwd=REPO_ROOT,
@@ -136,15 +139,15 @@ class PipelineEndToEndTest(unittest.TestCase):
 
     @staticmethod
     def _looks_like_scrape_failure(result):
-        """ recognize the ScrapeError path so a dead/unreachable target URL fails with a
-            pointed "replace TARGET_URL" message instead of a raw stack trace
+        """recognize the ScrapeError path so a dead/unreachable target URL fails with a
+        pointed "replace TARGET_URL" message instead of a raw stack trace
         """
         blob = (result.stdout + result.stderr).lower()
         return "scrapeerror" in blob or "could not extract content" in blob
 
     def _fetch_row(self, url):
-        """ read the saved evaluation row for `url` straight from SQLite (column names are
-            part of the persisted schema, which the refactor does not change)
+        """read the saved evaluation row for `url` straight from SQLite (column names are
+        part of the persisted schema, which the refactor does not change)
         """
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -171,14 +174,16 @@ class PipelineEndToEndTest(unittest.TestCase):
         return count
 
     def test_evaluate_pipeline_end_to_end(self):
-        """ run one live posting through the full pipeline, verify the persisted row, then
-            confirm a second run is served from cache
+        """run one live posting through the full pipeline, verify the persisted row, then
+        confirm a second run is served from cache
         """
         _log(f"target URL: {self.url}")
 
         # 1. force a full, uncached run: scrape -> commute -> compatibility -> summary -> save
-        _log("running full pipeline (--force): "
-             "scrape -> commute -> compatibility -> summary -> save ...")
+        _log(
+            "running full pipeline (--force): "
+            "scrape -> commute -> compatibility -> summary -> save ..."
+        )
         start = time.monotonic()
         result = self._run_evaluate([self.url, "--force"])
         force_secs = time.monotonic() - start
@@ -253,7 +258,7 @@ class PipelineEndToEndTest(unittest.TestCase):
         _log(f"cache-hit run OK in {cache_secs:.1f}s (served from cache, no re-scrape/LLM)")
 
     def test_discover_smoke(self):
-        """ run discover_jobs.py end to end and confirm it produces a job ad listing """
+        """run discover_jobs.py end to end and confirm it produces a job ad listing"""
         if not RUN_DISCOVERY_SMOKE:
             self.skipTest(
                 "discovery smoke test is opt-in (slow, scrapes live job boards): set "

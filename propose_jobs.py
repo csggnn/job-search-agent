@@ -22,12 +22,19 @@ DEFAULT_PRESELECT_MULTIPLIER = 3
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("n", type=int, help="how many jobs to propose")
-    parser.add_argument("--preselect-multiplier", type=int, default=DEFAULT_PRESELECT_MULTIPLIER,
-                        help="discover, pre-select and evaluate this many times N job ads "
-                             f"before ranking (default {DEFAULT_PRESELECT_MULTIPLIER})")
-    parser.add_argument("--no-discover", action="store_true",
-                        help="skip discovery and evaluation; rank the saved evaluations as they "
-                             "are, printing the overall shortlist only")
+    parser.add_argument(
+        "--preselect-multiplier",
+        type=int,
+        default=DEFAULT_PRESELECT_MULTIPLIER,
+        help="discover, pre-select and evaluate this many times N job ads "
+        f"before ranking (default {DEFAULT_PRESELECT_MULTIPLIER})",
+    )
+    parser.add_argument(
+        "--no-discover",
+        action="store_true",
+        help="skip discovery and evaluation; rank the saved evaluations as they "
+        "are, printing the overall shortlist only",
+    )
     add_discovery_arguments(parser)
     args = parser.parse_args()
 

@@ -13,7 +13,7 @@ from ui import columns
 
 
 def _schema_columns(table):
-    """ the column names of `table` after running storage's schema on an empty database """
+    """the column names of `table` after running storage's schema on an empty database"""
     conn = sqlite3.connect(":memory:")
     try:
         conn.executescript(storage._SCHEMA)

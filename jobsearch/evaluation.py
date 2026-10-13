@@ -19,19 +19,20 @@ from jobsearch.scrape import scrape_post
 
 
 def compatibility_score(job_title, company, location, description, rubric=None):
-    """ score 0-100 how well a job posting matches the candidate, using the cached rubric.
-        returns {"compatibility_score": int, "rationale": str,
-                 "criteria": [...evaluated rubric criteria]}
+    """score 0-100 how well a job posting matches the candidate, using the cached rubric.
+    returns {"compatibility_score": int, "rationale": str,
+             "criteria": [...evaluated rubric criteria]}
 
-        If no rubric is provided, the cached rubric will be checked for staleness and recompiled
-        if needed.
+    If no rubric is provided, the cached rubric will be checked for staleness and recompiled
+    if needed.
     """
     rubric = load_or_compile_rubric() if rubric is None else rubric
     evaluated_criteria = evaluate_rubric(rubric, match_text(job_title, location, description))
     scoring_guidance = rubric.get("scoring_guidance")
     guidance_block = (
         f"\nAdditional scoring guidance from the candidate:\n{scoring_guidance}\n"
-        if scoring_guidance else ""
+        if scoring_guidance
+        else ""
     )
 
     result = ask_json(
@@ -59,8 +60,8 @@ def compatibility_score(job_title, company, location, description, rubric=None):
 
 
 def summarize_evaluation(job, commute, compatibility):
-    """ produce a short "what works / what doesn't" overview grounded in the commute + rubric
-        data
+    """produce a short "what works / what doesn't" overview grounded in the commute + rubric
+    data
     """
     if commute["address"] == FULLY_REMOTE:
         commute_context = "Fully remote - no commute."
@@ -93,18 +94,21 @@ def summarize_evaluation(job, commute, compatibility):
 
 
 def _print_evaluation(evaluation, cached):
-    """ print an evaluation dict (as returned by storage.get_evaluation) in a consistent
-        format, whether it was just computed or served from the cache
+    """print an evaluation dict (as returned by storage.get_evaluation) in a consistent
+    format, whether it was just computed or served from the cache
     """
     suffix = f" (cached from {evaluation['evaluated_at']})" if cached else ""
     print(f"Evaluating Position: {evaluation['job_title']} at {evaluation['company']}{suffix}")
 
     if evaluation["commute_score"] is None:
-        print(f"Commute score: unknown ({evaluation['days_on_office']} days/week, "
-              f"address not found)")
+        print(
+            f"Commute score: unknown ({evaluation['days_on_office']} days/week, address not found)"
+        )
     else:
-        print(f"Commute score: {evaluation['commute_score']:.1f} min "
-              f"({evaluation['days_on_office']} days/week, {evaluation['commute_address']})")
+        print(
+            f"Commute score: {evaluation['commute_score']:.1f} min "
+            f"({evaluation['days_on_office']} days/week, {evaluation['commute_address']})"
+        )
 
     print(f"Compatibility score: {evaluation['compatibility_score']}/100")
     print("Works well:", evaluation["works_well"])
@@ -120,12 +124,12 @@ def _print_evaluation(evaluation, cached):
 
 
 def evaluate_job(url, force=False, post=None):
-    """ scrape a job posting and produce a full evaluation: commute, compatibility, overview.
-        returns a saved evaluation instead of re-running the pipeline if one already exists
-        for this url and the compatibility rubric hasn't changed since, unless force=True.
+    """scrape a job posting and produce a full evaluation: commute, compatibility, overview.
+    returns a saved evaluation instead of re-running the pipeline if one already exists
+    for this url and the compatibility rubric hasn't changed since, unless force=True.
 
-        post is the posting's already-extracted fields (see scrape.POST_FIELDS); other keys
-        are ignored. When given, the url is not scraped and serves as the storage key.
+    post is the posting's already-extracted fields (see scrape.POST_FIELDS); other keys
+    are ignored. When given, the url is not scraped and serves as the storage key.
     """
     rubric = load_or_compile_rubric()
     rubric_hash = storage.rubric_content_hash(rubric)
@@ -138,8 +142,9 @@ def evaluate_job(url, force=False, post=None):
 
     job = post if post is not None else scrape_post(url)
     commute = commute_score(job["company"], job["location"], job["description"])
-    compatibility = compatibility_score(job["job_title"], job["company"], job["location"],
-                                        job["description"], rubric=rubric)
+    compatibility = compatibility_score(
+        job["job_title"], job["company"], job["location"], job["description"], rubric=rubric
+    )
     overview = summarize_evaluation(job, commute, compatibility)
 
     storage.save_evaluation(url, rubric_hash, job, commute, compatibility, overview)

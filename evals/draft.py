@@ -34,10 +34,10 @@ from jobsearch.rubric import evaluate_rubric, load_rubric, match_text, rubric_is
 
 
 def draft_criteria(rubric, post, previous=None):
-    """ pre-fill name -> bool criteria labels by applying the rubric to a posting.
+    """pre-fill name -> bool criteria labels by applying the rubric to a posting.
 
-        a name present in `previous` keeps its value; the remaining names are filled from
-        evaluate_rubric(). returns (criteria_map, filled_names). Pure: regex only.
+    a name present in `previous` keeps its value; the remaining names are filled from
+    evaluate_rubric(). returns (criteria_map, filled_names). Pure: regex only.
     """
     previous = previous or {}
     criteria, filled = {}, []
@@ -53,18 +53,17 @@ def draft_criteria(rubric, post, previous=None):
 
 
 def draft_expected(post, rubric, previous=None):
-    """ pre-fill a case's "expected" block from its ad's post.
+    """pre-fill a case's "expected" block from its ad's post.
 
-        issues one commute_score() call, supplying days_on_office, address_contains and
-        commute_score, and one compatibility_score() call. The criteria labels use regex
-        alone. returns (expected, filled_names).
+    issues one commute_score() call, supplying days_on_office, address_contains and
+    commute_score, and one compatibility_score() call. The criteria labels use regex
+    alone. returns (expected, filled_names).
     """
     previous = previous or {}
     expected = {}
     filled = []
 
-    criteria, criteria_filled = draft_criteria(rubric, post,
-                                               previous=previous.get("criteria"))
+    criteria, criteria_filled = draft_criteria(rubric, post, previous=previous.get("criteria"))
     expected["criteria"] = criteria
     filled.extend(criteria_filled)
 
@@ -100,8 +99,9 @@ def draft_expected(post, rubric, previous=None):
     if "compatibility_score" in previous:
         expected["compatibility_score"] = previous["compatibility_score"]
     else:
-        compatibility = compatibility_score(post["job_title"], post["company"],
-                                            post["location"], post["description"], rubric=rubric)
+        compatibility = compatibility_score(
+            post["job_title"], post["company"], post["location"], post["description"], rubric=rubric
+        )
         expected["compatibility_score"] = compatibility["compatibility_score"]
         filled.append("compatibility_score")
 
@@ -109,7 +109,7 @@ def draft_expected(post, rubric, previous=None):
 
 
 def _is_incomplete(case, rubric):
-    """ True if the case is missing ground truth that drafting could fill """
+    """True if the case is missing ground truth that drafting could fill"""
     expected = case.get("expected") or {}
     if not expected:
         return True
@@ -126,11 +126,11 @@ def _note_for(case, filled):
         # draft.py fills address_contains with the full resolved address
         hints.append("reduce address_contains to a distinctive substring")
     hint = f" Review: {', '.join(hints)}." if hints else ""
-    return (f"Drafted {today}: {len(filled)} pre-filled value(s), not reviewed.{hint}")
+    return f"Drafted {today}: {len(filled)} pre-filled value(s), not reviewed.{hint}"
 
 
 def _draft_case(case, rubric, force):
-    """ draft one case in place; returns the list of pre-filled keys """
+    """draft one case in place; returns the list of pre-filled keys"""
     post = dataset.case_post(case)
     # usable_expected() omits values outside EXPECTED_TYPES, so a [lo, hi] range from the
     # previous case format is refilled rather than carried forward
@@ -147,10 +147,12 @@ def _draft_case(case, rubric, force):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("target", nargs="?", help="a case NAME, or a posting url to capture")
-    parser.add_argument("--all", action="store_true",
-                        help="draft every case with incomplete ground truth")
-    parser.add_argument("--force", action="store_true",
-                        help="re-draft from scratch, discarding human labels")
+    parser.add_argument(
+        "--all", action="store_true", help="draft every case with incomplete ground truth"
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="re-draft from scratch, discarding human labels"
+    )
     args = parser.parse_args()
 
     if not args.target and not args.all:
@@ -161,28 +163,34 @@ def main():
     if rubric is None:
         sys.exit("no compiled rubric - build one with: python scripts/recompile_rubric.py")
     if rubric_is_stale(rubric):
-        print("WARNING: the rubric is stale (resume.md/job_preferences.md changed since it was "
-              "compiled).\n         Drafting against the old rubric; recompile first with "
-              "scripts/recompile_rubric.py\n")
+        print(
+            "WARNING: the rubric is stale (resume.md/job_preferences.md changed since it was "
+            "compiled).\n         Drafting against the old rubric; recompile first with "
+            "scripts/recompile_rubric.py\n"
+        )
 
     cases = dataset.load_cases()
 
     if args.all:
-        targets = [c for c in cases if dataset.has_ad(c)
-                   and (args.force or _is_incomplete(c, rubric))]
+        targets = [
+            c for c in cases if dataset.has_ad(c) and (args.force or _is_incomplete(c, rubric))
+        ]
         no_ad = [c["name"] for c in cases if not dataset.has_ad(c)]
         if no_ad:
             print(f"Skipping {len(no_ad)} case(s) with no ad: {no_ad}\n")
         if not targets:
-            print("Every case with an ad already has complete ground truth. "
-                  "Use --force to re-draft.")
+            print(
+                "Every case with an ad already has complete ground truth. Use --force to re-draft."
+            )
             return
     else:
         index = dataset.find_case(cases, name=args.target, url=args.target)
         if index is None:
             if not args.target.startswith("http"):
-                sys.exit(f"no case named {args.target!r} - capture one with: "
-                         f"python evals/capture.py <url>")
+                sys.exit(
+                    f"no case named {args.target!r} - capture one with: "
+                    f"python evals/capture.py <url>"
+                )
             print(f"No case for {args.target} yet - capturing it first ...")
             name, ad = capture.capture(args.target)
             name, _ = capture.upsert_case(cases, name, args.target, ad)
@@ -201,9 +209,11 @@ def main():
         print(f"  pre-filled {len(filled)}: {filled}" if filled else "  nothing to fill")
         dataset.save_cases(cases)
 
-    print(f"\nDrafted {drafted} case(s) into {dataset.CASES_PATH}, all \"verified\": false.\n"
-          "Next: review the expected values by hand, then set \"verified\": true on the ones "
-          "you trust.\nOnly verified cases count under: python evals/run_evals.py --verified-only")
+    print(
+        f'\nDrafted {drafted} case(s) into {dataset.CASES_PATH}, all "verified": false.\n'
+        'Next: review the expected values by hand, then set "verified": true on the ones '
+        "you trust.\nOnly verified cases count under: python evals/run_evals.py --verified-only"
+    )
 
 
 if __name__ == "__main__":

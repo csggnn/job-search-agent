@@ -22,16 +22,16 @@ _LINKEDIN_VIEW_PATH_RE = re.compile(r"^/jobs/view/(?:[^/]*-)?(\d+)/?$")
 
 
 class ScrapeError(ValueError):
-    """ raised when a job posting's content could not be extracted from a URL """
+    """raised when a job posting's content could not be extracted from a URL"""
 
 
 def public_posting_url(url):
-    """ the no-login address of the posting at url, for a job board whose posting page
-        can serve a sign-in page in place of the posting; None for any other url.
+    """the no-login address of the posting at url, for a job board whose posting page
+    can serve a sign-in page in place of the posting; None for any other url.
 
-        Handled boards: LinkedIn. A LinkedIn url naming a job id, in its path
-        (/jobs/view/<id>, /jobs/view/<slug>-<id>) or its currentJobId query parameter,
-        maps to LINKEDIN_GUEST_POSTING_URL for that id.
+    Handled boards: LinkedIn. A LinkedIn url naming a job id, in its path
+    (/jobs/view/<id>, /jobs/view/<slug>-<id>) or its currentJobId query parameter,
+    maps to LINKEDIN_GUEST_POSTING_URL for that id.
     """
     parts = urlsplit(url)
     host = parts.netloc.lower()
@@ -45,7 +45,7 @@ def public_posting_url(url):
 
 
 def fetch_page_text(url):
-    """ return the raw text of a job posting page. raises ScrapeError if it can't be fetched. """
+    """return the raw text of a job posting page. raises ScrapeError if it can't be fetched."""
     tavily = TavilyClient(api_key=config.require_env("TAVILY_API_KEY"))
     result = tavily.extract(public_posting_url(url) or url, format="text")
     if not result["results"]:
@@ -54,17 +54,20 @@ def fetch_page_text(url):
 
 
 def blank_post_fields(post):
-    """ the POST_FIELDS keys of post whose value is missing or not a non-blank string, in
-        POST_FIELDS order
+    """the POST_FIELDS keys of post whose value is missing or not a non-blank string, in
+    POST_FIELDS order
     """
-    return [field for field in POST_FIELDS
-            if not isinstance(post.get(field), str) or not post[field].strip()]
+    return [
+        field
+        for field in POST_FIELDS
+        if not isinstance(post.get(field), str) or not post[field].strip()
+    ]
 
 
 def validate_post(post, source):
-    """ raise ScrapeError unless post holds every POST_FIELDS key with a non-blank string
-        value. Other keys are allowed and returned unchanged. source is a url or an ad
-        name, and appears in the error message.
+    """raise ScrapeError unless post holds every POST_FIELDS key with a non-blank string
+    value. Other keys are allowed and returned unchanged. source is a url or an ad
+    name, and appears in the error message.
     """
     if not isinstance(post, dict):
         raise ScrapeError(f"expected a job posting object from {source}, got {type(post).__name__}")
@@ -75,8 +78,8 @@ def validate_post(post, source):
 
 
 def extract_post(page_text, source="page text"):
-    """ extract a job posting's structured fields from its raw page text. raises ScrapeError
-        when the page holds no job description, e.g. a login wall showing only the title.
+    """extract a job posting's structured fields from its raw page text. raises ScrapeError
+    when the page holds no job description, e.g. a login wall showing only the title.
     """
     post = ask_json(
         "Extract the following fields from this job posting page as JSON, "
@@ -97,5 +100,5 @@ def extract_post(page_text, source="page text"):
 
 def scrape_post(url):
     """given a web address with a job post, extract job title, company, location relevant data
-       and description"""
+    and description"""
     return extract_post(fetch_page_text(url), source=url)

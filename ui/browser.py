@@ -25,8 +25,9 @@ EVALUATION_LABELS = dict(columns.EVALUATION_COLUMNS)
 CRITERION_LABELS = dict(columns.CRITERION_COLUMNS)
 
 # evaluation columns shown on the detail page; the title is the page heading
-DETAIL_COLUMNS = tuple(name for name, label in columns.EVALUATION_COLUMNS
-                       if label is not None and name != "job_title")
+DETAIL_COLUMNS = tuple(
+    name for name, label in columns.EVALUATION_COLUMNS if label is not None and name != "job_title"
+)
 CRITERION_SHOWN = tuple(name for name, label in columns.CRITERION_COLUMNS if label is not None)
 
 _TABLES = (
@@ -36,7 +37,7 @@ _TABLES = (
 
 
 def create_app(db_path):
-    """ the UI as a Flask app reading the database at db_path """
+    """the UI as a Flask app reading the database at db_path"""
     app = Flask(__name__)
     app.jinja_env.globals.update(commute=_commute, ad_href=_ad_href)
 
@@ -56,9 +57,15 @@ def create_app(db_path):
                 f"{view['where']} ORDER BY {view['order']}",
                 view["params"],
             ).fetchall()
-        return render_template("list.html", rows=[dict(r) for r in rows], warnings=warnings,
-                               cols=cols, labels=EVALUATION_LABELS, statuses=STATUSES,
-                               **view)
+        return render_template(
+            "list.html",
+            rows=[dict(r) for r in rows],
+            warnings=warnings,
+            cols=cols,
+            labels=EVALUATION_LABELS,
+            statuses=STATUSES,
+            **view,
+        )
 
     @app.get("/job/<int:job_id>")
     def job_detail(job_id):
@@ -72,28 +79,44 @@ def create_app(db_path):
                 abort(404)
             row = conn.execute(
                 f"SELECT {', '.join(cols)} FROM {columns.EVALUATIONS_TABLE} "
-                f"WHERE {columns.EVALUATION_KEY} = ?", (job_id,),
+                f"WHERE {columns.EVALUATION_KEY} = ?",
+                (job_id,),
             ).fetchone()
             if row is None:
                 abort(404)
             criteria, criterion_cols = None, []
             if present[columns.CRITERIA_TABLE] is not None:
-                criterion_cols = [c for c in CRITERION_SHOWN
-                                  if c in present[columns.CRITERIA_TABLE]]
-                criteria = [dict(r) for r in conn.execute(
-                    f"SELECT {', '.join(criterion_cols)} FROM {columns.CRITERIA_TABLE} "
-                    f"WHERE {columns.CRITERION_KEY} = ?", (job_id,),
-                )] if criterion_cols else []
-        return render_template("detail.html", row=dict(row), warnings=warnings,
-                               detail_fields=[c for c in DETAIL_COLUMNS if c in cols],
-                               labels=EVALUATION_LABELS, criteria=criteria,
-                               criterion_cols=criterion_cols, criterion_labels=CRITERION_LABELS)
+                criterion_cols = [
+                    c for c in CRITERION_SHOWN if c in present[columns.CRITERIA_TABLE]
+                ]
+                criteria = (
+                    [
+                        dict(r)
+                        for r in conn.execute(
+                            f"SELECT {', '.join(criterion_cols)} FROM {columns.CRITERIA_TABLE} "
+                            f"WHERE {columns.CRITERION_KEY} = ?",
+                            (job_id,),
+                        )
+                    ]
+                    if criterion_cols
+                    else []
+                )
+        return render_template(
+            "detail.html",
+            row=dict(row),
+            warnings=warnings,
+            detail_fields=[c for c in DETAIL_COLUMNS if c in cols],
+            labels=EVALUATION_LABELS,
+            criteria=criteria,
+            criterion_cols=criterion_cols,
+            criterion_labels=CRITERION_LABELS,
+        )
 
     return app
 
 
 def _connect(db_path):
-    """ a read-only connection returning sqlite3.Row rows, or None when the file is missing """
+    """a read-only connection returning sqlite3.Row rows, or None when the file is missing"""
     if not os.path.isfile(db_path):
         return None
     conn = sqlite3.connect(f"{Path(db_path).resolve().as_uri()}?mode=ro", uri=True)
@@ -102,8 +125,8 @@ def _connect(db_path):
 
 
 def _schema(conn):
-    """ ({table: present expected columns, or None when the table or its key is missing},
-         [missing table or column names, for the warning])
+    """({table: present expected columns, or None when the table or its key is missing},
+    [missing table or column names, for the warning])
     """
     present, missing = {}, []
     for table, expected, key in _TABLES:
@@ -119,8 +142,8 @@ def _schema(conn):
 
 
 def _list_view(cols, args):
-    """ the WHERE clause, ORDER BY and template state for the list page. Values outside the
-        allowed set, and filters or sorts on an absent column, are dropped.
+    """the WHERE clause, ORDER BY and template state for the list page. Values outside the
+    allowed set, and filters or sorts on an absent column, are dropped.
     """
     shown = [c for c in columns.LIST_COLUMNS if c in cols]
     where, params = [], []
@@ -159,8 +182,11 @@ def _list_view(cols, args):
         order = None
     order = f"{order}, {columns.EVALUATION_KEY}" if order else columns.EVALUATION_KEY
 
-    filters = {"status": status, "reviewed": reviewed,
-               "max_commute": args.get("max_commute") if max_commute is not None else None}
+    filters = {
+        "status": status,
+        "reviewed": reviewed,
+        "max_commute": args.get("max_commute") if max_commute is not None else None,
+    }
     filters = {k: v for k, v in filters.items() if v is not None}
     # each header links to its column ascending, or descending when already sorted ascending
     sort_args = {
@@ -180,7 +206,7 @@ def _list_view(cols, args):
 
 
 def _number(value):
-    """ value as a float, or None when it is not a number """
+    """value as a float, or None when it is not a number"""
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -188,7 +214,7 @@ def _number(value):
 
 
 def _commute(row):
-    """ the commute as shown: remote, unknown, or the stored value in minutes to one decimal """
+    """the commute as shown: remote, unknown, or the stored value in minutes to one decimal"""
     if row.get("is_remote"):
         return "remote"
     value = row.get("commute_score")
@@ -200,7 +226,7 @@ def _commute(row):
 
 
 def _ad_href(url):
-    """ url when it is an http(s) link, else None. Stored URLs come from scraped ads. """
+    """url when it is an http(s) link, else None. Stored URLs come from scraped ads."""
     if isinstance(url, str) and url.lower().startswith(("http://", "https://")):
         return url
     return None

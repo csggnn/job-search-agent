@@ -42,10 +42,10 @@ _COUNTRY_NAMES = {c.value[1]: c.value[0] for c in Country}  # alpha-2 -> JobSpy 
 
 
 def _resolve_target_locations(resume, preferences):
-    """ return the location strings usable for non-remote search queries: job_preferences.md's
-        Location section if present and filled in, else resume.md's Contact location
-        (skipped if still template placeholder text), else the home address from
-        job_preferences.md
+    """return the location strings usable for non-remote search queries: job_preferences.md's
+    Location section if present and filled in, else resume.md's Contact location
+    (skipped if still template placeholder text), else the home address from
+    job_preferences.md
     """
     section = extract_section(preferences, "Location")
     if section:
@@ -55,7 +55,8 @@ def _resolve_target_locations(resume, preferences):
         locations = [
             stripped.lstrip("-").strip()
             for stripped in (line.strip() for line in section.splitlines())
-            if stripped.startswith("-") and stripped.lstrip("-").strip()
+            if stripped.startswith("-")
+            and stripped.lstrip("-").strip()
             and not stripped.lstrip("-").strip().startswith("(fill in")
         ]
         if locations:
@@ -69,8 +70,8 @@ def _resolve_target_locations(resume, preferences):
 
 
 def draft_queries(resume, preferences, target_locations):
-    """ ask the LLM to propose job search query phrases, tagged remote vs location-bound, plus a
-        primary country code (ISO 3166-1 alpha-2) to use as search context for remote queries
+    """ask the LLM to propose job search query phrases, tagged remote vs location-bound, plus a
+    primary country code (ISO 3166-1 alpha-2) to use as search context for remote queries
     """
     locations_block = "\n".join(f"- {loc}" for loc in target_locations)
 
@@ -103,19 +104,23 @@ def draft_queries(resume, preferences, target_locations):
 
 
 def _validate_queries(queries, target_locations):
-    """ drop any non-remote query with an invalid location/country, guarding against a
-        non-compliant LLM reply
+    """drop any non-remote query with an invalid location/country, guarding against a
+    non-compliant LLM reply
     """
     valid = []
     for q in queries:
         if not q["is_remote"]:
             if q["location"] not in target_locations:
-                print(f"Warning: dropping query {q['query']!r} - location {q['location']!r} "
-                      "not in target locations")
+                print(
+                    f"Warning: dropping query {q['query']!r} - location {q['location']!r} "
+                    "not in target locations"
+                )
                 continue
             if not _COUNTRY_CODE_RE.match((q["country"] or "").lower()):
-                print(f"Warning: dropping query {q['query']!r} - invalid country code "
-                      f"{q['country']!r}")
+                print(
+                    f"Warning: dropping query {q['query']!r} - invalid country code "
+                    f"{q['country']!r}"
+                )
                 continue
             q["country"] = q["country"].lower()
         valid.append(q)
@@ -123,7 +128,7 @@ def _validate_queries(queries, target_locations):
 
 
 def compile_queries():
-    """ (re)build the search query set from resume.md + job_preferences.md """
+    """(re)build the search query set from resume.md + job_preferences.md"""
     resume = read_resume()
     preferences = read_job_preferences()
     target_locations = _resolve_target_locations(resume, preferences)
@@ -151,24 +156,23 @@ def compile_queries():
 
 
 def load_or_compile_queries():
-    """ return the cached query set if resume.md/job_preferences.md haven't changed, else
-        recompile
+    """return the cached query set if resume.md/job_preferences.md haven't changed, else
+    recompile
     """
     if os.path.exists(QUERIES_PATH):
         with open(QUERIES_PATH) as f:
             cached = json.load(f)
-        if (
-            cached.get("resume_hash") == file_hash(RESUME_PATH)
-            and cached.get("preferences_hash") == file_hash(JOB_PREFERENCES_PATH)
-        ):
+        if cached.get("resume_hash") == file_hash(RESUME_PATH) and cached.get(
+            "preferences_hash"
+        ) == file_hash(JOB_PREFERENCES_PATH):
             return cached
     return compile_queries()
 
 
 def _clean(value):
-    """ normalize a pandas cell to a plain Python value, turning NaN/missing into None.
-        Container cells (JobSpy returns a few list-valued columns) are passed through, since
-        pd.isna() answers element-wise for those.
+    """normalize a pandas cell to a plain Python value, turning NaN/missing into None.
+    Container cells (JobSpy returns a few list-valued columns) are passed through, since
+    pd.isna() answers element-wise for those.
     """
     if isinstance(value, (list, tuple, set, dict)):
         return value or None
@@ -176,40 +180,40 @@ def _clean(value):
 
 
 def _clean_text(value):
-    """ _clean() for a cell rendered as text (e.g. date_posted, which JobSpy returns as a
-        datetime.date), so a job ad dict stays JSON-shaped
+    """_clean() for a cell rendered as text (e.g. date_posted, which JobSpy returns as a
+    datetime.date), so a job ad dict stays JSON-shaped
     """
     value = _clean(value)
     return None if value is None else str(value)
 
 
 def _best_apply_link(record):
-    """ pick the most useful URL for a JobSpy result: the direct apply link (usually the
-        original job board/company posting) if JobSpy resolved one, falling back to the
-        site's own job page URL
+    """pick the most useful URL for a JobSpy result: the direct apply link (usually the
+    original job board/company posting) if JobSpy resolved one, falling back to the
+    site's own job page URL
     """
     return _clean(record.get("job_url_direct")) or _clean(record.get("job_url"))
 
 
 def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
-    """ search Indeed + LinkedIn (via JobSpy) for one query entry, returning one job ad dict
-        per result that has a url.
+    """search Indeed + LinkedIn (via JobSpy) for one query entry, returning one job ad dict
+    per result that has a url.
 
-        Main fields of each dict:
-        - url: the direct apply link if JobSpy resolved one, else the job board's page URL.
-          Never None.
-        - job_title, company: the posting's job title and employer name.
-        - location: the posting's location string, or the generic search location when
-          JobSpy returned none. None when neither is available.
-        - description: the full ad text.
+    Main fields of each dict:
+    - url: the direct apply link if JobSpy resolved one, else the job board's page URL.
+      Never None.
+    - job_title, company: the posting's job title and employer name.
+    - location: the posting's location string, or the generic search location when
+      JobSpy returned none. None when neither is available.
+    - description: the full ad text.
 
-        job_title, company and description are None when JobSpy returned no value. The
-        other keys (is_remote, date_posted, job_type, job_level, min_amount, max_amount,
-        currency, company_industry, work_from_home_type) carry JobSpy's metadata as plain
-        values, None when missing.
+    job_title, company and description are None when JobSpy returned no value. The
+    other keys (is_remote, date_posted, job_type, job_level, min_amount, max_amount,
+    currency, company_industry, work_from_home_type) carry JobSpy's metadata as plain
+    values, None when missing.
 
-        JobSpy fetches each LinkedIn description with one extra HTTP request per result
-        (latency and block risk, no API spend).
+    JobSpy fetches each LinkedIn description with one extra HTTP request per result
+    (latency and block risk, no API spend).
     """
     country_name = _COUNTRY_NAMES.get(country, "worldwide")
     location = query["location"] if not query["is_remote"] else _COUNTRY_NAMES.get(country)
@@ -255,9 +259,9 @@ def jobspy_search(query, country, max_results=DEFAULT_MAX_RESULTS, debug=False):
 
 
 def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=False):
-    """ run one JobSpy search per cached query, aggregating job ads deduped by
-        normalized url (first occurrence keeps the ad's fields; matched_queries collects
-        every query phrase that surfaced it)
+    """run one JobSpy search per cached query, aggregating job ads deduped by
+    normalized url (first occurrence keeps the ad's fields; matched_queries collects
+    every query phrase that surfaced it)
     """
     primary_country = cache["primary_country"]
     aggregated = {}
@@ -274,57 +278,72 @@ def discover_job_ads(cache, max_results_per_query=DEFAULT_MAX_RESULTS, debug=Fal
 
 
 def filter_new_job_ads(job_ads):
-    """ drop job ads already present in storage.py's evaluations DB (by normalized url) """
+    """drop job ads already present in storage.py's evaluations DB (by normalized url)"""
     known = {normalized for _, normalized in storage.list_evaluated_urls()}
     return [c for c in job_ads if storage.normalize_url(c["url"]) not in known]
 
 
 def _print_job_ads(job_ads):
-    """ print newly discovered job ad urls for manual review """
+    """print newly discovered job ad urls for manual review"""
     print(f"\n{len(job_ads)} new job ad(s):\n")
     for c in job_ads:
-        print(f"- {c['job_title'] or '(untitled)'} at {c['company'] or '(unknown company)'} "
-              f"({c['location'] or 'location unknown'})")
+        print(
+            f"- {c['job_title'] or '(untitled)'} at {c['company'] or '(unknown company)'} "
+            f"({c['location'] or 'location unknown'})"
+        )
         print(f"  {c['url']}")
         print(f"  matched: {', '.join(c['matched_queries'])}")
 
 
 def _evaluate_job_ad(job_ad):
-    """ evaluate one pre-selected job ad on its JobSpy fields, returning the evaluation, or
-        None when a scrape.POST_FIELDS value is blank. The job ad is passed as the post, so
-        no page is fetched.
+    """evaluate one pre-selected job ad on its JobSpy fields, returning the evaluation, or
+    None when a scrape.POST_FIELDS value is blank. The job ad is passed as the post, so
+    no page is fetched.
     """
     try:
         validate_post(job_ad, job_ad["url"])
     except ScrapeError:
-        print(f"  skipping {job_ad['url']}: JobSpy returned no usable title, company, "
-              "location or description")
+        print(
+            f"  skipping {job_ad['url']}: JobSpy returned no usable title, company, "
+            "location or description"
+        )
         return None
     return evaluate_job(job_ad["url"], post=job_ad)
 
 
 def add_discovery_arguments(parser):
-    """ register the discovery-pipeline flags shared by discover_jobs.py and propose_jobs.py
-        on an argparse parser. Defined here, next to discover_jobs(), so a new pipeline knob
-        reaches both entrypoints from one edit.
+    """register the discovery-pipeline flags shared by discover_jobs.py and propose_jobs.py
+    on an argparse parser. Defined here, next to discover_jobs(), so a new pipeline knob
+    reaches both entrypoints from one edit.
     """
-    parser.add_argument("--max-results", type=int, default=DEFAULT_MAX_RESULTS,
-                        help="max JobSpy results to keep per query")
-    parser.add_argument("--force", action="store_true",
-                        help="ignore the cached search queries and recompile them")
+    parser.add_argument(
+        "--max-results",
+        type=int,
+        default=DEFAULT_MAX_RESULTS,
+        help="max JobSpy results to keep per query",
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="ignore the cached search queries and recompile them"
+    )
     parser.add_argument("--debug", action="store_true", help="print intermediate search details")
 
 
-def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_RESULTS,
-                   force_queries=False, preselect_job_ads=True, debug=False):
-    """ full discovery pipeline: compile/reuse search queries, search the job boards, dedupe
-        within-run and against storage, pre-select the job ads worth evaluating, then either
-        list them or run evaluate_job() on them.
+def discover_jobs(
+    evaluate=False,
+    limit=None,
+    max_results_per_query=DEFAULT_MAX_RESULTS,
+    force_queries=False,
+    preselect_job_ads=True,
+    debug=False,
+):
+    """full discovery pipeline: compile/reuse search queries, search the job boards, dedupe
+    within-run and against storage, pre-select the job ads worth evaluating, then either
+    list them or run evaluate_job() on them.
 
-        limit is pre-selection's N - the number of job ads handed to evaluation - not a
-        truncation of the tail. preselect_job_ads=False restores the pre-selection-free
-        behaviour (evaluate the first `limit` job ads in discovery order), so the two are
-        comparable on one job ad set.
+    limit is pre-selection's N - the number of job ads handed to evaluation - not a
+    truncation of the tail. preselect_job_ads=False restores the pre-selection-free
+    behaviour (evaluate the first `limit` job ads in discovery order), so the two are
+    comparable on one job ad set.
     """
     cache = compile_queries() if force_queries else load_or_compile_queries()
 
@@ -356,8 +375,10 @@ def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_
         to_run = new_job_ads[:limit] if limit else new_job_ads
 
     if not evaluate:
-        print("\nRun with --evaluate to score these (costs LLM, Tavily address-search and ORS "
-              "calls per url).")
+        print(
+            "\nRun with --evaluate to score these (costs LLM, Tavily address-search and ORS "
+            "calls per url)."
+        )
         return to_run
 
     results = []

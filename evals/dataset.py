@@ -33,12 +33,12 @@ EXPECTED_TYPES = {
 
 
 def slugify(text):
-    """ turn free text (e.g. "Acme - Widget Inspector") into a filesystem/case-name safe slug """
+    """turn free text (e.g. "Acme - Widget Inspector") into a filesystem/case-name safe slug"""
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
 def load_cases():
-    """ return the case list, or [] if CASES_PATH is absent """
+    """return the case list, or [] if CASES_PATH is absent"""
     if not os.path.exists(CASES_PATH):
         return []
     with open(CASES_PATH) as f:
@@ -46,7 +46,7 @@ def load_cases():
 
 
 def save_cases(cases):
-    """ write the case list to cases.json """
+    """write the case list to cases.json"""
     os.makedirs(config.EVALS_DATA_DIR, exist_ok=True)
     with open(CASES_PATH, "w") as f:
         json.dump(cases, f, indent=2)
@@ -54,8 +54,8 @@ def save_cases(cases):
 
 
 def backup_cases():
-    """ copy cases.json to BACKUP_PATH. returns the backup path, or None if cases.json is
-        absent.
+    """copy cases.json to BACKUP_PATH. returns the backup path, or None if cases.json is
+    absent.
     """
     if not os.path.exists(CASES_PATH):
         return None
@@ -65,7 +65,7 @@ def backup_cases():
 
 
 def find_case(cases, name=None, url=None):
-    """ index of the case matching name, or matching url after normalization; None if absent """
+    """index of the case matching name, or matching url after normalization; None if absent"""
     if name is not None:
         for i, case in enumerate(cases):
             if case.get("name") == name:
@@ -79,17 +79,17 @@ def find_case(cases, name=None, url=None):
 
 
 def ad_filename(name):
-    """ the ad filename assigned to a newly captured case """
+    """the ad filename assigned to a newly captured case"""
     return f"{name}.json"
 
 
 def ad_path(ad):
-    """ absolute path of an ad, given the filename stored on a case """
+    """absolute path of an ad, given the filename stored on a case"""
     return os.path.join(ADS_DIR, ad)
 
 
 def save_ad(name, ad):
-    """ write an ad and return the filename to record on the case """
+    """write an ad and return the filename to record on the case"""
     os.makedirs(ADS_DIR, exist_ok=True)
     filename = ad_filename(name)
     with open(ad_path(filename), "w") as f:
@@ -99,8 +99,8 @@ def save_ad(name, ad):
 
 
 def load_ad(case):
-    """ return a case's stored ad. raises FileNotFoundError if the case records no
-        ad, or the recorded file is absent.
+    """return a case's stored ad. raises FileNotFoundError if the case records no
+    ad, or the recorded file is absent.
     """
     ad = case.get("ad")
     if not ad:
@@ -119,12 +119,12 @@ def load_ad(case):
 
 
 def case_post(case):
-    """ the job posting a case replays against, checked by scrape.validate_post """
+    """the job posting a case replays against, checked by scrape.validate_post"""
     return validate_post(load_ad(case)["post"], f"ad {case['ad']!r}")
 
 
 def has_ad(case):
-    """ True if the case's ad is recorded and present on disk """
+    """True if the case's ad is recorded and present on disk"""
     return bool(case.get("ad")) and os.path.exists(ad_path(case["ad"]))
 
 
@@ -137,16 +137,16 @@ def _well_typed(key, value):
 
 
 def usable_expected(expected):
-    """ the subset of an "expected" block whose values match EXPECTED_TYPES.
+    """the subset of an "expected" block whose values match EXPECTED_TYPES.
 
-        Unknown keys and values of another type, such as a [lo, hi] range from the previous
-        case format, are omitted. draft.py treats an omitted value as unset and refills it.
+    Unknown keys and values of another type, such as a [lo, hi] range from the previous
+    case format, are omitted. draft.py treats an omitted value as unset and refills it.
     """
     return {k: v for k, v in (expected or {}).items() if _well_typed(k, v)}
 
 
 def validate_expected(case):
-    """ raise ValueError naming any expected value outside EXPECTED_TYPES """
+    """raise ValueError naming any expected value outside EXPECTED_TYPES"""
     bad = sorted(k for k, v in (case.get("expected") or {}).items() if not _well_typed(k, v))
     if bad:
         raise ValueError(

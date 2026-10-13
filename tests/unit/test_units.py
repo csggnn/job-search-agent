@@ -58,9 +58,7 @@ class RubricContentHashTest(unittest.TestCase):
     def test_stable_and_ignores_fields_outside_the_payload(self):
         base = {"criteria": [{"name": "alpha", "weight": 3}], "scoring_guidance": "notes"}
         with_extra = {**base, "resume_hash": "abc", "preferences_hash": "def"}
-        self.assertEqual(
-            storage.rubric_content_hash(base), storage.rubric_content_hash(with_extra)
-        )
+        self.assertEqual(storage.rubric_content_hash(base), storage.rubric_content_hash(with_extra))
 
     def test_changes_when_criteria_change(self):
         a = {"criteria": [{"name": "alpha", "weight": 3}], "scoring_guidance": None}
@@ -107,25 +105,29 @@ class MatchTextTest(unittest.TestCase):
         )
 
     def test_omitted_parts_are_skipped(self):
-        self.assertEqual(match_text("Widget Inspector", None, "We build widgets."),
-                         "Widget Inspector\nWe build widgets.")
+        self.assertEqual(
+            match_text("Widget Inspector", None, "We build widgets."),
+            "Widget Inspector\nWe build widgets.",
+        )
         self.assertEqual(match_text(None, "", "We build widgets."), "We build widgets.")
 
     def test_a_criterion_matches_evidence_in_the_title(self):
-        rubric = {"criteria": [
-            {"name": "role", "pattern": r"widget\s+inspector", "type": "role",
-             "weight": 3},
-        ]}
+        rubric = {
+            "criteria": [
+                {"name": "role", "pattern": r"widget\s+inspector", "type": "role", "weight": 3},
+            ]
+        }
         # the role is named only in the title; the description never restates it
         text = match_text("Widget Inspector", "Springfield", "You will check things daily.")
         [role] = evaluate_rubric(rubric, text)
         self.assertTrue(role["matched"])
 
     def test_a_criterion_matches_evidence_in_the_location(self):
-        rubric = {"criteria": [
-            {"name": "where", "pattern": r"springfield", "type": "field",
-             "weight": 3},
-        ]}
+        rubric = {
+            "criteria": [
+                {"name": "where", "pattern": r"springfield", "type": "field", "weight": 3},
+            ]
+        }
         text = match_text("Widget Inspector", "Springfield, Utopia", "You will check things.")
         [where] = evaluate_rubric(rubric, text)
         self.assertTrue(where["matched"])
@@ -181,26 +183,36 @@ class PublicPostingUrlTest(unittest.TestCase):
     GUEST = LINKEDIN_GUEST_POSTING_URL.format("4452901048")
 
     def test_linkedin_job_view_url(self):
-        self.assertEqual(public_posting_url("https://www.linkedin.com/jobs/view/4452901048"),
-                         self.GUEST)
+        self.assertEqual(
+            public_posting_url("https://www.linkedin.com/jobs/view/4452901048"), self.GUEST
+        )
 
     def test_linkedin_slug_url_on_a_country_subdomain(self):
-        self.assertEqual(public_posting_url("https://be.linkedin.com/jobs/view/"
-                                            "senior-embedded-engineer-at-acme-4452901048/?trk=x"),
-                         self.GUEST)
+        self.assertEqual(
+            public_posting_url(
+                "https://be.linkedin.com/jobs/view/"
+                "senior-embedded-engineer-at-acme-4452901048/?trk=x"
+            ),
+            self.GUEST,
+        )
 
     def test_linkedin_current_job_id_parameter(self):
-        self.assertEqual(public_posting_url("https://www.linkedin.com/jobs/search/"
-                                            "?keywords=widgets&currentJobId=4452901048"),
-                         self.GUEST)
+        self.assertEqual(
+            public_posting_url(
+                "https://www.linkedin.com/jobs/search/?keywords=widgets&currentJobId=4452901048"
+            ),
+            self.GUEST,
+        )
 
     def test_linkedin_url_without_a_job_id_has_none(self):
         self.assertIsNone(public_posting_url("https://www.linkedin.com/company/acme/"))
 
     def test_non_linkedin_url_has_none(self):
         # a lookalike host ending in "linkedin.com" is not a LinkedIn subdomain
-        for url in ("https://acme.example/careers/jobs/view/4452901048",
-                    "https://notlinkedin.com/jobs/view/4452901048"):
+        for url in (
+            "https://acme.example/careers/jobs/view/4452901048",
+            "https://notlinkedin.com/jobs/view/4452901048",
+        ):
             self.assertIsNone(public_posting_url(url))
 
 
@@ -238,8 +250,9 @@ class HomeAddressTest(unittest.TestCase):
         self.assertEqual(config.home_address(), "1 Riverside Dr, 00001 Metropolis, Freedonia")
 
     def test_skips_a_comment_and_a_subheading_before_the_address(self):
-        self._with_preferences("## Home Address\n<!-- street address -->\n### Home\n"
-                               "1 Riverside Dr, Metropolis\n")
+        self._with_preferences(
+            "## Home Address\n<!-- street address -->\n### Home\n1 Riverside Dr, Metropolis\n"
+        )
         self.assertEqual(config.home_address(), "1 Riverside Dr, Metropolis")
 
     def test_skips_blank_lines_before_the_address(self):
@@ -290,19 +303,29 @@ class DefaultDataTest(unittest.TestCase):
     def test_target_locations_come_from_the_location_section(self):
         section = extract_section(self.preferences, "Location")
         self.assertTrue(section, f"## Location missing or empty in {self.PREFERENCES_PATH}")
-        bullets = [line.strip().lstrip("-").strip() for line in section.splitlines()
-                   if line.strip().startswith("-")]
+        bullets = [
+            line.strip().lstrip("-").strip()
+            for line in section.splitlines()
+            if line.strip().startswith("-")
+        ]
         self.assertTrue(bullets, f"## Location has no '-' entries in {self.PREFERENCES_PATH}")
-        self.assertEqual(sorted(_resolve_target_locations(self.resume, self.preferences)),
-                         sorted(bullets), "target locations differ from the ## Location entries")
+        self.assertEqual(
+            sorted(_resolve_target_locations(self.resume, self.preferences)),
+            sorted(bullets),
+            "target locations differ from the ## Location entries",
+        )
 
     def test_scoring_notes_present(self):
-        self.assertTrue(extract_section(self.preferences, "Scoring Notes"),
-                        f"## Scoring Notes missing or empty in {self.PREFERENCES_PATH}")
+        self.assertTrue(
+            extract_section(self.preferences, "Scoring Notes"),
+            f"## Scoring Notes missing or empty in {self.PREFERENCES_PATH}",
+        )
 
     def test_no_placeholder_text(self):
-        for path, text in ((self.RESUME_PATH, self.resume),
-                           (self.PREFERENCES_PATH, self.preferences)):
+        for path, text in (
+            (self.RESUME_PATH, self.resume),
+            (self.PREFERENCES_PATH, self.preferences),
+        ):
             match = self.PLACEHOLDER.search(text)
             self.assertIsNone(match, f"placeholder {match and match.group(0)!r} in {path}")
 
@@ -317,8 +340,11 @@ class RequireDataTest(unittest.TestCase):
         self.data_dir = os.path.join(root, "data")
         self.resume = os.path.join(self.data_dir, "resume.md")
         self.preferences = os.path.join(self.data_dir, "job_preferences.md")
-        for name, value in (("DATA_DIR", self.data_dir), ("RESUME_PATH", self.resume),
-                            ("JOB_PREFERENCES_PATH", self.preferences)):
+        for name, value in (
+            ("DATA_DIR", self.data_dir),
+            ("RESUME_PATH", self.resume),
+            ("JOB_PREFERENCES_PATH", self.preferences),
+        ):
             patcher = mock.patch.object(config, name, value)
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -374,9 +400,11 @@ class EmptyPreferencesSectionsTest(unittest.TestCase):
     # config.empty_preferences_sections() names the sections the pipeline reads that are
     # missing or empty
 
-    PREFERENCES = ("## Location\n- Metropolis, Freedonia\n\n"
-                   "## Home Address\n1 Riverside Dr, Metropolis\n\n"
-                   "## Scoring Notes\nweigh A\n")
+    PREFERENCES = (
+        "## Location\n- Metropolis, Freedonia\n\n"
+        "## Home Address\n1 Riverside Dr, Metropolis\n\n"
+        "## Scoring Notes\nweigh A\n"
+    )
 
     def test_complete_preferences(self):
         self.assertEqual(config.empty_preferences_sections(self.PREFERENCES), [])
@@ -392,13 +420,15 @@ class EmptyPreferencesSectionsTest(unittest.TestCase):
         self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_preferences_section_holds_the_placeholder(self):
-        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
-                                               "(fill in: full street address)")
+        preferences = self.PREFERENCES.replace(
+            "1 Riverside Dr, Metropolis", "(fill in: full street address)"
+        )
         self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_section_holding_only_a_comment_is_empty(self):
-        preferences = self.PREFERENCES.replace("1 Riverside Dr, Metropolis",
-                                               "<!-- full street address -->")
+        preferences = self.PREFERENCES.replace(
+            "1 Riverside Dr, Metropolis", "<!-- full street address -->"
+        )
         self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_section_holding_only_a_subheading_is_empty(self):
@@ -406,13 +436,13 @@ class EmptyPreferencesSectionsTest(unittest.TestCase):
         self.assertEqual(config.empty_preferences_sections(preferences), ["Scoring Notes"])
 
     def test_section_starting_with_a_subheading_has_content(self):
-        preferences = self.PREFERENCES.replace("## Scoring Notes\nweigh A\n",
-                                               "## Scoring Notes\n### Must-haves\n- weigh A\n")
+        preferences = self.PREFERENCES.replace(
+            "## Scoring Notes\nweigh A\n", "## Scoring Notes\n### Must-haves\n- weigh A\n"
+        )
         self.assertEqual(config.empty_preferences_sections(preferences), [])
 
 
 class EnvExampleTest(unittest.TestCase):
-
     def test_env_example_names_every_api_key(self):
         path = os.path.join(os.path.dirname(__file__), "..", "..", ".env.example")
         with open(path) as f:
@@ -430,19 +460,31 @@ class ValidateQueriesTest(unittest.TestCase):
         self.assertEqual(_validate_queries([q], self.TARGETS), [q])
 
     def test_keeps_valid_onsite_query_and_lowercases_country(self):
-        q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia",
-             "country": "XY"}
+        q = {
+            "query": "some role",
+            "is_remote": False,
+            "location": "Metropolis, Freedonia",
+            "country": "XY",
+        }
         [kept] = _validate_queries([q], self.TARGETS)
         self.assertEqual(kept["country"], "xy")
 
     def test_drops_onsite_query_with_untargeted_location(self):
-        q = {"query": "some role", "is_remote": False, "location": "Gotham, Elbonia",
-             "country": "zz"}
+        q = {
+            "query": "some role",
+            "is_remote": False,
+            "location": "Gotham, Elbonia",
+            "country": "zz",
+        }
         self.assertEqual(_validate_queries([q], self.TARGETS), [])
 
     def test_drops_onsite_query_with_invalid_country_code(self):
-        q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia",
-             "country": "notacode"}
+        q = {
+            "query": "some role",
+            "is_remote": False,
+            "location": "Metropolis, Freedonia",
+            "country": "notacode",
+        }
         self.assertEqual(_validate_queries([q], self.TARGETS), [])
 
 

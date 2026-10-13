@@ -17,10 +17,10 @@ RUBRIC_MODEL = "anthropic:claude-sonnet-5"
 
 
 def _provider_kwargs(model):
-    """ per-provider extra request kwargs. Anthropic 'claude-*-5'-gen models emit extended-thinking
-        blocks by default, which aisuite's response converter can't parse (it reads content[0].text
-        and chokes on a leading ThinkingBlock) - explicitly disable thinking so replies are plain
-        text.
+    """per-provider extra request kwargs. Anthropic 'claude-*-5'-gen models emit extended-thinking
+    blocks by default, which aisuite's response converter can't parse (it reads content[0].text
+    and chokes on a leading ThinkingBlock) - explicitly disable thinking so replies are plain
+    text.
     """
     if model.startswith("anthropic:"):
         return {"thinking": {"type": "disabled"}}
@@ -28,7 +28,7 @@ def _provider_kwargs(model):
 
 
 def _parse_json_reply(content):
-    """ extract JSON from a model reply that may include a code fence and/or leading prose """
+    """extract JSON from a model reply that may include a code fence and/or leading prose"""
     fence_match = re.search(r"```(?:json)?\s*(.*?)```", content, re.DOTALL)
     if fence_match:
         content = fence_match.group(1)
@@ -40,7 +40,7 @@ def _parse_json_reply(content):
 
 
 def ask_json(prompt, max_tokens=1024, model=EXTRACTION_MODEL):
-    """ send a prompt to the given model (default extraction model) and parse its JSON reply """
+    """send a prompt to the given model (default extraction model) and parse its JSON reply"""
     client = ai.Client()
     messages = [{"role": "user", "content": prompt}]
     response = client.chat.completions.create(
@@ -52,12 +52,13 @@ def ask_json(prompt, max_tokens=1024, model=EXTRACTION_MODEL):
     return _parse_json_reply(response.choices[0].message.content)
 
 
-def ask_json_with_tools(prompt, tools, tool_names, max_tokens=1024, max_iterations=10,
-                        model=EXTRACTION_MODEL):
-    """ run an agentic tool-call loop, letting the given model (default extraction model) call the
-        given tools before answering.
-        `tools` is a {name: {"spec": <tool schema>, "impl": <callable>}} registry owned by the
-        caller.
+def ask_json_with_tools(
+    prompt, tools, tool_names, max_tokens=1024, max_iterations=10, model=EXTRACTION_MODEL
+):
+    """run an agentic tool-call loop, letting the given model (default extraction model) call the
+    given tools before answering.
+    `tools` is a {name: {"spec": <tool schema>, "impl": <callable>}} registry owned by the
+    caller.
     """
     client = ai.Client()
     tool_specs = [tools[name]["spec"] for name in tool_names]
