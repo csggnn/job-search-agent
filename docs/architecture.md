@@ -460,9 +460,12 @@ or `docker-compose.yml`. The contract test runs in `unit-tests.yml` on every pul
 `pyproject.toml` configures ruff. `scripts/ruff.sh` runs it from the pinned image
 `ghcr.io/astral-sh/ruff`, with no network access and the checkout mounted at its host path,
 so it needs podman and no Python install on the host. `.github/workflows/lint.yml` runs
-`scripts/ruff.sh check .` on every pull request.
+`scripts/ruff.sh check .` and `scripts/ruff.sh format --check .` on every pull request.
 
-CI fails on any finding. Size and complexity rules (`C901`, `PLR09xx`) are not enabled.
+CI fails on any lint finding and on any file `ruff format` would change. Size and complexity rules (`C901`, `PLR09xx`) are not enabled.
+
+`.git-blame-ignore-revs` lists commits that only reformat code. `git blame` skips them after
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
 ## Files on disk
 
@@ -482,6 +485,7 @@ data/                   user data, gitignored: personalization files, generated 
 docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
 .githooks/              pre-commit: re-renders the system diagram
 pyproject.toml          ruff configuration
+.git-blame-ignore-revs  reformat-only commits skipped by git blame
 .env.example            template for ~/.config/job-search-agent/.env
 ```
 

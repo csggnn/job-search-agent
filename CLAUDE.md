@@ -123,14 +123,15 @@ podman-compose exec job-search python3 -m unittest discover -s tests/unit   # of
 podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # needs keys
 ```
 
-Lint uses ruff, configured in `pyproject.toml` and run on the host from a pinned container
-image by `scripts/ruff.sh`. Every `.py` file passes `scripts/ruff.sh check .`;
-`.github/workflows/lint.yml` runs it on pull requests. To exclude one line from a rule, end
-it with `# noqa: <code>`, e.g. `# noqa: E501`.
+Lint and formatting use ruff, configured in `pyproject.toml` and run on the host from a
+pinned container image by `scripts/ruff.sh`. Every `.py` file passes `scripts/ruff.sh check .`
+and `scripts/ruff.sh format --check .`; `.github/workflows/lint.yml` runs both on pull
+requests. To exclude one line from a rule, end it with `# noqa: <code>`, e.g. `# noqa: E501`.
 
 ```
 scripts/ruff.sh check .
 scripts/ruff.sh check --fix <file>
+scripts/ruff.sh format <file>
 ```
 
 Evals:
