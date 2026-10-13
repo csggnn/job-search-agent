@@ -8,8 +8,13 @@ proposal cut. No LLM, no network, no database.
 import unittest
 
 from jobsearch.ranking import (
-    commute_modifier, combined_score, rank_evaluations, propose, format_proposal,
-    COMMUTE_NEUTRAL, COMMUTE_CUTOFF,
+    COMMUTE_CUTOFF,
+    COMMUTE_NEUTRAL,
+    combined_score,
+    commute_modifier,
+    format_proposal,
+    propose,
+    rank_evaluations,
 )
 
 
@@ -54,9 +59,9 @@ class RankEvaluationsTest(unittest.TestCase):
 
     def test_orders_by_descending_combined_score(self):
         rows = [
-            self._row(70, 0, url="a"),    # 85
-            self._row(90, 60, url="b"),   # 75
-            self._row(80, 30, url="c"),   # 80
+            self._row(70, 0, url="a"),  # 85
+            self._row(90, 60, url="b"),  # 75
+            self._row(80, 30, url="c"),  # 80
         ]
         self.assertEqual([e["url"] for e in rank_evaluations(rows)], ["a", "c", "b"])
 
@@ -71,16 +76,20 @@ class RankEvaluationsTest(unittest.TestCase):
 
     def test_ties_break_on_compatibility_score(self):
         rows = [
-            self._row(60, None, url="low"),   # 60
-            self._row(75, 60, url="high"),    # 60
+            self._row(60, None, url="low"),  # 60
+            self._row(75, 60, url="high"),  # 60
         ]
         self.assertEqual([e["url"] for e in rank_evaluations(rows)], ["high", "low"])
 
 
 class ProposeTest(unittest.TestCase):
     def _row(self, compatibility, commute, status="new", **extra):
-        return {"compatibility_score": compatibility, "commute_score": commute,
-                "application_status": status, **extra}
+        return {
+            "compatibility_score": compatibility,
+            "commute_score": commute,
+            "application_status": status,
+            **extra,
+        }
 
     def test_returns_the_top_m_eligible_in_rank_order(self):
         rows = [
@@ -107,8 +116,9 @@ class ProposeTest(unittest.TestCase):
     def test_every_row_appears_exactly_once(self):
         rows = [self._row(i, 0, url=str(i)) for i in range(10)]
         result = propose(rows, 3)
-        seen = [e["url"] for e in result["proposed"]] + \
-               [x["evaluation"]["url"] for x in result["excluded"]]
+        seen = [e["url"] for e in result["proposed"]] + [
+            x["evaluation"]["url"] for x in result["excluded"]
+        ]
         self.assertCountEqual(seen, [str(i) for i in range(10)])
 
     def test_proposes_fewer_than_m_when_too_few_are_eligible(self):
@@ -119,12 +129,30 @@ class ProposeTest(unittest.TestCase):
 class FormatProposalTest(unittest.TestCase):
     def test_renders_counts_and_reasons(self):
         rows = [
-            {"compatibility_score": 90, "commute_score": 0, "application_status": "new",
-             "job_title": "A", "company": "Co", "url": "u1"},
-            {"compatibility_score": 60, "commute_score": None, "application_status": "new",
-             "job_title": "B", "company": "Co", "url": "u2"},
-            {"compatibility_score": 80, "commute_score": 0, "application_status": "applied",
-             "job_title": "C", "company": "Co", "url": "u3"},
+            {
+                "compatibility_score": 90,
+                "commute_score": 0,
+                "application_status": "new",
+                "job_title": "A",
+                "company": "Co",
+                "url": "u1",
+            },
+            {
+                "compatibility_score": 60,
+                "commute_score": None,
+                "application_status": "new",
+                "job_title": "B",
+                "company": "Co",
+                "url": "u2",
+            },
+            {
+                "compatibility_score": 80,
+                "commute_score": 0,
+                "application_status": "applied",
+                "job_title": "C",
+                "company": "Co",
+                "url": "u3",
+            },
         ]
         text = format_proposal(propose(rows, 1), 1)
         self.assertIn("1 job(s) proposed out of 3 evaluated", text)

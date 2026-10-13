@@ -455,6 +455,18 @@ databases it builds from `ui/columns.py` under a temporary directory. It reads n
 `.github/workflows/ui-tests.yml` runs it on pull requests that change `ui/**`, `tests/ui/**`
 or `docker-compose.yml`. The contract test runs in `unit-tests.yml` on every pull request.
 
+## Static analysis
+
+`pyproject.toml` configures ruff. `scripts/ruff.sh` runs it from the pinned image
+`ghcr.io/astral-sh/ruff`, with no network access and the checkout mounted at its host path,
+so it needs podman and no Python install on the host. `.github/workflows/lint.yml` runs
+`scripts/ruff.sh check .` and `scripts/ruff.sh format --check .` on every pull request.
+
+CI fails on any lint finding and on any file `ruff format` would change. Size and complexity rules (`C901`, `PLR09xx`) are not enabled.
+
+`.git-blame-ignore-revs` lists commits that only reformat code. `git blame` skips them after
+`git config blame.ignoreRevsFile .git-blame-ignore-revs`.
+
 ## Files on disk
 
 ```
@@ -466,12 +478,14 @@ jobsearch/              the package: scrape, commute, rubric, evaluation, discov
 ui/                     read-only web UI over the evaluations database, its own container
 evals/                  the eval harness
 tests/                  unit/ (offline), e2e/ (live, needs keys) and ui/ (browser, ui container)
-scripts/                check_setup.py, recompile_rubric.py, export_diagram.sh
+scripts/                check_setup.py, recompile_rubric.py, export_diagram.sh, ruff.sh
 data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,
                         the evaluations database and the eval set
 docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
 .githooks/              pre-commit: re-renders the system diagram
+pyproject.toml          ruff configuration
+.git-blame-ignore-revs  reformat-only commits skipped by git blame
 .env.example            template for ~/.config/job-search-agent/.env
 ```
 

@@ -33,9 +33,9 @@ SCORE_MAX = 100
 
 
 def commute_modifier(commute_score):
-    """ the adjustment a commute applies to a compatibility score, in compatibility points.
-        returns None when the commute exceeds COMMUTE_CUTOFF, which zeroes the job rather
-        than penalizing it.
+    """the adjustment a commute applies to a compatibility score, in compatibility points.
+    returns None when the commute exceeds COMMUTE_CUTOFF, which zeroes the job rather
+    than penalizing it.
     """
     if commute_score > COMMUTE_CUTOFF:
         return None
@@ -43,14 +43,14 @@ def commute_modifier(commute_score):
 
 
 def combined_score(compatibility_score, commute_score):
-    """ the single 0-100 value jobs are ranked by: compatibility adjusted by the commute
-        modifier, clamped to [SCORE_MIN, SCORE_MAX].
+    """the single 0-100 value jobs are ranked by: compatibility adjusted by the commute
+    modifier, clamped to [SCORE_MIN, SCORE_MAX].
 
-        A commute beyond COMMUTE_CUTOFF returns SCORE_MIN regardless of compatibility.
-        commute_score of None means figure_address() could not resolve an office, which is a
-        data failure rather than evidence about the job: it scores as COMMUTE_NEUTRAL, the
-        modifier's zero point, so compatibility passes through unchanged and the job is
-        neither rewarded nor punished for the failure. The caller reports it as unknown.
+    A commute beyond COMMUTE_CUTOFF returns SCORE_MIN regardless of compatibility.
+    commute_score of None means figure_address() could not resolve an office, which is a
+    data failure rather than evidence about the job: it scores as COMMUTE_NEUTRAL, the
+    modifier's zero point, so compatibility passes through unchanged and the job is
+    neither rewarded nor punished for the failure. The caller reports it as unknown.
     """
     if commute_score is None:
         commute_score = COMMUTE_NEUTRAL
@@ -67,10 +67,10 @@ EXCLUDED_STATUSES = {"applied", "discarded"}
 
 
 def rank_evaluations(evaluations):
-    """ order evaluated jobs by descending combined_score, then by descending
-        compatibility_score for ties. evaluations are storage rows carrying at least
-        "compatibility_score" and "commute_score"; each returned row gains a "combined_score"
-        and "commute_known".
+    """order evaluated jobs by descending combined_score, then by descending
+    compatibility_score for ties. evaluations are storage rows carrying at least
+    "compatibility_score" and "commute_score"; each returned row gains a "combined_score"
+    and "commute_known".
     """
     ranked = [
         {
@@ -85,14 +85,14 @@ def rank_evaluations(evaluations):
 
 
 def propose(evaluations, m):
-    """ the shortlist: the m highest-ranked jobs whose application_status is not in
-        EXCLUDED_STATUSES. returns
+    """the shortlist: the m highest-ranked jobs whose application_status is not in
+    EXCLUDED_STATUSES. returns
 
-            {"proposed": [ranked evaluation, ...],          # <= m
-             "excluded": [{"evaluation": {...}, "reason": str}, ...]}
+        {"proposed": [ranked evaluation, ...],          # <= m
+         "excluded": [{"evaluation": {...}, "reason": str}, ...]}
 
-        Every input row appears once across the two lists. "reason" is the excluding status
-        for an already-actioned job, otherwise "ranked below the top m".
+    Every input row appears once across the two lists. "reason" is the excluding status
+    for an already-actioned job, otherwise "ranked below the top m".
     """
     proposed, excluded = [], []
     for e in rank_evaluations(evaluations):
@@ -107,24 +107,26 @@ def propose(evaluations, m):
 
 
 def _proposal_line(rank, e):
-    """ one proposed job as a terminal block: rank, combined score, title, fit and commute """
+    """one proposed job as a terminal block: rank, combined score, title, fit and commute"""
     if not e.get("commute_known"):
         commute = "commute unknown"
     elif e.get("commute_score"):
         commute = f"commute {e['commute_score']:.0f} (weighted min)"
     else:
         commute = "no commute (remote)"
-    return "\n".join([
-        f"{rank}. [{e['combined_score']}] {e.get('job_title') or '(untitled)'} "
-        f"at {e.get('company') or '(unknown company)'}",
-        f"   fit {e.get('compatibility_score')}/100 | {commute}",
-        f"   {e.get('url') or ''}",
-    ])
+    return "\n".join(
+        [
+            f"{rank}. [{e['combined_score']}] {e.get('job_title') or '(untitled)'} "
+            f"at {e.get('company') or '(unknown company)'}",
+            f"   fit {e.get('compatibility_score')}/100 | {commute}",
+            f"   {e.get('url') or ''}",
+        ]
+    )
 
 
 def format_proposal(result, m, heading=None):
-    """ render a propose() result for the terminal: an optional heading naming the pool, the
-        proposed jobs in rank order, then a count of what was held back and why.
+    """render a propose() result for the terminal: an optional heading naming the pool, the
+    proposed jobs in rank order, then a count of what was held back and why.
     """
     total = len(result["proposed"]) + len(result["excluded"])
     lines = []
@@ -140,8 +142,10 @@ def format_proposal(result, m, heading=None):
         lines.append(f"\n{len(actioned)} excluded as already applied to or discarded:\n")
         for x in actioned:
             e = x["evaluation"]
-            lines.append(f"- {e.get('job_title') or '(untitled)'} "
-                         f"at {e.get('company') or '(unknown company)'} - {x['reason']}")
+            lines.append(
+                f"- {e.get('job_title') or '(untitled)'} "
+                f"at {e.get('company') or '(unknown company)'} - {x['reason']}"
+            )
     if below:
         lines.append(f"\n{len(below)} evaluated but ranked below the top {m}.")
     return "\n".join(lines)

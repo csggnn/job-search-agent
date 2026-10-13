@@ -14,8 +14,9 @@ from jobsearch.evaluation import evaluate_job
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("url")
-    parser.add_argument("--force", action="store_true",
-                        help="ignore any saved evaluation and force a fresh run")
+    parser.add_argument(
+        "--force", action="store_true", help="ignore any saved evaluation and force a fresh run"
+    )
     args = parser.parse_args()
     config.require_data()
     evaluate_job(args.url, force=args.force)

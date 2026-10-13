@@ -17,16 +17,21 @@ import os
 import re
 
 from jobsearch.config import (
-    read_resume, read_job_preferences, file_hash, extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
+    DATA_DIR,
+    JOB_PREFERENCES_PATH,
+    RESUME_PATH,
+    extract_section,
+    file_hash,
+    read_job_preferences,
+    read_resume,
 )
-from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL
+from jobsearch.llm import EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL, ask_json, ask_json_with_tools
 
 RUBRIC_PATH = os.path.join(DATA_DIR, "compatibility_rubric.json")
 
 
 def test_regex(pattern, test_text):
-    """ tool: test a regex pattern (case-insensitive) against a piece of sample text """
+    """tool: test a regex pattern (case-insensitive) against a piece of sample text"""
     try:
         matches = re.findall(pattern, test_text, re.IGNORECASE)
     except re.error as e:
@@ -49,7 +54,10 @@ TOOLS = {
                     "type": "object",
                     "properties": {
                         "pattern": {"type": "string", "description": "the regex pattern to test"},
-                        "test_text": {"type": "string", "description": "sample text to test the pattern against"},
+                        "test_text": {
+                            "type": "string",
+                            "description": "sample text to test the pattern against",
+                        },
                     },
                     "required": ["pattern", "test_text"],
                 },
@@ -79,7 +87,9 @@ SCORING_NOTES_GUARD = (
 
 
 def draft_rubric(resume, preferences):
-    """ agentically propose + regex-test criteria that detect resume/preference matches in a job ad """
+    """agentically propose + regex-test criteria that detect resume/preference matches in a job
+    ad
+    """
     return ask_json_with_tools(
         "You are building a reusable scoring rubric to evaluate future job postings against "
         "a specific candidate's resume and job preferences. This rubric will be applied to "
@@ -93,12 +103,13 @@ def draft_rubric(resume, preferences):
         "a preference names.\n\n"
         f"Candidate resume:\n{resume}\n\n"
         f"Candidate job preferences:\n{preferences}\n\n"
-        + SCORING_NOTES_GUARD +
-        "Identify the 6-10 most impactful, concrete, checkable criteria (skills, "
+        + SCORING_NOTES_GUARD
+        + "Identify the 6-10 most impactful, concrete, checkable criteria (skills, "
         "technologies, role types, work felds) that indicate whether a job "
         "posting matches this candidate - prioritize the ones explicitly called out in the "
         "preferences."
-        "Every criterion must be directly traceable to specific text in the resume or job preferences."
+        "Every criterion must be directly traceable to specific text in the resume or job "
+        "preferences."
         "Allow for words appearing between the ones you anchor on: a "
         "pattern for a senior engineer role must still match 'Senior Widget Engineer', and a "
         "pattern anchored on a noun must still match the synonyms a title uses for it. "
@@ -109,7 +120,8 @@ def draft_rubric(resume, preferences):
         "When you are done testing, respond with only a JSON object:\n"
         '{"criteria": [{"name": <short label>, "pattern": <regex pattern string, no inline '
         'flags needed - matching is case-insensitive>, "type": "role" | '
-        '"skill" | "field", "weight": <integer [-5, 5] importance: negative when there is negative preference for a topic, '
+        '"skill" | "field", "weight": <integer [-5, 5] importance: negative when there is '
+        "negative preference for a topic, "
         '"rationale": <why this criterion matters, one sentence>}, ...]}',
         tools=TOOLS,
         tool_names=["test_regex"],
@@ -120,15 +132,15 @@ def draft_rubric(resume, preferences):
 
 
 def reflect_on_rubric(resume, preferences, draft):
-    """ single-shot critique/revision pass over the drafted rubric, before it gets cached """
+    """single-shot critique/revision pass over the drafted rubric, before it gets cached"""
     return ask_json(
         "You are reviewing a draft scoring rubric for quality before it gets cached and used "
         "to evaluate many future job postings via regex matching alone.\n\n"
         f"Candidate resume:\n{resume}\n\n"
         f"Candidate job preferences:\n{preferences}\n\n"
         f"Draft rubric:\n{json.dumps(draft, indent=2)}\n\n"
-        + SCORING_NOTES_GUARD +
-        "Check for, in this order of priority:\n"
+        + SCORING_NOTES_GUARD
+        + "Check for, in this order of priority:\n"
         "1. Hallucinated criteria: for each criterion, find the specific phrase in the "
         "resume or preferences text above that justifies it. If you cannot point to such a "
         "phrase, DELETE the criterion, even if it seems like a reasonable inference.\n"
@@ -147,7 +159,7 @@ def reflect_on_rubric(resume, preferences, draft):
 
 
 def compile_rubric():
-    """ agentically (re)build the compatibility rubric from resume.md + job_preferences.md """
+    """agentically (re)build the compatibility rubric from resume.md + job_preferences.md"""
     resume = read_resume()
     preferences = read_job_preferences()
 
@@ -166,10 +178,10 @@ def compile_rubric():
 
 
 def load_rubric():
-    """ return the rubric cached on disk, or None if RUBRIC_PATH is absent.
+    """return the rubric cached on disk, or None if RUBRIC_PATH is absent.
 
-        Callers that require one fixed rubric for a sequence of evaluations, such as the eval
-        harness, use this with rubric_is_stale() in place of load_or_compile_rubric().
+    Callers that require one fixed rubric for a sequence of evaluations, such as the eval
+    harness, use this with rubric_is_stale() in place of load_or_compile_rubric().
     """
     if not os.path.exists(RUBRIC_PATH):
         return None
@@ -178,15 +190,14 @@ def load_rubric():
 
 
 def rubric_is_stale(rubric):
-    """ True if resume.md/job_preferences.md have changed since rubric was compiled """
-    return (
-        rubric.get("resume_hash") != file_hash(RESUME_PATH)
-        or rubric.get("preferences_hash") != file_hash(JOB_PREFERENCES_PATH)
-    )
+    """True if resume.md/job_preferences.md have changed since rubric was compiled"""
+    return rubric.get("resume_hash") != file_hash(RESUME_PATH) or rubric.get(
+        "preferences_hash"
+    ) != file_hash(JOB_PREFERENCES_PATH)
 
 
 def load_or_compile_rubric():
-    """ return the cached rubric if resume.md/job_preferences.md haven't changed, else recompile """
+    """return the cached rubric if resume.md/job_preferences.md haven't changed, else recompile"""
     cached = load_rubric()
     if cached is not None and not rubric_is_stale(cached):
         return cached
@@ -194,28 +205,25 @@ def load_or_compile_rubric():
 
 
 def match_text(job_title, location, description):
-    """ the text rubric patterns are matched against: a posting's title, location and
-        description joined by newlines, skipping the parts a posting omits.
+    """the text rubric patterns are matched against: a posting's title, location and
+    description joined by newlines, skipping the parts a posting omits.
 
-        A criterion's evidence is not confined to the description: a role is stated in the
-        title, a city in the location. Matching the description alone reports those
-        criteria as unmatched.
+    A criterion's evidence is not confined to the description: a role is stated in the
+    title, a city in the location. Matching the description alone reports those
+    criteria as unmatched.
     """
     return "\n".join(part for part in (job_title, location, description) if part)
 
 
 def evaluate_rubric(rubric, text):
-    """ deterministically check which rubric criteria match a posting, via regex. text is
-        match_text() output.
-        each criterion gets a "score": its weight if matched, 0 if unmatched. weights are
-        already signed - positive for a wanted role/skill/field, negative for one to avoid.
+    """deterministically check which rubric criteria match a posting, via regex. text is
+    match_text() output.
+    each criterion gets a "score": its weight if matched, 0 if unmatched. weights are
+    already signed - positive for a wanted role/skill/field, negative for one to avoid.
     """
     evaluated = []
     for criterion in rubric["criteria"]:
         matched = bool(re.search(criterion["pattern"], text, re.IGNORECASE))
-        if matched:
-            score = criterion["weight"] 
-        else:
-            score = 0
+        score = criterion["weight"] if matched else 0
         evaluated.append({**criterion, "matched": matched, "score": score})
     return evaluated

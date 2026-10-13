@@ -18,11 +18,11 @@ from jobsearch.config import FULLY_REMOTE
 
 
 def score_criteria(expected_criteria, evaluated_criteria):
-    """ compare name -> bool ground truth against evaluate_rubric() output.
+    """compare name -> bool ground truth against evaluate_rubric() output.
 
-        returns {"correct", "labeled", "wrong": [{name, expected, actual}],
-                 "stale_labels": [...], "unlabeled": [...], "tp", "fp", "fn", "tn"}.
-        "labeled" counts correct plus wrong. The positive class is a matched criterion.
+    returns {"correct", "labeled", "wrong": [{name, expected, actual}],
+             "stale_labels": [...], "unlabeled": [...], "tp", "fp", "fn", "tn"}.
+    "labeled" counts correct plus wrong. The positive class is a matched criterion.
     """
     actual = {c["name"]: bool(c["matched"]) for c in evaluated_criteria}
     expected = dict(expected_criteria or {})
@@ -51,15 +51,18 @@ def score_criteria(expected_criteria, evaluated_criteria):
         "wrong": wrong,
         "stale_labels": stale_labels,
         "unlabeled": unlabeled,
-        "tp": tp, "fp": fp, "fn": fn, "tn": tn,
+        "tp": tp,
+        "fp": fp,
+        "fn": fn,
+        "tn": tn,
     }
 
 
 def score_scalar(expected, actual, tolerance):
-    """ compare a numeric result against ground truth within tolerance.
+    """compare a numeric result against ground truth within tolerance.
 
-        an actual of None (e.g. a commute score for an unresolved address) fails with an
-        abs_error of None, which aggregate() excludes from the MAE.
+    an actual of None (e.g. a commute score for an unresolved address) fails with an
+    abs_error of None, which aggregate() excludes from the MAE.
     """
     if actual is None:
         return {"expected": expected, "actual": None, "abs_error": None, "passed": False}
@@ -73,10 +76,10 @@ def score_scalar(expected, actual, tolerance):
 
 
 def score_address(expected_contains, actual):
-    """ check a resolved office address against ground truth.
+    """check a resolved office address against ground truth.
 
-        expected_contains is a substring, matched case-insensitively. The FULLY_REMOTE
-        sentinel is compared by equality instead.
+    expected_contains is a substring, matched case-insensitively. The FULLY_REMOTE
+    sentinel is compared by equality instead.
     """
     if expected_contains == FULLY_REMOTE:
         passed = actual == FULLY_REMOTE
@@ -86,7 +89,7 @@ def score_address(expected_contains, actual):
 
 
 def _scalar_metrics(results, extra_unresolved=False):
-    """ pass-rate + MAE over the scored cases for one scalar step """
+    """pass-rate + MAE over the scored cases for one scalar step"""
     scored = [r for r in results if r is not None]
     if not scored:
         return None
@@ -103,22 +106,20 @@ def _scalar_metrics(results, extra_unresolved=False):
 
 
 def aggregate(case_results):
-    """ turn per-case results into a run's "metrics" block """
+    """turn per-case results into a run's "metrics" block"""
     metrics = {
         "cases_total": len(case_results),
         "cases_scored": sum(1 for c in case_results if c.get("scored")),
         "cases_no_ad": sum(1 for c in case_results if c.get("skipped") == "no_ad"),
         "cases_undrafted": sum(1 for c in case_results if c.get("skipped") == "undrafted"),
-        "cases_truncated": sum(1 for c in case_results
-                               if c.get("skipped") == "truncated_ad"),
+        "cases_truncated": sum(1 for c in case_results if c.get("skipped") == "truncated_ad"),
     }
 
     compat = _scalar_metrics([c.get("compatibility_score") for c in case_results])
     if compat:
         metrics["compatibility_score"] = compat
 
-    commute = _scalar_metrics([c.get("commute_score") for c in case_results],
-                              extra_unresolved=True)
+    commute = _scalar_metrics([c.get("commute_score") for c in case_results], extra_unresolved=True)
     if commute:
         metrics["commute_score"] = commute
 
@@ -149,7 +150,9 @@ def aggregate(case_results):
             "accuracy": round(correct / labeled, 3) if labeled else None,
             "precision": round(tp / (tp + fp), 3) if (tp + fp) else None,
             "recall": round(tp / (tp + fn), 3) if (tp + fn) else None,
-            "tp": tp, "fp": fp, "fn": fn,
+            "tp": tp,
+            "fp": fp,
+            "fn": fn,
             "tn": sum(c["tn"] for c in criteria),
             "stale_labels": sum(len(c["stale_labels"]) for c in criteria),
             "unlabeled": sum(len(c["unlabeled"]) for c in criteria),
@@ -164,7 +167,7 @@ _HIGHER_IS_BETTER = ("accuracy", "precision", "recall", "pass_rate", "exact", "w
 
 
 def _case_score(case):
-    """ (passed_checks, total_checks) for one case's snapshot entry """
+    """(passed_checks, total_checks) for one case's snapshot entry"""
     passed = total = 0
     for step in ("compatibility_score", "commute_score", "days_on_office", "address"):
         if case.get(step):
@@ -177,11 +180,11 @@ def _case_score(case):
 
 
 def compare_runs(previous, current):
-    """ diff two run snapshots.
+    """diff two run snapshots.
 
-        returns {"metrics_delta", "regressed", "improved", "only_in_previous",
-        "only_in_current"}. Cases present in one run are reported under only_in_previous or
-        only_in_current and excluded from the regressed/improved lists.
+    returns {"metrics_delta", "regressed", "improved", "only_in_previous",
+    "only_in_current"}. Cases present in one run are reported under only_in_previous or
+    only_in_current and excluded from the regressed/improved lists.
     """
     prev_cases = {c["name"]: c for c in previous.get("cases", [])}
     curr_cases = {c["name"]: c for c in current.get("cases", [])}

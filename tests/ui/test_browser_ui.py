@@ -25,16 +25,56 @@ AD_HOST = "https://jobs.example.com"
 
 # id, title, company, compatibility, is_remote, commute, status, reviewed
 EVALUATIONS = [
-    dict(id=1, job_title="Job A", company="Acme", compatibility_score=82, is_remote=0,
-         commute_score=19.5, application_status="new", reviewed=0),
-    dict(id=2, job_title="Job B", company="Beta", compatibility_score=60, is_remote=0,
-         commute_score=45, application_status="applied", reviewed=1),
-    dict(id=3, job_title="Job C", company="Gamma", compatibility_score=75, is_remote=0,
-         commute_score=None, application_status="new", reviewed=1),
-    dict(id=4, job_title="Job D", company="Delta", compatibility_score=70, is_remote=1,
-         commute_score=0, application_status="discarded", reviewed=0),
-    dict(id=5, job_title=None, company="Epsilon", compatibility_score=50, is_remote=0,
-         commute_score=25, application_status="new", reviewed=0),
+    dict(
+        id=1,
+        job_title="Job A",
+        company="Acme",
+        compatibility_score=82,
+        is_remote=0,
+        commute_score=19.5,
+        application_status="new",
+        reviewed=0,
+    ),
+    dict(
+        id=2,
+        job_title="Job B",
+        company="Beta",
+        compatibility_score=60,
+        is_remote=0,
+        commute_score=45,
+        application_status="applied",
+        reviewed=1,
+    ),
+    dict(
+        id=3,
+        job_title="Job C",
+        company="Gamma",
+        compatibility_score=75,
+        is_remote=0,
+        commute_score=None,
+        application_status="new",
+        reviewed=1,
+    ),
+    dict(
+        id=4,
+        job_title="Job D",
+        company="Delta",
+        compatibility_score=70,
+        is_remote=1,
+        commute_score=0,
+        application_status="discarded",
+        reviewed=0,
+    ),
+    dict(
+        id=5,
+        job_title=None,
+        company="Epsilon",
+        compatibility_score=50,
+        is_remote=0,
+        commute_score=25,
+        application_status="new",
+        reviewed=0,
+    ),
 ]
 for _row in EVALUATIONS:
     _row.update(
@@ -50,27 +90,49 @@ for _row in EVALUATIONS:
     )
 
 CRITERIA = [
-    dict(evaluation_id=1, name="Criterion A", type="skill", weight=3, matched=1, score=3,
-         rationale="rationale A"),
-    dict(evaluation_id=1, name="Criterion B", type="field", weight=2, matched=1, score=2,
-         rationale="rationale B"),
-    dict(evaluation_id=1, name="Criterion C", type="role", weight=-3, matched=0, score=0,
-         rationale="rationale C"),
+    dict(
+        evaluation_id=1,
+        name="Criterion A",
+        type="skill",
+        weight=3,
+        matched=1,
+        score=3,
+        rationale="rationale A",
+    ),
+    dict(
+        evaluation_id=1,
+        name="Criterion B",
+        type="field",
+        weight=2,
+        matched=1,
+        score=2,
+        rationale="rationale B",
+    ),
+    dict(
+        evaluation_id=1,
+        name="Criterion C",
+        type="role",
+        weight=-3,
+        matched=0,
+        score=0,
+        rationale="rationale C",
+    ),
 ]
 
 EXTRA_COLUMN = "ad_text"
 
 
 def build_db(path, drop=(), extra_column=False, criteria_table=True, evaluations_table=True):
-    """ write a database at `path` from `ui.columns` and the fixed rows. `drop` names
-        evaluation columns to leave out; `extra_column` adds a column the UI does not read.
+    """write a database at `path` from `ui.columns` and the fixed rows. `drop` names
+    evaluation columns to leave out; `extra_column` adds a column the UI does not read.
     """
     eval_cols = [name for name, _ in columns.EVALUATION_COLUMNS if name not in drop]
     conn = sqlite3.connect(path)
     try:
         if evaluations_table:
-            ddl = [f"{c} INTEGER PRIMARY KEY" if c == columns.EVALUATION_KEY else c
-                   for c in eval_cols]
+            ddl = [
+                f"{c} INTEGER PRIMARY KEY" if c == columns.EVALUATION_KEY else c for c in eval_cols
+            ]
             if extra_column:
                 ddl.append(EXTRA_COLUMN)
             conn.execute(f"CREATE TABLE {columns.EVALUATIONS_TABLE} ({', '.join(ddl)})")
@@ -116,7 +178,7 @@ def tearDownModule():
 
 
 class UiTestCase(unittest.TestCase):
-    """ serves one database for the class; subclasses set `db_options` or `create_db` """
+    """serves one database for the class; subclasses set `db_options` or `create_db`"""
 
     db_options = {}
     create_db = True
@@ -152,8 +214,10 @@ class UiTestCase(unittest.TestCase):
         return self.page.goto(self.base + path)
 
     def listed_ids(self):
-        return [int(i) for i in
-                self.page.locator("tr.job").evaluate_all("rows => rows.map(r => r.dataset.id)")]
+        return [
+            int(i)
+            for i in self.page.locator("tr.job").evaluate_all("rows => rows.map(r => r.dataset.id)")
+        ]
 
     def cell(self, job_id, column):
         return self.page.locator(f"tr.job[data-id='{job_id}'] td.col-{column}")
@@ -256,11 +320,14 @@ class DetailPageTest(UiTestCase):
         self.cell(1, "job_title").locator("a").click()
         self.assertTrue(self.page.url.endswith("/job/1"))
         self.assertIn("Job A", self.page.locator("h1").inner_text())
-        for column, text in [("company", "Acme"), ("notes", "note for job 1"),
-                             ("compatibility_rationale", "rationale for job 1"),
-                             ("works_well", "works well for job 1"),
-                             ("does_not_work", "does not work for job 1"),
-                             ("commute_address", "Street 1, Town")]:
+        for column, text in [
+            ("company", "Acme"),
+            ("notes", "note for job 1"),
+            ("compatibility_rationale", "rationale for job 1"),
+            ("works_well", "works well for job 1"),
+            ("does_not_work", "does not work for job 1"),
+            ("commute_address", "Street 1, Town"),
+        ]:
             self.assertIn(text, self.page.locator(f"dd.field-{column}").inner_text())
         ad = self.page.locator("dd.field-url a")
         self.assertEqual(f"{AD_HOST}/1", ad.get_attribute("href"))

@@ -22,9 +22,12 @@ from jobsearch.rubric import compile_rubric, load_or_compile_rubric
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--if-changed", action="store_true",
-                        help="only recompile if resume.md/job_preferences.md hashes changed "
-                             "(same check evaluate_job() uses); otherwise force a fresh build")
+    parser.add_argument(
+        "--if-changed",
+        action="store_true",
+        help="only recompile if resume.md/job_preferences.md hashes changed "
+        "(same check evaluate_job() uses); otherwise force a fresh build",
+    )
     args = parser.parse_args()
     config.require_data()
 

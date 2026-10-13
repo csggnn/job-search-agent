@@ -7,8 +7,8 @@ import hashlib
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from datetime import UTC, datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from jobsearch import config
 
@@ -58,7 +58,10 @@ CREATE INDEX IF NOT EXISTS idx_evaluations_score ON evaluations(compatibility_sc
 # columns added after the initial release; applied to pre-existing DBs via ALTER TABLE
 _MIGRATIONS = [
     ("reviewed", "ALTER TABLE evaluations ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 0"),
-    ("application_status", "ALTER TABLE evaluations ADD COLUMN application_status TEXT NOT NULL DEFAULT 'new'"),
+    (
+        "application_status",
+        "ALTER TABLE evaluations ADD COLUMN application_status TEXT NOT NULL DEFAULT 'new'",
+    ),
     ("status_reason", "ALTER TABLE evaluations ADD COLUMN status_reason TEXT"),
     ("notes", "ALTER TABLE evaluations ADD COLUMN notes TEXT"),
 ]
@@ -67,7 +70,7 @@ APPLICATION_STATUSES = {"new", "applied", "discarded"}
 
 
 def _migrate_schema(conn):
-    """ add any columns from _MIGRATIONS that are missing from an existing evaluations table """
+    """add any columns from _MIGRATIONS that are missing from an existing evaluations table"""
     existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(evaluations)")}
     for column, ddl in _MIGRATIONS:
         if column not in existing_columns:
@@ -75,7 +78,7 @@ def _migrate_schema(conn):
 
 
 def _get_connection():
-    """ open a connection to the evaluations DB, creating/migrating the schema if needed """
+    """open a connection to the evaluations DB, creating/migrating the schema if needed"""
     os.makedirs(config.DATA_DIR, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
@@ -85,33 +88,36 @@ def _get_connection():
 
 
 def normalize_url(url):
-    """ canonicalize a job URL for dedup/lookup: strip tracking params and trailing slashes,
-        but keep other query params since some sites encode the job id there
+    """canonicalize a job URL for dedup/lookup: strip tracking params and trailing slashes,
+    but keep other query params since some sites encode the job id there
     """
     parts = urlsplit(url)
     query_pairs = sorted(
-        (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
         if k.lower() not in _TRACKING_PARAMS and not k.lower().startswith("utm_")
     )
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query_pairs), ""))
+    return urlunsplit(
+        (parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query_pairs), "")
+    )
 
 
 def rubric_content_hash(rubric):
-    """ sha256 of every rubric field that feeds compatibility_score()'s prompt (criteria +
-        scoring_guidance), used to detect any change that would affect an already-evaluated
-        job's judgment - including hand-edits to compatibility_rubric.json that don't touch
-        resume.md/job_preferences.md, and scoring_guidance-only edits that don't add/remove/
-        reweight any criterion.
+    """sha256 of every rubric field that feeds compatibility_score()'s prompt (criteria +
+    scoring_guidance), used to detect any change that would affect an already-evaluated
+    job's judgment - including hand-edits to compatibility_rubric.json that don't touch
+    resume.md/job_preferences.md, and scoring_guidance-only edits that don't add/remove/
+    reweight any criterion.
     """
     payload = {"criteria": rubric["criteria"], "scoring_guidance": rubric.get("scoring_guidance")}
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 def list_evaluated_urls():
-    """ return [(url, normalized_url), ...] for every saved evaluation - the original url last
-        passed to save_evaluation() plus its normalized form, for callers that need to diff
-        against another set of urls (e.g. cases.json) using the same normalization.
+    """return [(url, normalized_url), ...] for every saved evaluation - the original url last
+    passed to save_evaluation() plus its normalized form, for callers that need to diff
+    against another set of urls (e.g. cases.json) using the same normalization.
     """
     conn = _get_connection()
     try:
@@ -122,10 +128,10 @@ def list_evaluated_urls():
 
 
 def list_evaluated_job_openings():
-    """ return [(normalized_url, company, job_title, application_status), ...] for every saved
-        evaluation - the job-opening identity fields, for callers that dedupe on the opening
-        rather than on the url it was found under (jobsearch.preselection). Read-only, no
-        schema of its own: list_evaluated_urls() returns urls only.
+    """return [(normalized_url, company, job_title, application_status), ...] for every saved
+    evaluation - the job-opening identity fields, for callers that dedupe on the opening
+    rather than on the url it was found under (jobsearch.preselection). Read-only, no
+    schema of its own: list_evaluated_urls() returns urls only.
     """
     conn = _get_connection()
     try:
@@ -138,17 +144,25 @@ def list_evaluated_job_openings():
 
 
 _LIST_COLUMNS = (
-    "url", "job_title", "company", "is_remote", "days_on_office", "commute_address",
-    "commute_score", "compatibility_score", "application_status", "evaluated_at",
+    "url",
+    "job_title",
+    "company",
+    "is_remote",
+    "days_on_office",
+    "commute_address",
+    "commute_score",
+    "compatibility_score",
+    "application_status",
+    "evaluated_at",
 )
 
 
 def list_evaluations():
-    """ return every saved evaluation as a dict of _LIST_COLUMNS, most recently evaluated
-        first. The fields ranking needs (compatibility_score, commute_score,
-        application_status) plus the identity and display fields, without the rationale and
-        per-criterion detail. For jobsearch.ranking, which scores rows regardless of how
-        they were evaluated.
+    """return every saved evaluation as a dict of _LIST_COLUMNS, most recently evaluated
+    first. The fields ranking needs (compatibility_score, commute_score,
+    application_status) plus the identity and display fields, without the rationale and
+    per-criterion detail. For jobsearch.ranking, which scores rows regardless of how
+    they were evaluated.
     """
     conn = _get_connection()
     try:
@@ -157,19 +171,32 @@ def list_evaluations():
         ).fetchall()
     finally:
         conn.close()
-    return [dict(zip(_LIST_COLUMNS, row)) for row in rows]
+    return [dict(zip(_LIST_COLUMNS, row, strict=True)) for row in rows]
 
 
 _EVALUATION_COLUMNS = (
-    "url", "job_title", "company", "commute_score", "commute_address", "days_on_office",
-    "compatibility_score", "compatibility_rationale", "works_well", "does_not_work",
-    "rubric_hash", "evaluated_at", "reviewed", "application_status", "status_reason", "notes",
+    "url",
+    "job_title",
+    "company",
+    "commute_score",
+    "commute_address",
+    "days_on_office",
+    "compatibility_score",
+    "compatibility_rationale",
+    "works_well",
+    "does_not_work",
+    "rubric_hash",
+    "evaluated_at",
+    "reviewed",
+    "application_status",
+    "status_reason",
+    "notes",
 )
 
 
 def get_evaluation(url):
-    """ return the full saved evaluation row for url as a dict, or None if never evaluated.
-        includes both pipeline-derived fields and user-tracked fields (reviewed, notes, etc).
+    """return the full saved evaluation row for url as a dict, or None if never evaluated.
+    includes both pipeline-derived fields and user-tracked fields (reviewed, notes, etc).
     """
     conn = _get_connection()
     try:
@@ -182,15 +209,15 @@ def get_evaluation(url):
 
     if row is None:
         return None
-    return dict(zip(_EVALUATION_COLUMNS, row))
+    return dict(zip(_EVALUATION_COLUMNS, row, strict=True))
 
 
 _CRITERION_COLUMNS = ("name", "type", "weight", "matched", "score", "rationale")
 
 
 def get_evaluation_criteria(url):
-    """ return the list of evaluation_criteria rows (name, type, weight, matched, score,
-        rationale) for url's saved evaluation, or [] if never evaluated.
+    """return the list of evaluation_criteria rows (name, type, weight, matched, score,
+    rationale) for url's saved evaluation, or [] if never evaluated.
     """
     conn = _get_connection()
     try:
@@ -202,17 +229,17 @@ def get_evaluation_criteria(url):
     finally:
         conn.close()
 
-    return [dict(zip(_CRITERION_COLUMNS, row)) for row in rows]
+    return [dict(zip(_CRITERION_COLUMNS, row, strict=True)) for row in rows]
 
 
 def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
-    """ upsert the pipeline-derived fields of the evaluation for url: updates the existing row
-        if one exists for this normalized_url (preserving user-tracked fields like reviewed/
-        notes/application_status), else inserts a fresh row with their defaults. Always
-        replaces evaluation_criteria for the row, since those are fully derived.
+    """upsert the pipeline-derived fields of the evaluation for url: updates the existing row
+    if one exists for this normalized_url (preserving user-tracked fields like reviewed/
+    notes/application_status), else inserts a fresh row with their defaults. Always
+    replaces evaluation_criteria for the row, since those are fully derived.
     """
     normalized = normalize_url(url)
-    evaluated_at = datetime.now(timezone.utc).isoformat()
+    evaluated_at = datetime.now(UTC).isoformat()
     is_remote = 1 if commute["address"] == config.FULLY_REMOTE else 0
 
     conn = _get_connection()
@@ -229,13 +256,25 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
                 "compatibility_score = ?, compatibility_rationale = ?, works_well = ?, "
                 "does_not_work = ?, rubric_hash = ?, evaluated_at = ? WHERE id = ?",
                 (
-                    url, job["job_title"], job["company"], is_remote, commute["days_on_office"],
-                    commute["address"], commute["score"], compatibility["compatibility_score"],
-                    compatibility["rationale"], overview["works_well"], overview["does_not_work"],
-                    rubric_hash, evaluated_at, evaluation_id,
+                    url,
+                    job["job_title"],
+                    job["company"],
+                    is_remote,
+                    commute["days_on_office"],
+                    commute["address"],
+                    commute["score"],
+                    compatibility["compatibility_score"],
+                    compatibility["rationale"],
+                    overview["works_well"],
+                    overview["does_not_work"],
+                    rubric_hash,
+                    evaluated_at,
+                    evaluation_id,
                 ),
             )
-            conn.execute("DELETE FROM evaluation_criteria WHERE evaluation_id = ?", (evaluation_id,))
+            conn.execute(
+                "DELETE FROM evaluation_criteria WHERE evaluation_id = ?", (evaluation_id,)
+            )
         else:
             cursor = conn.execute(
                 "INSERT INTO evaluations (url, normalized_url, job_title, company, is_remote, "
@@ -243,10 +282,20 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
                 "compatibility_rationale, works_well, does_not_work, rubric_hash, evaluated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    url, normalized, job["job_title"], job["company"], is_remote,
-                    commute["days_on_office"], commute["address"], commute["score"],
-                    compatibility["compatibility_score"], compatibility["rationale"],
-                    overview["works_well"], overview["does_not_work"], rubric_hash, evaluated_at,
+                    url,
+                    normalized,
+                    job["job_title"],
+                    job["company"],
+                    is_remote,
+                    commute["days_on_office"],
+                    commute["address"],
+                    commute["score"],
+                    compatibility["compatibility_score"],
+                    compatibility["rationale"],
+                    overview["works_well"],
+                    overview["does_not_work"],
+                    rubric_hash,
+                    evaluated_at,
                 ),
             )
             evaluation_id = cursor.lastrowid
@@ -273,12 +322,14 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
 
 
 def update_review(url, reviewed=None, application_status=None, status_reason=None, notes=None):
-    """ partial update of the user-tracked fields for an existing evaluation; None = leave
-        unchanged. Raises ValueError if the url has never been evaluated, or if
-        application_status isn't one of APPLICATION_STATUSES.
+    """partial update of the user-tracked fields for an existing evaluation; None = leave
+    unchanged. Raises ValueError if the url has never been evaluated, or if
+    application_status isn't one of APPLICATION_STATUSES.
     """
     if application_status is not None and application_status not in APPLICATION_STATUSES:
-        raise ValueError(f"application_status must be one of {APPLICATION_STATUSES}, got {application_status!r}")
+        raise ValueError(
+            f"application_status must be one of {APPLICATION_STATUSES}, got {application_status!r}"
+        )
 
     normalized = normalize_url(url)
     updates = {

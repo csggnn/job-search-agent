@@ -34,8 +34,14 @@ EVALUATION_COLUMNS = (
 
 # the evaluation columns shown on the list page, in display order
 LIST_COLUMNS = (
-    "job_title", "company", "compatibility_score", "commute_score", "reviewed",
-    "application_status", "evaluated_at", "url",
+    "job_title",
+    "company",
+    "compatibility_score",
+    "commute_score",
+    "reviewed",
+    "application_status",
+    "evaluated_at",
+    "url",
 )
 
 CRITERIA_TABLE = "evaluation_criteria"

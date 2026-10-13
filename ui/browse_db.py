@@ -20,10 +20,14 @@ DEFAULT_PORT = 8000
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--db", required=True, help="path of the evaluations database to show")
-    parser.add_argument("--host", default=os.environ.get("UI_HOST", DEFAULT_HOST),
-                        help=f"address to listen on (default $UI_HOST, else {DEFAULT_HOST})")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT,
-                        help=f"port to listen on (default {DEFAULT_PORT})")
+    parser.add_argument(
+        "--host",
+        default=os.environ.get("UI_HOST", DEFAULT_HOST),
+        help=f"address to listen on (default $UI_HOST, else {DEFAULT_HOST})",
+    )
+    parser.add_argument(
+        "--port", type=int, default=DEFAULT_PORT, help=f"port to listen on (default {DEFAULT_PORT})"
+    )
     args = parser.parse_args()
 
     create_app(args.db).run(host=args.host, port=args.port)

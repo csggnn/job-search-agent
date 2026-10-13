@@ -12,8 +12,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from tavily import TavilyClient
 import aisuite as ai
+from tavily import TavilyClient
 
 from jobsearch import config
 
@@ -50,15 +50,17 @@ def ask(client: ai.Client, model: str, context: str, query: str) -> str:
 
 
 def check_data():
-    """ print the missing user data files and job preferences sections. returns True if none """
+    """print the missing user data files and job preferences sections. returns True if none"""
     problems = []
     message = config.missing_data_message()
     if message:
         problems.append(message)
     if os.path.exists(config.JOB_PREFERENCES_PATH):
         empty = config.empty_preferences_sections(config.read_job_preferences())
-        problems += [f"## {heading} is missing or empty in {config.JOB_PREFERENCES_PATH}"
-                     for heading in empty]
+        problems += [
+            f"## {heading} is missing or empty in {config.JOB_PREFERENCES_PATH}"
+            for heading in empty
+        ]
     for problem in problems:
         print(problem)
     if not problems:
@@ -67,7 +69,7 @@ def check_data():
 
 
 def check_keys():
-    """ print the API keys missing from the environment. returns True if none """
+    """print the API keys missing from the environment. returns True if none"""
     missing = [name for name in config.API_KEYS if not config.get_env(name)]
     for name in missing:
         print(f"MISSING: {name} is not set in {config.KEYS_FILE}")
