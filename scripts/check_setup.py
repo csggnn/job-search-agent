@@ -12,8 +12,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from tavily import TavilyClient
 import aisuite as ai
+from tavily import TavilyClient
 
 from jobsearch import config
 

@@ -125,8 +125,8 @@ SELECTION_MAX_TOKENS = 2048
 #    "min_amount": float|None, "max_amount": float|None, "currency": str|None,
 #    "company_industry": str|None, "work_from_home_type": str|None}
 #
-# Stage 1 adds: "job_opening_key" (normalized company+title), "prescore" (int), "matched_criteria" ([str]). Stage 2 adds "selection_reason" (str) to
-# the selected.
+# Stage 1 adds: "job_opening_key" (normalized company+title), "prescore" (int),
+# "matched_criteria" ([str]). Stage 2 adds "selection_reason" (str) to the selected.
 #
 # OUTPUT - see preselect().
 

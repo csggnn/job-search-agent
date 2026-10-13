@@ -7,8 +7,8 @@ import hashlib
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
-from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
+from datetime import UTC, datetime
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from jobsearch import config
 
@@ -58,7 +58,8 @@ CREATE INDEX IF NOT EXISTS idx_evaluations_score ON evaluations(compatibility_sc
 # columns added after the initial release; applied to pre-existing DBs via ALTER TABLE
 _MIGRATIONS = [
     ("reviewed", "ALTER TABLE evaluations ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 0"),
-    ("application_status", "ALTER TABLE evaluations ADD COLUMN application_status TEXT NOT NULL DEFAULT 'new'"),
+    ("application_status",
+     "ALTER TABLE evaluations ADD COLUMN application_status TEXT NOT NULL DEFAULT 'new'"),
     ("status_reason", "ALTER TABLE evaluations ADD COLUMN status_reason TEXT"),
     ("notes", "ALTER TABLE evaluations ADD COLUMN notes TEXT"),
 ]
@@ -94,7 +95,9 @@ def normalize_url(url):
         if k.lower() not in _TRACKING_PARAMS and not k.lower().startswith("utm_")
     )
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query_pairs), ""))
+    return urlunsplit(
+        (parts.scheme.lower(), parts.netloc.lower(), path, urlencode(query_pairs), "")
+    )
 
 
 def rubric_content_hash(rubric):
@@ -157,7 +160,7 @@ def list_evaluations():
         ).fetchall()
     finally:
         conn.close()
-    return [dict(zip(_LIST_COLUMNS, row)) for row in rows]
+    return [dict(zip(_LIST_COLUMNS, row, strict=True)) for row in rows]
 
 
 _EVALUATION_COLUMNS = (
@@ -182,7 +185,7 @@ def get_evaluation(url):
 
     if row is None:
         return None
-    return dict(zip(_EVALUATION_COLUMNS, row))
+    return dict(zip(_EVALUATION_COLUMNS, row, strict=True))
 
 
 _CRITERION_COLUMNS = ("name", "type", "weight", "matched", "score", "rationale")
@@ -202,7 +205,7 @@ def get_evaluation_criteria(url):
     finally:
         conn.close()
 
-    return [dict(zip(_CRITERION_COLUMNS, row)) for row in rows]
+    return [dict(zip(_CRITERION_COLUMNS, row, strict=True)) for row in rows]
 
 
 def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
@@ -212,7 +215,7 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
         replaces evaluation_criteria for the row, since those are fully derived.
     """
     normalized = normalize_url(url)
-    evaluated_at = datetime.now(timezone.utc).isoformat()
+    evaluated_at = datetime.now(UTC).isoformat()
     is_remote = 1 if commute["address"] == config.FULLY_REMOTE else 0
 
     conn = _get_connection()
@@ -235,7 +238,9 @@ def save_evaluation(url, rubric_hash, job, commute, compatibility, overview):
                     rubric_hash, evaluated_at, evaluation_id,
                 ),
             )
-            conn.execute("DELETE FROM evaluation_criteria WHERE evaluation_id = ?", (evaluation_id,))
+            conn.execute(
+                "DELETE FROM evaluation_criteria WHERE evaluation_id = ?", (evaluation_id,)
+            )
         else:
             cursor = conn.execute(
                 "INSERT INTO evaluations (url, normalized_url, job_title, company, is_remote, "
@@ -278,7 +283,8 @@ def update_review(url, reviewed=None, application_status=None, status_reason=Non
         application_status isn't one of APPLICATION_STATUSES.
     """
     if application_status is not None and application_status not in APPLICATION_STATUSES:
-        raise ValueError(f"application_status must be one of {APPLICATION_STATUSES}, got {application_status!r}")
+        raise ValueError(f"application_status must be one of {APPLICATION_STATUSES}, "
+                         f"got {application_status!r}")
 
     normalized = normalize_url(url)
     updates = {

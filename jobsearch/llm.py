@@ -19,7 +19,8 @@ RUBRIC_MODEL = "anthropic:claude-sonnet-5"
 def _provider_kwargs(model):
     """ per-provider extra request kwargs. Anthropic 'claude-*-5'-gen models emit extended-thinking
         blocks by default, which aisuite's response converter can't parse (it reads content[0].text
-        and chokes on a leading ThinkingBlock) - explicitly disable thinking so replies are plain text.
+        and chokes on a leading ThinkingBlock) - explicitly disable thinking so replies are plain
+        text.
     """
     if model.startswith("anthropic:"):
         return {"thinking": {"type": "disabled"}}
@@ -51,10 +52,12 @@ def ask_json(prompt, max_tokens=1024, model=EXTRACTION_MODEL):
     return _parse_json_reply(response.choices[0].message.content)
 
 
-def ask_json_with_tools(prompt, tools, tool_names, max_tokens=1024, max_iterations=10, model=EXTRACTION_MODEL):
+def ask_json_with_tools(prompt, tools, tool_names, max_tokens=1024, max_iterations=10,
+                        model=EXTRACTION_MODEL):
     """ run an agentic tool-call loop, letting the given model (default extraction model) call the
         given tools before answering.
-        `tools` is a {name: {"spec": <tool schema>, "impl": <callable>}} registry owned by the caller.
+        `tools` is a {name: {"spec": <tool schema>, "impl": <callable>}} registry owned by the
+        caller.
     """
     client = ai.Client()
     tool_specs = [tools[name]["spec"] for name in tool_names]
@@ -72,7 +75,9 @@ def ask_json_with_tools(prompt, tools, tool_names, max_tokens=1024, max_iteratio
         if not message.tool_calls:
             return _parse_json_reply(message.content)
 
-        messages.append({"role": "assistant", "content": message.content, "tool_calls": message.tool_calls})
+        messages.append(
+            {"role": "assistant", "content": message.content, "tool_calls": message.tool_calls}
+        )
         for tool_call in message.tool_calls:
             args = json.loads(tool_call.function.arguments) if tool_call.function.arguments else {}
             result = tools[tool_call.function.name]["impl"](**args)

@@ -27,7 +27,6 @@ from jobsearch import config, storage
 from jobsearch.llm import EXTRACTION_MODEL
 from jobsearch.scrape import extract_post, fetch_page_text
 
-
 # A job board serving a login wall returns a post with a populated job_title and company and
 # a description holding the wall's teaser text. validate_post() accepts such a post. A
 # description of that length matches no rubric criteria, and figure_days_on_office() returns
@@ -36,7 +35,7 @@ MIN_DESCRIPTION_CHARS = 600
 
 
 def _now():
-    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 def looks_truncated(post):
@@ -155,8 +154,8 @@ def _list_cases(cases):
         where = expected.get("address_contains") or case.get("url", "")
         print(f"  {'*' if dataset.has_ad(case) else '-':<3} "
               f"{'*' if case.get('verified') else '-':<2} "
-              f"{case['name'][:52]:<52} {str(days if days is not None else '?'):<5} "
-              f"{str(score if score is not None else '?'):<7} {where[:60]}")
+              f"{case['name'][:52]:<52} {days if days is not None else '?':<5} "
+              f"{score if score is not None else '?':<7} {where[:60]}")
     print("\nSelect cases covering a range of commutes, remote policies, and fit, then:\n"
           "  python evals/capture.py --from-cases NAME [NAME ...]")
 

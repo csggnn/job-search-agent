@@ -23,7 +23,8 @@ def classify_location(company, location, debug=False):
         f"Location: {location}\n\n"
         'Respond with only a JSON object with keys "status" and "address":\n'
         '"status" must hold one of the following 3 options:\n'
-        '- "remote": the job is fully remote, no office attendance is required. Set "address" to null.\n'
+        '- "remote": the job is fully remote, no office attendance is required. Set "address" '
+        'to null.\n'
         '- "full_address": the location text already contains a specific street-level '
         'address (street name and number), not just a city/region/country. Set '
         '"address" to that address.\n'
@@ -115,7 +116,8 @@ def figure_days_on_office(description):
         "- if the job location is hybrid but no specific number of days is stated, use 4.\n"
         "- If nothing about remote/hybrid/on-site policy is mentioned at all, use 5 as the "
         "conservative default."
-        "double check that your reply is text representing a single integer with no other added comment",
+        "double check that your reply is text representing a single integer with no other "
+        "added comment",
         max_tokens=256,
     )
     return result
@@ -149,9 +151,8 @@ def geocode_address(address):
         features = response.json()["features"]
         if features:
             break
-        else: 
-            if attempt>0:
-                raise ValueError(f"could not geocode address: {address}")
+        elif attempt>0:
+            raise ValueError(f"could not geocode address: {address}")
     return features[0]["geometry"]["coordinates"]
 
 

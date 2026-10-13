@@ -283,7 +283,7 @@ def main():
     _print_metrics(metrics)
 
     snapshot = {
-        "run_id": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ"),
+        "run_id": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H-%M-%SZ"),
         "rubric_hash": storage.rubric_content_hash(rubric),
         "rubric_stale": stale,
         "rubric_criteria": [c["name"] for c in rubric["criteria"]],

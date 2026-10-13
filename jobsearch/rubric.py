@@ -17,10 +17,15 @@ import os
 import re
 
 from jobsearch.config import (
-    read_resume, read_job_preferences, file_hash, extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
+    DATA_DIR,
+    JOB_PREFERENCES_PATH,
+    RESUME_PATH,
+    extract_section,
+    file_hash,
+    read_job_preferences,
+    read_resume,
 )
-from jobsearch.llm import ask_json, ask_json_with_tools, EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL
+from jobsearch.llm import EXTRACTION_MODEL_MAX_TOKENS, RUBRIC_MODEL, ask_json, ask_json_with_tools
 
 RUBRIC_PATH = os.path.join(DATA_DIR, "compatibility_rubric.json")
 
@@ -49,7 +54,10 @@ TOOLS = {
                     "type": "object",
                     "properties": {
                         "pattern": {"type": "string", "description": "the regex pattern to test"},
-                        "test_text": {"type": "string", "description": "sample text to test the pattern against"},
+                        "test_text": {
+                            "type": "string",
+                            "description": "sample text to test the pattern against",
+                        },
                     },
                     "required": ["pattern", "test_text"],
                 },
@@ -79,7 +87,9 @@ SCORING_NOTES_GUARD = (
 
 
 def draft_rubric(resume, preferences):
-    """ agentically propose + regex-test criteria that detect resume/preference matches in a job ad """
+    """ agentically propose + regex-test criteria that detect resume/preference matches in a job
+        ad
+    """
     return ask_json_with_tools(
         "You are building a reusable scoring rubric to evaluate future job postings against "
         "a specific candidate's resume and job preferences. This rubric will be applied to "
@@ -98,7 +108,8 @@ def draft_rubric(resume, preferences):
         "technologies, role types, work felds) that indicate whether a job "
         "posting matches this candidate - prioritize the ones explicitly called out in the "
         "preferences."
-        "Every criterion must be directly traceable to specific text in the resume or job preferences."
+        "Every criterion must be directly traceable to specific text in the resume or job "
+        "preferences."
         "Allow for words appearing between the ones you anchor on: a "
         "pattern for a senior engineer role must still match 'Senior Widget Engineer', and a "
         "pattern anchored on a noun must still match the synonyms a title uses for it. "
@@ -109,7 +120,8 @@ def draft_rubric(resume, preferences):
         "When you are done testing, respond with only a JSON object:\n"
         '{"criteria": [{"name": <short label>, "pattern": <regex pattern string, no inline '
         'flags needed - matching is case-insensitive>, "type": "role" | '
-        '"skill" | "field", "weight": <integer [-5, 5] importance: negative when there is negative preference for a topic, '
+        '"skill" | "field", "weight": <integer [-5, 5] importance: negative when there is '
+        'negative preference for a topic, '
         '"rationale": <why this criterion matters, one sentence>}, ...]}',
         tools=TOOLS,
         tool_names=["test_regex"],
@@ -213,9 +225,6 @@ def evaluate_rubric(rubric, text):
     evaluated = []
     for criterion in rubric["criteria"]:
         matched = bool(re.search(criterion["pattern"], text, re.IGNORECASE))
-        if matched:
-            score = criterion["weight"] 
-        else:
-            score = 0
+        score = criterion["weight"] if matched else 0
         evaluated.append({**criterion, "matched": matched, "score": score})
     return evaluated

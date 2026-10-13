@@ -8,7 +8,7 @@ that `python discover_jobs.py` keeps working.
 import argparse
 
 from jobsearch import config
-from jobsearch.discovery import discover_jobs, add_discovery_arguments
+from jobsearch.discovery import add_discovery_arguments, discover_jobs
 from jobsearch.preselection import DEFAULT_N
 
 
@@ -27,7 +27,8 @@ def main():
     args = parser.parse_args()
     config.require_data()
     discover_jobs(evaluate=args.evaluate, limit=args.limit, max_results_per_query=args.max_results,
-                  force_queries=args.force, preselect_job_ads=not args.no_preselect, debug=args.debug)
+                  force_queries=args.force, preselect_job_ads=not args.no_preselect,
+                  debug=args.debug)
 
 
 if __name__ == "__main__":

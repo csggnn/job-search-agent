@@ -8,8 +8,13 @@ proposal cut. No LLM, no network, no database.
 import unittest
 
 from jobsearch.ranking import (
-    commute_modifier, combined_score, rank_evaluations, propose, format_proposal,
-    COMMUTE_NEUTRAL, COMMUTE_CUTOFF,
+    COMMUTE_CUTOFF,
+    COMMUTE_NEUTRAL,
+    combined_score,
+    commute_modifier,
+    format_proposal,
+    propose,
+    rank_evaluations,
 )
 
 

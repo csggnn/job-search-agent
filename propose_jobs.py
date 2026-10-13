@@ -13,8 +13,8 @@ parses arguments and picks the pools to rank.
 import argparse
 
 from jobsearch import config, storage
-from jobsearch.discovery import discover_jobs, add_discovery_arguments
-from jobsearch.ranking import propose, format_proposal
+from jobsearch.discovery import add_discovery_arguments, discover_jobs
+from jobsearch.ranking import format_proposal, propose
 
 DEFAULT_PRESELECT_MULTIPLIER = 3
 

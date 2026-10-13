@@ -74,8 +74,8 @@ def _dotenv_values():
     values = {}
     if not ENV_PATH.exists():
         return values
-    for line in ENV_PATH.read_text().splitlines():
-        line = line.strip()
+    for raw_line in ENV_PATH.read_text().splitlines():
+        line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, _, raw = line.partition("=")
@@ -129,6 +129,7 @@ class PipelineEndToEndTest(unittest.TestCase):
             [sys.executable, "evaluate_job_post.py", *args],
             cwd=REPO_ROOT,
             capture_output=True,
+            check=False,
             text=True,
             timeout=PIPELINE_TIMEOUT_S,
         )
@@ -176,7 +177,8 @@ class PipelineEndToEndTest(unittest.TestCase):
         _log(f"target URL: {self.url}")
 
         # 1. force a full, uncached run: scrape -> commute -> compatibility -> summary -> save
-        _log("running full pipeline (--force): scrape -> commute -> compatibility -> summary -> save ...")
+        _log("running full pipeline (--force): "
+             "scrape -> commute -> compatibility -> summary -> save ...")
         start = time.monotonic()
         result = self._run_evaluate([self.url, "--force"])
         force_secs = time.monotonic() - start
@@ -261,6 +263,7 @@ class PipelineEndToEndTest(unittest.TestCase):
             [sys.executable, "discover_jobs.py"],
             cwd=REPO_ROOT,
             capture_output=True,
+            check=False,
             text=True,
             timeout=PIPELINE_TIMEOUT_S,
         )

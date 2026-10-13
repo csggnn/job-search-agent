@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 from tavily import TavilyClient
 
 from jobsearch import config
-from jobsearch.llm import ask_json, EXTRACTION_MODEL_MAX_TOKENS
+from jobsearch.llm import EXTRACTION_MODEL_MAX_TOKENS, ask_json
 
 POST_FIELDS = ("job_title", "company", "location", "description")
 
@@ -82,9 +82,11 @@ def extract_post(page_text, source="page text"):
         "Extract the following fields from this job posting page as JSON, "
         "with exactly these keys: job_title, company, location, description. "
         "location should contain any address/city/office info found on the page. "
-        "Description should collect the full job and company description, including the remote policy information available. "
+        "Description should collect the full job and company description, including the remote "
+        "policy information available. "
         "Set description to an empty string only if the page contains no text describing the job's "
-        "responsibilities, requirements or company, e.g. a page showing only the job title and location. "
+        "responsibilities, requirements or company, e.g. a page showing only the job title and "
+        "location. "
         "Sign-in or cookie prompts elsewhere on the page do not affect this. "
         "Respond with only the JSON object, no other text.\n\n"
         f"{page_text}",
@@ -94,5 +96,6 @@ def extract_post(page_text, source="page text"):
 
 
 def scrape_post(url):
-    """given a web address with a job post, extract job title, company, location relevant data and description"""
+    """given a web address with a job post, extract job title, company, location relevant data
+       and description"""
     return extract_post(fetch_page_text(url), source=url)

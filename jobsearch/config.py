@@ -52,7 +52,7 @@ def require_env(name):
         return os.environ[name]
     except KeyError:
         raise RuntimeError(f"required environment variable {name!r} is not set: add it to "
-                           f"{KEYS_FILE}")
+                           f"{KEYS_FILE}") from None
 
 
 # the job preferences sections the pipeline reads
@@ -150,8 +150,8 @@ def _first_content_line(text):
         no line qualifies, or if a "#" or "##" heading comes first: an empty section makes
         extract_section() run into the next one.
     """
-    for line in text.splitlines():
-        line = line.strip()
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
         if not line or line.startswith(("(fill in", "<!--")) or line.startswith("###"):
             continue
         return None if line.startswith("#") else line

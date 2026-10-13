@@ -20,11 +20,28 @@ from unittest.mock import patch
 
 from jobsearch import preselection
 from jobsearch.preselection import (
-    BUDGET_WARN_JOB_ADS, DEFAULT_N, DROP_DUPLICATE, DROP_EVALUATED, DROP_INCOMPLETE,
-    DROP_NOT_SELECTED, DROP_STALE, EXCERPT_CHARS, MAX_AGE_DAYS,
-    check_budget, collapse_duplicates, description_excerpt, drop_already_evaluated,
-    drop_incomplete, drop_stale, format_preselection, job_opening_key, prescore_job_ads, preselect,
-    select_batch, summarize_job_ad, validate_selection,
+    BUDGET_WARN_JOB_ADS,
+    DEFAULT_N,
+    DROP_DUPLICATE,
+    DROP_EVALUATED,
+    DROP_INCOMPLETE,
+    DROP_NOT_SELECTED,
+    DROP_STALE,
+    EXCERPT_CHARS,
+    MAX_AGE_DAYS,
+    check_budget,
+    collapse_duplicates,
+    description_excerpt,
+    drop_already_evaluated,
+    drop_incomplete,
+    drop_stale,
+    format_preselection,
+    job_opening_key,
+    prescore_job_ads,
+    preselect,
+    select_batch,
+    summarize_job_ad,
+    validate_selection,
 )
 
 # a rubric whose weights sum to something other than 0 on every subset used below, so a

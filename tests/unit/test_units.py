@@ -19,13 +19,18 @@ from unittest import mock
 import evaluate_job_post
 from jobsearch import config, storage
 from jobsearch.config import extract_section
-from jobsearch.rubric import evaluate_rubric, match_text, test_regex
 from jobsearch.discovery import (
-    _evaluate_job_ad, _resolve_target_locations, _validate_queries,
+    _evaluate_job_ad,
+    _resolve_target_locations,
+    _validate_queries,
 )
 from jobsearch.llm import _parse_json_reply
+from jobsearch.rubric import evaluate_rubric, match_text, test_regex
 from jobsearch.scrape import (
-    LINKEDIN_GUEST_POSTING_URL, ScrapeError, public_posting_url, validate_post,
+    LINKEDIN_GUEST_POSTING_URL,
+    ScrapeError,
+    public_posting_url,
+    validate_post,
 )
 
 
@@ -227,7 +232,8 @@ class HomeAddressTest(unittest.TestCase):
     def test_reads_the_address_from_its_section(self):
         self._with_preferences(
             "# Job Preferences\n\n## Location\n- Metropolis, FD\n\n"
-            "## Home Address\n1 Riverside Dr, 00001 Metropolis, Freedonia\n\n## Scoring Notes\nweigh A\n"
+            "## Home Address\n1 Riverside Dr, 00001 Metropolis, Freedonia\n\n"
+            "## Scoring Notes\nweigh A\n"
         )
         self.assertEqual(config.home_address(), "1 Riverside Dr, 00001 Metropolis, Freedonia")
 
@@ -247,7 +253,9 @@ class HomeAddressTest(unittest.TestCase):
         self.assertIn("job_preferences.md", str(ctx.exception))
 
     def test_raises_when_section_still_holds_the_placeholder(self):
-        self._with_preferences("## Home Address\n(fill in: full street address, e.g. 1 Riverside Dr)\n")
+        self._with_preferences(
+            "## Home Address\n(fill in: full street address, e.g. 1 Riverside Dr)\n"
+        )
         with self.assertRaises(RuntimeError):
             config.home_address()
 
@@ -341,9 +349,11 @@ class RequireDataTest(unittest.TestCase):
     @mock.patch("jobsearch.evaluation.scrape_post")
     def test_one_file_is_missing_makes_no_api_call(self, scrape_post, load_or_compile_rubric):
         self._write_resume()
-        with mock.patch.object(sys, "argv", ["evaluate_job_post.py", "https://example.com/1"]):
-            with self.assertRaises(RuntimeError):
-                evaluate_job_post.main()
+        with (
+            mock.patch.object(sys, "argv", ["evaluate_job_post.py", "https://example.com/1"]),
+            self.assertRaises(RuntimeError),
+        ):
+            evaluate_job_post.main()
         scrape_post.assert_not_called()
         load_or_compile_rubric.assert_not_called()
 
@@ -372,7 +382,9 @@ class EmptyPreferencesSectionsTest(unittest.TestCase):
         self.assertEqual(config.empty_preferences_sections(self.PREFERENCES), [])
 
     def test_preferences_lack_a_section(self):
-        preferences = self.PREFERENCES.replace("## Home Address\n1 Riverside Dr, Metropolis\n\n", "")
+        preferences = self.PREFERENCES.replace(
+            "## Home Address\n1 Riverside Dr, Metropolis\n\n", ""
+        )
         self.assertEqual(config.empty_preferences_sections(preferences), ["Home Address"])
 
     def test_preferences_section_is_empty(self):
@@ -418,16 +430,19 @@ class ValidateQueriesTest(unittest.TestCase):
         self.assertEqual(_validate_queries([q], self.TARGETS), [q])
 
     def test_keeps_valid_onsite_query_and_lowercases_country(self):
-        q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia", "country": "XY"}
+        q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia",
+             "country": "XY"}
         [kept] = _validate_queries([q], self.TARGETS)
         self.assertEqual(kept["country"], "xy")
 
     def test_drops_onsite_query_with_untargeted_location(self):
-        q = {"query": "some role", "is_remote": False, "location": "Gotham, Elbonia", "country": "zz"}
+        q = {"query": "some role", "is_remote": False, "location": "Gotham, Elbonia",
+             "country": "zz"}
         self.assertEqual(_validate_queries([q], self.TARGETS), [])
 
     def test_drops_onsite_query_with_invalid_country_code(self):
-        q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia", "country": "notacode"}
+        q = {"query": "some role", "is_remote": False, "location": "Metropolis, Freedonia",
+             "country": "notacode"}
         self.assertEqual(_validate_queries([q], self.TARGETS), [])
 
 

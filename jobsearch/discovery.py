@@ -19,12 +19,17 @@ from jobspy.model import Country
 
 from jobsearch import config, storage
 from jobsearch.config import (
-    read_resume, read_job_preferences, file_hash, extract_section,
-    RESUME_PATH, JOB_PREFERENCES_PATH, DATA_DIR,
+    DATA_DIR,
+    JOB_PREFERENCES_PATH,
+    RESUME_PATH,
+    extract_section,
+    file_hash,
+    read_job_preferences,
+    read_resume,
 )
-from jobsearch.llm import ask_json
 from jobsearch.evaluation import evaluate_job
-from jobsearch.preselection import preselect, format_preselection, DEFAULT_N
+from jobsearch.llm import ask_json
+from jobsearch.preselection import DEFAULT_N, format_preselection, preselect
 from jobsearch.rubric import load_or_compile_rubric
 from jobsearch.scrape import ScrapeError, validate_post
 
@@ -74,7 +79,8 @@ def draft_queries(resume, preferences, target_locations):
         "against the Google Jobs search engine.\n\n"
         f"Candidate resume:\n{resume}\n\n"
         f"Candidate job preferences:\n{preferences}\n\n"
-        f"Target locations the candidate is open to for on-site/hybrid roles:\n{locations_block}\n\n"
+        "Target locations the candidate is open to for on-site/hybrid roles:\n"
+        f"{locations_block}\n\n"
         "Propose 4-10 distinct search queries covering different role/title/seniority phrasings "
         "drawn from the resume and preferences above - do not build a location x title cross "
         "product, just distinct role phrasings. For each query, decide:\n"
@@ -104,10 +110,12 @@ def _validate_queries(queries, target_locations):
     for q in queries:
         if not q["is_remote"]:
             if q["location"] not in target_locations:
-                print(f"Warning: dropping query {q['query']!r} - location {q['location']!r} not in target locations")
+                print(f"Warning: dropping query {q['query']!r} - location {q['location']!r} "
+                      "not in target locations")
                 continue
             if not _COUNTRY_CODE_RE.match((q["country"] or "").lower()):
-                print(f"Warning: dropping query {q['query']!r} - invalid country code {q['country']!r}")
+                print(f"Warning: dropping query {q['query']!r} - invalid country code "
+                      f"{q['country']!r}")
                 continue
             q["country"] = q["country"].lower()
         valid.append(q)
@@ -348,7 +356,8 @@ def discover_jobs(evaluate=False, limit=None, max_results_per_query=DEFAULT_MAX_
         to_run = new_job_ads[:limit] if limit else new_job_ads
 
     if not evaluate:
-        print("\nRun with --evaluate to score these (costs LLM, Tavily address-search and ORS calls per url).")
+        print("\nRun with --evaluate to score these (costs LLM, Tavily address-search and ORS "
+              "calls per url).")
         return to_run
 
     results = []

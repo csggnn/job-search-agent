@@ -15,7 +15,11 @@ from evals import capture
 from evals.capture import looks_truncated, upsert_case
 from evals.dataset import usable_expected, validate_expected
 from evals.scoring import (
-    aggregate, compare_runs, score_address, score_criteria, score_scalar,
+    aggregate,
+    compare_runs,
+    score_address,
+    score_criteria,
+    score_scalar,
 )
 from jobsearch.config import FULLY_REMOTE
 
@@ -113,7 +117,7 @@ class UpsertCaseTest(unittest.TestCase):
 
     def test_unmatched_url_appends_a_case(self):
         cases = []
-        name, added = self._upsert(cases, "acme-widget-inspector", "https://example.com/job/9")
+        _name, added = self._upsert(cases, "acme-widget-inspector", "https://example.com/job/9")
         self.assertTrue(added)
         self.assertEqual(cases[0]["name"], "acme-widget-inspector")
         self.assertFalse(cases[0]["verified"])
