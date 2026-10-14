@@ -28,7 +28,7 @@ This is a personal project, started as an agentic-coding exercise (`docs/plan.md
 job-search-agent runs inside a container and relies on your own accounts for LLM, web
 search and commute-routing calls; it is currently configured to work with Anthropic, but can be edited to use other providers.
 
-1. Clone the repo and put your API keys in
+1. Clone the repo with `git clone --recurse-submodules` and put your API keys in
    [`~/.config/job-search-agent/.env`](.env.example), created from the template:
    ```
    mkdir -p ~/.config/job-search-agent

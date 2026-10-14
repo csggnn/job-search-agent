@@ -484,6 +484,7 @@ data/                   user data, gitignored: personalization files, generated 
                         the evaluations database and the eval set
 docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
 .githooks/              pre-commit: re-renders the system diagram
+.setup/                 git submodule: simplicity-rules, generic agent rules imported by CLAUDE.md
 pyproject.toml          ruff configuration
 .git-blame-ignore-revs  reformat-only commits skipped by git blame
 .env.example            template for ~/.config/job-search-agent/.env
