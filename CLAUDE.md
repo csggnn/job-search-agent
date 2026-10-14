@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+@.setup/CLAUDE.generic.md
+
 Guidance for Claude Code (claude.ai/code) working in this repository.
 
 Descriptive architecture lives in [docs/architecture.md](docs/architecture.md) and
