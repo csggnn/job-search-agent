@@ -22,7 +22,7 @@ workspace "Job Search Agent" "Container view of the job search evaluation pipeli
         llm = softwareSystem "Anthropic" "LLM API, via aisuite" "External"
         tavily = softwareSystem "Tavily" "Web extract and search" "External"
         ors = softwareSystem "OpenRouteService" "Geocoding and routing" "External"
-        boards = softwareSystem "Job boards" "Indeed, LinkedIn" "External"
+        boards = softwareSystem "Job boards" "Indeed, LinkedIn, Ashby" "External"
 
         seeker -> ui "Browses evaluations" "HTTP, localhost"
         seeker -> engine "Runs discovery, evaluation, proposals" "CLI"
@@ -38,7 +38,7 @@ workspace "Job Search Agent" "Container view of the job search evaluation pipeli
         engine -> llm "Extraction, rubric, scoring, summary" "HTTPS"
         engine -> tavily "Posting extract (manual URL), office-address search" "HTTPS"
         engine -> ors "Geocoding, routing" "HTTPS"
-        engine -> boards "Searches postings" "JobSpy"
+        engine -> boards "Searches postings; fetches Ashby postings" "JobSpy, HTTPS"
 
         evals -> profile "Reads" "File read"
         evals -> derived "Reads rubric, no recompile" "File read"
