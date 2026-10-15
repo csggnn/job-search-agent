@@ -51,7 +51,8 @@ podman pod, with no host port, on a copy of the source files. Two runs on the sa
 produce identical files.
 
 The pre-commit hook in `.githooks/` runs the script on the staged `workspace.dsl` and
-`workspace.json` when either is staged, and stages the new `containers.png`. An invalid
+`workspace.json` when either is staged, and stages the new `containers.png`. The hook also
+runs ruff, described under "Static analysis". An invalid
 DSL fails the commit. Each clone enables the hook once:
 
 ```
@@ -464,6 +465,16 @@ so it needs podman and no Python install on the host. `.github/workflows/lint.ym
 
 CI fails on any lint finding and on any file `ruff format` would change. Size and complexity rules (`C901`, `PLR09xx`) are not enabled.
 
+The pre-commit hook in `.githooks/` runs `ruff check` and `ruff format --check` on the
+staged versions of the staged `.py` files and fails the commit on any finding. It copies
+the index's Python files and `pyproject.toml` to a temporary directory inside the
+checkout, since `scripts/ruff.sh` mounts only the checkout.
+
+`.claude/settings.json` registers `.claude/hooks/ruff.sh` as a Claude Code PostToolUse
+hook for `Edit`, `Write` and `MultiEdit`. On a `.py` file inside the project it runs
+`ruff check --fix` and `ruff format`. Findings that remain and formatter failures go to
+stderr with exit status 2, which Claude Code returns to Claude.
+
 `.git-blame-ignore-revs` lists commits that only reformat code. `git blame` skips them after
 `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
@@ -483,7 +494,8 @@ data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,
                         the evaluations database and the eval set
 docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
-.githooks/              pre-commit: re-renders the system diagram
+.githooks/              pre-commit: ruff on staged Python files, re-renders the system diagram
+.claude/                Claude Code project settings, skills and the ruff hook
 pyproject.toml          ruff configuration
 .git-blame-ignore-revs  reformat-only commits skipped by git blame
 .env.example            template for ~/.config/job-search-agent/.env

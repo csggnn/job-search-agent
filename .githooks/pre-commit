@@ -1,10 +1,37 @@
 #!/bin/sh
-# Re-render docs/structurizr/containers.png when the diagram source is staged, and stage
-# the result. Renders the staged versions of workspace.dsl and workspace.json.
+# Lint and format-check the staged Python files, and re-render
+# docs/structurizr/containers.png when the diagram source is staged.
+# Both read the staged versions of the files, not the working tree.
 # Enabled per clone with: git config core.hooksPath .githooks
 set -eu
 
-git diff --cached --name-only | grep -qE '^docs/structurizr/workspace\.(dsl|json)$' || exit 0
+repo=$(git rev-parse --show-toplevel)
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# Ruff. scripts/ruff.sh mounts only the checkout, so the index copy goes in a directory
+# inside it. The copy holds every Python file in the index, so import sorting detects the
+# first-party packages, and the staged pyproject.toml, the nearest configuration to it.
+if printf '%s\n' "$staged" | grep -q '\.py$'; then
+    tmp=$(mktemp -d "$repo/.pre-commit-ruff.XXXXXX")
+    trap 'rm -rf "$tmp"' EXIT
+    git ls-files -z -- '*.py' | git checkout-index --prefix="$tmp/" -z --stdin
+    git show :pyproject.toml > "$tmp/pyproject.toml"
+    ruff_staged() {
+        git diff --cached --name-only --diff-filter=ACMR -z -- '*.py' |
+            (cd "$tmp" && xargs -0 "$repo/scripts/ruff.sh" "$@")
+    }
+    status=0
+    ruff_staged check --no-cache --quiet || status=1
+    ruff_staged format --no-cache --check --quiet || status=1
+    if [ "$status" -ne 0 ]; then
+        echo "pre-commit: ruff findings in staged files. Fix with: scripts/ruff.sh check --fix <file>; scripts/ruff.sh format <file>" >&2
+        exit 1
+    fi
+    rm -rf "$tmp"
+    trap - EXIT
+fi
+
+printf '%s\n' "$staged" | grep -qE '^docs/structurizr/workspace\.(dsl|json)$' || exit 0
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
