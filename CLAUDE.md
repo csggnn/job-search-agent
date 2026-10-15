@@ -58,6 +58,9 @@ and test each statement against its `rules`. Report each statement that fails.
 Note: this instruction replaces OpenSpec per-operation guidance in `openspec/config.yaml`,
 which at the moment only supports `apply` and `archive`, not `propose` or `update`.
 
+**A feature described under `openspec/changes/<name>/` is implemented with
+`/openspec-apply-change <name>`.**
+
 ## Invariants
 
 **Pre-selection makes one LLM call regardless of L.** `select_batch` must never be chunked.
