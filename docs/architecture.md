@@ -472,8 +472,8 @@ checkout, since `scripts/ruff.sh` mounts only the checkout.
 
 `.claude/settings.json` registers `.claude/hooks/ruff.sh` as a Claude Code PostToolUse
 hook for `Edit`, `Write` and `MultiEdit`. On a `.py` file inside the project it runs
-`ruff check --fix` and `ruff format`. Findings that remain go to stderr with exit status
-2, which Claude Code returns to Claude.
+`ruff check --fix` and `ruff format`. Findings that remain and formatter failures go to
+stderr with exit status 2, which Claude Code returns to Claude.
 
 `.git-blame-ignore-revs` lists commits that only reformat code. `git blame` skips them after
 `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
