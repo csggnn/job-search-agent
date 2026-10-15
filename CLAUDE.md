@@ -134,6 +134,9 @@ scripts/ruff.sh check --fix <file>
 scripts/ruff.sh format <file>
 ```
 
+The pre-commit hook in `.githooks/` fails a commit whose staged `.py` files have ruff
+findings.
+
 Evals:
 
 ```
