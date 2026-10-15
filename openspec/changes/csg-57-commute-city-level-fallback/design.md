@@ -48,13 +48,12 @@ Constraints:
 - Precision is classified from the place the route actually ends at, whichever step produced
   that place, so a city returned by the resolver and a city taken from the ad text are
   classified the same way.
-- Precision classification and the city lookup in the description add no LLM call per
-  evaluated job.
+- Precision classification and the workplace judgment add no LLM call per evaluated job.
+- The workplace judgment is unit-testable offline with a mocked LLM response.
 - The precision rule is unit-testable offline, with no ORS or LLM call.
 
 **Non-Goals:**
 - Better street-address search. CSG-56 covers it.
-- Feeding a city found in the description into the address search query.
 - Recording precision in eval ground truth or eval run snapshots.
 
 ## Decisions
@@ -83,16 +82,29 @@ does not cover the fallback path, and leaves precision to the model's judgment.
 Alternative rejected: mark approximate only when the fallback path runs. It misses the
 resolver returning a city.
 
-### D2. `classify_location()` also returns the city the ad names
+### D2. `classify_location()` judges the workplace from location and description
 
 `classify_location()` receives the description in addition to the company and location
-text. Its JSON response gains a `city` key: the most specific city or town the location
-text or the description names as the workplace, with its country when stated, or null. A
-street address stated in the description counts as `full_address`, as one in the location
-text does. The `status` values and their meaning are unchanged.
+text. The prompt presents the location text as the default workplace and instructs the LLM
+to override it only when the description states that this role is based at another place.
+A mention of another office, such as a headquarters, does not override it. The JSON
+response gains a `workplace` key: the judged city or town with its country when stated, or
+null. A street address the ad states for the judged workplace, in the location text or the
+description, counts as `full_address`. The `status` values and their meaning are
+unchanged.
 
-`figure_address()` returns the resolved address together with that city, so
-`commute_score()` can use the city as a destination candidate.
+`figure_address()` passes the judged workplace to `search_office_address()` and
+`resolve_office_address()` in place of the location text, and falls back to the location
+text when `workplace` is null. It returns the resolved address together with the judged
+workplace, so `commute_score()` can use the workplace as a destination candidate.
+
+Alternative rejected: keep the search on the location text. A search steered by the
+location field finds that office, which then wins over an override at D3 step 1, so an
+override would only take effect when the search finds nothing.
+
+Alternative rejected: the location field always wins and the description only fills gaps.
+It ignores ads whose description states a different workplace than the job board's
+location field.
 
 Alternative rejected: a separate LLM call that reads the description only when the search
 finds nothing. It adds a call and a prompt for a subset of jobs. `classify_location()`
@@ -109,18 +121,17 @@ unrelated judgments.
 that geocodes to a precise or approximate layer:
 
 ```
-1. the full address from the location text or description, or the address the resolver
-   picked
-2. the city from classify_location()
+1. the full address the ad states for the workplace, or the address the resolver picked
+2. the workplace judged by classify_location()
 3. the ad's location text with a trailing "Metropolitan Area" removed
 ```
 
 A candidate that raises `ValueError` in geocoding, or geocodes to an unusable layer, is
 skipped. With no usable candidate, the score is `None`. The resolver result stays first, so
-a street address it finds always wins over a city. The classified city precedes the raw
-location text because it can be more specific, e.g. Antwerp from the description when the
-location is "Belgium". The raw location text remains as a fallback when the LLM returns no
-city.
+a street address it finds always wins over a city. The judged workplace precedes the raw
+location text because it can be more specific or can override it, e.g. Antwerp from the
+description when the location is "Belgium". The raw location text remains as a fallback
+when the LLM returns no workplace.
 
 `geocode_address()` keeps its single LLM rewrite retry. The rewrite can turn a street
 address into a city-level match, and the layer then classifies it as approximate.
@@ -171,9 +182,11 @@ already reads and writes the evaluations DB. `docs/structurizr/workspace.dsl` is
 - [The ad's location text geocodes to a same-named town in another country] -> The
   location text from job boards normally includes region or country. The stored
   `commute_address` shows which place was used.
-- [The description names several cities, e.g. a company listing all its offices] -> The
-  prompt asks for the workplace of this role. A wrong pick is still labelled city-level, and
-  the stored `commute_address` shows which place was used.
+- [The LLM overrides the location field wrongly, e.g. on a description listing all the
+  employer's offices] -> The prompt keeps the location field unless the description states
+  where this role is based. The stored `commute_address` shows which place was used. Unit
+  tests cover only the wiring; the judgment itself needs eval cases with a conflicting
+  location and description.
 - [With the description in its input, `classify_location()` returns `remote` for a hybrid
   role] -> `figure_days_on_office()` runs first and decides remote by office days. The
   prompt keeps `remote` for no office attendance.

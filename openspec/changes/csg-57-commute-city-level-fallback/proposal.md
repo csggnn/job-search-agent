@@ -19,6 +19,8 @@ approximate.
   required office days as for a precise commute.
 - When the web search finds no office address and the ad's location or description names a
   city or town, the commute is computed to that city or town.
+- When the description states that the role is based at a different place than the ad's
+  location, that place is used.
 - An approximate commute is marked as approximate in the saved evaluation, in the printed
   evaluation summary and in the proposed shortlist.
 - An ad whose location and description name no city or town, only a region, a country or

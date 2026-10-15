@@ -7,11 +7,38 @@ and derives the commute score that ranking uses from it.
 
 ## ADDED Requirements
 
+### Requirement: The workplace is judged from the location and the description
+The system SHALL judge a non-remote role's workplace from the ad's location text and
+description together. The location text SHALL be the default workplace. The description
+SHALL override it when it states that this role is based at another place. A description
+that only mentions another office of the employer, such as a headquarters, SHALL NOT
+override it.
+
+#### Scenario: Description places the role elsewhere
+- **WHEN** the ad's location is "Ghent, Belgium" and its description states that the role
+  is based in the Antwerp office
+- **THEN** the judged workplace is Antwerp
+
+#### Scenario: Description mentions headquarters only
+- **WHEN** the ad's location is "Ghent, Belgium" and its description states that the
+  company is headquartered in Antwerp, with no statement about where the role is based
+- **THEN** the judged workplace is Ghent
+
+#### Scenario: Description street address for another office
+- **WHEN** the ad's location is "Ghent, Belgium" and its description gives a street
+  address in Antwerp as the headquarters address
+- **THEN** the judged workplace is Ghent and the Antwerp address is not used
+
 ### Requirement: Office location is searched when the ad gives no street address
-When neither a non-remote job's location text nor its description holds a street address,
-the system SHALL search the web for the employer's office address, using the location text
-to pick the office. A street address in the location text or the description SHALL be used
+When the ad states no street address for the role's workplace, the system SHALL search the
+web for the employer's office address, using the judged workplace to pick the office. When
+no workplace is judged, the search SHALL use the location text. A street address the ad
+states for the role's workplace, in the location text or the description, SHALL be used
 without a search.
+
+#### Scenario: Search follows the judged workplace
+- **WHEN** the ad's location is "Ghent, Belgium" and the judged workplace is Antwerp
+- **THEN** the system searches the web for the employer's office address in Antwerp
 
 #### Scenario: Location names a city only
 - **WHEN** a non-remote ad's location is "Ghent, Belgium" with no street address
@@ -39,7 +66,7 @@ marked approximate.
 
 ### Requirement: A city-level place gives an approximate commute 10 minutes longer
 When no street address is found and a city, town or comparable locality is known, from the
-search result or from the ad's location or description, the system SHALL route to that place, add 10
+search result, from the judged workplace or from the ad's location text, the system SHALL route to that place, add 10
 minutes to the one-way drive time, and weight the sum by the required office days per week
 with the same factors as a precise commute. The commute SHALL be marked approximate. A place
 returned by the search that is a city rather than a street address SHALL be treated as
