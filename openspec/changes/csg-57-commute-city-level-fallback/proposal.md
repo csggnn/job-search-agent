@@ -5,27 +5,29 @@
 An ad with no findable street address gets an unknown commute, and ranking treats it as
 neutral. Recruiter ads, multi-site employers and companies with no public office address
 fall into this group. In a 15-ad run, 7 non-remote ads had an unknown commute, including 3
-of the top 5 proposed jobs. When the address search returns only a city, the commute is
+of the top 5 proposed jobs. When the office web search returns only a city, the commute is
 routed to that city and stored as if it were a street address, with no mark that it is
 approximate.
 
 ## What Changes
 
-- An ad whose location is generic or missing triggers a web search for the office
+- An ad that states no street address triggers a web search for the employer's office
   address.
-- A street address found in the ad or by the search gives a precise commute.
+- A street address found in the ad or by the office web search gives a precise commute.
 - When only a city or town is known, the commute is computed to that city or town and the
   one-way drive time is increased by 10 minutes. The commute score is weighted by the
   required office days as for a precise commute.
-- When the web search finds no office address and the ad's location or description names a
-  city or town, the commute is computed to that city or town.
-- When the description states that the role is based at a different place than the ad's
-  location, that place is used.
+- When the office web search returns only a city or town, that city or town is used, also
+  when the ad names a different one.
+- When the office web search finds nothing and the ad location field or the ad description
+  names a city or town, the commute is computed to that city or town.
+- When the ad description states that the role is based at a different place than the ad
+  location field, that place is used.
 - An approximate commute is marked as approximate in the saved evaluation, in the printed
   evaluation summary and in the proposed shortlist.
-- An ad whose location and description name no city or town, only a region, a country or
-  no place at all, keeps an unknown commute. Ranking treats an unknown commute as neutral,
-  as it does today.
+- When the office web search finds nothing and the ad location field and the ad
+  description name no city or town, only a region, a country or no place at all, the
+  commute stays unknown. Ranking treats an unknown commute as neutral, as it does today.
 - Ranking applies no separate penalty. The 10 minutes are part of the saved commute score.
 - Saved evaluations from before this change keep their scores and read as not approximate
   until re-evaluated.
@@ -34,8 +36,8 @@ approximate.
 ## Capabilities
 
 ### New Capabilities
-- `commute-scoring`: resolving a job's office location to a precise, approximate or
-  unknown place, and the commute score derived from it.
+- `commute-scoring`: choosing the job location from the ad and the office web search,
+  classifying it as precise, approximate or unknown, and the commute score derived from it.
 
 ### Modified Capabilities
 
