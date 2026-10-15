@@ -135,7 +135,8 @@ scripts/ruff.sh format <file>
 ```
 
 The pre-commit hook in `.githooks/` fails a commit whose staged `.py` files have ruff
-findings.
+findings. In Claude Code, `.claude/hooks/ruff.sh` fixes and formats each edited `.py`
+file and returns the findings ruff cannot fix.
 
 Evals:
 

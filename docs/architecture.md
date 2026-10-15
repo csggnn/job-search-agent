@@ -470,6 +470,11 @@ staged versions of the staged `.py` files and fails the commit on any finding. I
 the index's Python files and `pyproject.toml` to a temporary directory inside the
 checkout, since `scripts/ruff.sh` mounts only the checkout.
 
+`.claude/settings.json` registers `.claude/hooks/ruff.sh` as a Claude Code PostToolUse
+hook for `Edit`, `Write` and `MultiEdit`. On a `.py` file inside the project it runs
+`ruff check --fix` and `ruff format`. Findings that remain go to stderr with exit status
+2, which Claude Code returns to Claude.
+
 `.git-blame-ignore-revs` lists commits that only reformat code. `git blame` skips them after
 `git config blame.ignoreRevsFile .git-blame-ignore-revs`.
 
@@ -490,6 +495,7 @@ data/                   user data, gitignored: personalization files, generated 
                         the evaluations database and the eval set
 docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
 .githooks/              pre-commit: ruff on staged Python files, re-renders the system diagram
+.claude/                Claude Code project settings, skills and the ruff hook
 pyproject.toml          ruff configuration
 .git-blame-ignore-revs  reformat-only commits skipped by git blame
 .env.example            template for ~/.config/job-search-agent/.env
