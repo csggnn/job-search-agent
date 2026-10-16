@@ -5,7 +5,13 @@ query crafting, searching multiple engines, ad-by-ad validation, evaluation and 
 so that jobseekers can focus only on the ads which fit their own skills, preferences
 and commute.
 
-This is a personal project, started as an agentic-coding exercise (`docs/plan.md`).
+This is a personal project, started as an agentic-coding exercise (`docs/plan.md`) and an
+experimentation benchmark for AI-assisted coding with Claude Code and
+[OpenSpec](https://github.com/Fission-AI/OpenSpec). The skills and hooks that assist code
+generation in this repo are in the
+[simplicity-rules](https://github.com/csggnn/simplicity-rules) plugin.
+[job-search-bench](https://github.com/csggnn/job-search-bench) evaluates changes to that
+plugin on features of this project.
 
 ## Key features
 
