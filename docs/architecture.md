@@ -493,7 +493,7 @@ scripts/                check_setup.py, recompile_rubric.py, export_diagram.sh, 
 data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,
                         the evaluations database and the eval set
-docs/                   architecture, evals, roadmap; structurizr/ holds the C4 container diagram
+docs/                   architecture, evals; structurizr/ holds the C4 container diagram
 .githooks/              pre-commit: ruff on staged Python files, re-renders the system diagram
 .claude/                Claude Code project settings, skills and the ruff hook
 pyproject.toml          ruff configuration
