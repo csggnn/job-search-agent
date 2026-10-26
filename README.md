@@ -5,7 +5,7 @@ query crafting, searching multiple engines, ad-by-ad validation, evaluation and 
 so that jobseekers can focus only on the ads which fit their own skills, preferences
 and commute.
 
-This is a personal project, started as an agentic-coding exercise (`docs/plan.md`).
+This is a personal project, started as an agentic-coding exercise.
 
 ## Key features
 
@@ -200,7 +200,6 @@ Everything past basic use is documented separately:
 |----------|---------|
 | [docs/architecture.md](docs/architecture.md) | The C4 container diagram, commands and flags, the pipeline internals, the database and how to query it, file layout, and how personalization files stay out of git |
 | [docs/evals.md](docs/evals.md) | How the tests and eval harness work, and what the metrics mean |
-| [docs/roadmap.md](docs/roadmap.md) | Known limitations that need code changes |
 
 ## License
 
