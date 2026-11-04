@@ -131,6 +131,13 @@ pinned container image by `scripts/ruff.sh`. Every `.py` file passes `scripts/ru
 and `scripts/ruff.sh format --check .`; `.github/workflows/lint.yml` runs both on pull
 requests. To exclude one line from a rule, end it with `# noqa: <code>`, e.g. `# noqa: E501`.
 
+`package.json` pins the OpenSpec CLI. `.github/workflows/openspec.yml` runs
+`npx openspec validate --all --no-interactive` on pull requests and checks that the files
+under `.claude/` match `openspec update` at the pinned version. The
+`.claude/skills/openspec-*` files are generated. Dependabot bumps the pin weekly, and
+`.github/workflows/openspec-regenerate.yml` regenerates the files on its pull request and
+enables auto-merge.
+
 ```
 scripts/ruff.sh check .
 scripts/ruff.sh check --fix <file>
