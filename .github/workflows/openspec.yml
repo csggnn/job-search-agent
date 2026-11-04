@@ -1,0 +1,27 @@
+name: OpenSpec
+
+on:
+  pull_request:
+
+jobs:
+  openspec:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install OpenSpec
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Validate OpenSpec changes and specs
+        run: npx openspec validate --all --no-interactive
+
+      - name: Check generated OpenSpec files match the pinned version
+        if: ${{ !cancelled() }}
+        run: |
+          npx openspec update --force > /dev/null
+          git diff --exit-code -- .claude
