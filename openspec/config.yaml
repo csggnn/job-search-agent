@@ -29,6 +29,10 @@ rules:
     - Non-Goals list design-level exclusions. Scope the proposal already defers is not restated.
     - Each Decision serves a goal, a Context constraint or a proposal outcome. A Decision that serves none is removed.
     - Rejected alternatives belong under the Decision they relate to.
+    - Context describes the flow the change touches, as it was before the change. A fact belongs in Context when more than one Decision, Risk or Migration Plan step cites it. A fact cited by none is removed.
+    - A sentence or diagram in any section that describes behavior before the change says so and uses the past tense, e.g. "Before this change, `bench/cli.py` took two `SHA:LABEL` arguments." A block of such sentences can share one lead-in, e.g. "Before this change:" above a diagram. A sentence in the present tense describes behavior after the change.
+    - A Decision opens with a paragraph labelled **Before this change:** that holds the facts it depends on that Context does not hold, when it has any. The choice follows in a paragraph labelled **After this change:**. A Decision with no such facts opens with the **After this change:** paragraph.
+    - A flow or a folder layout the reader needs to follow the design is drawn as a plain-text diagram or a file tree in a code block. The drawing replaces the prose it shows. Diagrams use ASCII characters only.
     - Context names the containers, data stores and external systems the change touches, and their relationships, as listed in docs/structurizr/workspace.dsl.
     - A Decision that adds, removes or changes a relationship listed in docs/structurizr/workspace.dsl names that relationship.
   tasks:
