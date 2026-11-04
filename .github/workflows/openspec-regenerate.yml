@@ -1,0 +1,57 @@
+name: OpenSpec regenerate
+
+# Regenerates the OpenSpec files on a Dependabot pull request that bumps the pinned
+# OpenSpec version, approves the workflow runs of the new commit and enables auto-merge.
+# Runs triggered by a github-actions[bot] commit wait for approval while the bot has no
+# commit on main (fork pull request approval policy: first-time contributors). A merge
+# commit keeps the bot's commit on main.
+on:
+  pull_request:
+    paths: [package.json, package-lock.json]
+
+permissions: {}
+
+jobs:
+  regenerate:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+      pull-requests: write
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEAD_REF: ${{ github.head_ref }}
+      PR_URL: ${{ github.event.pull_request.html_url }}
+    steps:
+      - name: Check out the pull request branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          persist-credentials: false
+
+      - name: Regenerate OpenSpec files
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx openspec update --force > /dev/null
+
+      - name: Commit, push and approve the new runs
+        run: |
+          if [ -z "$(git status --porcelain -- .claude)" ]; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .claude
+          git commit -m "chore: regenerate OpenSpec files"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:${HEAD_REF}"
+          sha=$(git rev-parse HEAD)
+          for _ in $(seq 1 12); do
+            sleep 10
+            for id in $(gh run list --commit "$sha" --status action_required --json databaseId -q '.[].databaseId'); do
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/approve" || true
+            done
+          done
+
+      - name: Enable auto-merge
+        run: gh pr merge "$PR_URL" --auto --merge
