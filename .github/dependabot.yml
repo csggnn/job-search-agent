@@ -1,8 +1,47 @@
 version: 2
 updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        update-types: [minor, patch]
+  - package-ecosystem: pre-commit
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      pre-commit:
+        update-types: [minor, patch]
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      pip:
+        update-types: [minor, patch]
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      npm:
+        update-types: [minor, patch]
+  - package-ecosystem: docker
+    directories: [/, /ui]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      docker:
+        update-types: [minor, patch]
