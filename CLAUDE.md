@@ -46,8 +46,8 @@ user before implementation.
 **Keep the system diagram current.** When a change adds or removes a container, a data
 store, an external system, or an access between any of them, update
 `docs/structurizr/workspace.dsl` in the same change and run `scripts/export_diagram.sh`
-to re-render `docs/structurizr/containers.png`. The pre-commit hook in `.githooks/` does
-this on commit when enabled. If the change affects a relationship listed in
+to re-render `docs/structurizr/containers.png`. The `export-diagram` pre-commit hook does
+this on commit. If the change affects a relationship listed in
 `docs/architecture.md` as omitted, update that list too.
 
 **Do not cite line numbers** in documentation or issues. Name the file and the function.
@@ -108,8 +108,9 @@ input row appears exactly once across `proposed` and `excluded`.
 
 ## Commands
 
-The host machine has no Python deps installed. Everything runs inside the podman compose
-container.
+The host machine has no Python deps installed. The app and its tests run inside the podman
+compose container. Dev tools that read files as text run on the host from pre-commit's
+isolated environments, which uv provides.
 
 ```
 podman-compose up -d
@@ -126,27 +127,31 @@ podman-compose exec job-search python3 -m unittest discover -s tests/unit   # of
 podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # needs keys
 ```
 
-Lint and formatting use ruff, configured in `pyproject.toml` and run on the host from a
-pinned container image by `scripts/ruff.sh`. Every `.py` file passes `scripts/ruff.sh check .`
-and `scripts/ruff.sh format --check .`; `.github/workflows/lint.yml` runs both on pull
-requests. To exclude one line from a rule, end it with `# noqa: <code>`, e.g. `# noqa: E501`.
-
-`package.json` pins the OpenSpec CLI. `.github/workflows/openspec.yml` runs
-`npx openspec validate --all --no-interactive` on pull requests and checks that the files
-under `.claude/` match `openspec update` at the pinned version. The
-`.claude/skills/openspec-*` files are generated. Dependabot bumps the pin weekly, and
-`.github/workflows/openspec-regenerate.yml` regenerates the files on its pull request and
-enables auto-merge.
+`.pre-commit-config.yaml` defines the text checks: whitespace, YAML, TOML and JSON, ruff
+(configured in `pyproject.toml`), shellcheck, gitleaks, zizmor, and the `export-diagram`
+hook. Install the hooks once per clone with `uvx pre-commit install`. Every file passes
+`uvx pre-commit run --all-files`. To exclude one line from a ruff rule, end it with
+`# noqa: <code>`, e.g. `# noqa: E501`.
 
 ```
-scripts/ruff.sh check .
-scripts/ruff.sh check --fix <file>
-scripts/ruff.sh format <file>
+uvx pre-commit run --all-files
+uvx pre-commit run ruff-check --files <file>
+uvx pre-commit run ruff-format --files <file>
 ```
 
-The pre-commit hook in `.githooks/` fails a commit whose staged `.py` files have ruff
-findings. In Claude Code, `.claude/hooks/ruff.sh` fixes and formats each edited `.py`
-file and returns the findings ruff cannot fix.
+In Claude Code, `.claude/hooks/ruff.sh` runs the ruff hooks on each edited `.py` file and
+returns the findings ruff cannot fix.
+
+CI (`.github/workflows/ci.yml`) runs the hooks except `export-diagram`, and the OpenSpec
+checks, in the `check` job on pull requests and pushes to `master`. The `unit-tests` job
+runs the unit suite in the container. `check` and `unit-tests` are required before merge. `package.json` pins the OpenSpec CLI. CI runs
+`npx openspec validate --all --no-interactive` and checks that the files under `.claude/`
+match `openspec update` at the pinned version. The `.claude/skills/openspec-*` files are
+generated. Dependabot updates GitHub Actions, pre-commit hooks, pip and npm packages and
+Docker base images weekly. `.github/workflows/openspec-regenerate.yml` regenerates the
+OpenSpec files on a Dependabot bump. `.github/workflows/dependabot-automerge.yml` enables
+auto-merge on a Dependabot pull request with a minor or patch update and disables it for
+any other update.
 
 Evals:
 

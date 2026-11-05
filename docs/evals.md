@@ -20,8 +20,8 @@ podman-compose exec job-search python3 -m unittest discover -s tests/unit   # of
 podman-compose exec job-search python3 -m unittest discover -s tests/e2e    # needs keys
 ```
 
-`.github/workflows/unit-tests.yml` runs the unit suite on every pull request. It builds the
-image from the `Dockerfile` and runs `unittest discover -s tests/unit` inside it, mounting
+The `unit-tests` job in `.github/workflows/ci.yml` runs the unit suite on every pull request
+and push to `master`. It builds the image from the `Dockerfile` and runs `unittest discover -s tests/unit` inside it, mounting
 the checkout at `/workspace` as `podman-compose` does. The e2e suite is not run in CI: it
 needs API keys and a live posting.
 

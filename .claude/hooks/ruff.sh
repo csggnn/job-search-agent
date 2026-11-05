@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Claude Code PostToolUse hook for Edit and Write. Applies ruff fixes and formatting to the
-# edited Python file. Findings ruff cannot fix and formatter failures go to stderr with exit
-# status 2, which Claude Code returns to Claude. Files outside the project directory are
-# skipped.
+# Claude Code PostToolUse hook for Edit and Write. Applies the pre-commit Ruff hooks to the
+# edited Python file: fixes, then formatting, then a check. Findings left after the fixes go
+# to stderr with exit status 2, which Claude Code returns to Claude. Files outside the
+# project directory are skipped.
 set -uo pipefail
 
 file=$(jq -r '.tool_input.file_path // empty')
@@ -10,15 +10,10 @@ repo=${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}
 [[ $file == "$repo"/*.py && -f $file ]] || exit 0
 
 cd "$repo" || exit 0
-findings=$(scripts/ruff.sh check --fix --force-exclude --quiet "$file" 2>&1)
-check=$?
-formatter=$(scripts/ruff.sh format --force-exclude --quiet "$file" 2>&1)
-format=$?
-if [[ $check -ne 0 ]]; then
+# A hook that modifies the file exits 1, so the fixing runs do not decide the result.
+uvx pre-commit run ruff-check --files "$file" >/dev/null 2>&1
+uvx pre-commit run ruff-format --files "$file" >/dev/null 2>&1
+if ! findings=$(uvx pre-commit run ruff-check --files "$file" 2>&1); then
     printf 'ruff findings in %s:\n%s\n' "$file" "$findings" >&2
-    exit 2
-fi
-if [[ $format -ne 0 ]]; then
-    printf 'ruff format failed on %s:\n%s\n' "$file" "$formatter" >&2
     exit 2
 fi

@@ -1,0 +1,38 @@
+name: Dependabot auto-merge
+
+# Sets auto-merge on each push to a Dependabot pull request. A minor or patch update
+# enables it; the pull request merges after the required checks pass. Any other update
+# type, or failed metadata, disables it.
+on: pull_request
+
+permissions: {}
+
+jobs:
+  automerge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Read the update metadata
+        id: metadata
+        continue-on-error: true
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+
+      - name: Set auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          case "$UPDATE_TYPE" in
+            version-update:semver-minor | version-update:semver-patch)
+              gh pr merge "$PR_URL" --auto --merge
+              ;;
+            *)
+              if [ "$(gh pr view "$PR_URL" --json autoMergeRequest -q '.autoMergeRequest != null')" = true ]; then
+                gh pr merge "$PR_URL" --disable-auto
+              fi
+              ;;
+          esac

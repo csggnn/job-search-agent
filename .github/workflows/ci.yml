@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      # exception: export-diagram needs podman and the UI image. The Diagram workflow checks
+      # the PNG.
+      - name: Run pre-commit hooks
+        env:
+          SKIP: export-diagram
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+      - name: Install OpenSpec
+        if: ${{ !cancelled() }}
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Validate OpenSpec changes and specs
+        if: ${{ !cancelled() }}
+        run: npx openspec validate --all --no-interactive
+
+      - name: Check generated OpenSpec files match the pinned version
+        if: ${{ !cancelled() }}
+        run: |
+          npx openspec update --force > /dev/null
+          git diff --exit-code -- .claude
+
+  # exception: the tests run in the project container.
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The checkout is bind-mounted into the test container, so a persisted
+          # token would be readable from inside it. Nothing here writes to git.
+          persist-credentials: false
+
+      - name: Build the container image
+        run: podman build -t job-search-agent:ci .
+
+      - name: Run unit tests in the container
+        run: >
+          podman run --rm
+          -v "$PWD:/workspace"
+          -w /workspace
+          job-search-agent:ci
+          python3 -m unittest discover -s tests/unit

@@ -50,14 +50,10 @@ its position. Local mode also writes a search index and logs to
 podman pod, with no host port, on a copy of the source files. Two runs on the same input
 produce identical files.
 
-The pre-commit hook in `.githooks/` runs the script on the staged `workspace.dsl` and
-`workspace.json` when either is staged, and stages the new `containers.png`. The hook also
-runs ruff, described under "Static analysis". An invalid
-DSL fails the commit. Each clone enables the hook once:
-
-```
-git config core.hooksPath .githooks
-```
+The `export-diagram` pre-commit hook runs the script when `workspace.dsl` or
+`workspace.json` is staged. An invalid DSL fails the commit. A re-rendered
+`containers.png` also fails the commit; staging it and committing again passes. The hooks
+are described under "Static analysis".
 
 The "Diagram" workflow fails a pull request that changes `workspace.dsl` or
 `workspace.json` without changing `containers.png`.
@@ -454,25 +450,25 @@ pipeline image does not contain the UI's packages.
 **Tests and CI.** `tests/ui/test_browser_ui.py` drives the UI with headless Chromium against
 databases it builds from `ui/columns.py` under a temporary directory. It reads no user data.
 `.github/workflows/ui-tests.yml` runs it on pull requests that change `ui/**`, `tests/ui/**`
-or `docker-compose.yml`. The contract test runs in `unit-tests.yml` on every pull request.
+or `docker-compose.yml`. The contract test runs in the `unit-tests` job of `ci.yml` on every
+pull request.
 
 ## Static analysis
 
-`pyproject.toml` configures ruff. `scripts/ruff.sh` runs it from the pinned image
-`ghcr.io/astral-sh/ruff`, with no network access and the checkout mounted at its host path,
-so it needs podman and no Python install on the host. `.github/workflows/lint.yml` runs
-`scripts/ruff.sh check .` and `scripts/ruff.sh format --check .` on every pull request.
+`.pre-commit-config.yaml` pins each hook by `rev`: pre-commit-hooks (whitespace, YAML,
+TOML, JSON, large files), ruff (`ruff check --fix`, `ruff format`), shellcheck, gitleaks and
+zizmor. pre-commit installs each in its own environment, so the host needs uv and no
+project dependencies. The local `export-diagram` hook runs `scripts/export_diagram.sh`.
+pre-commit runs the hooks on the staged files; unstaged changes are stashed during the run.
+`pyproject.toml` configures ruff. Size and complexity rules (`C901`, `PLR09xx`) are not
+enabled.
 
-CI fails on any lint finding and on any file `ruff format` would change. Size and complexity rules (`C901`, `PLR09xx`) are not enabled.
-
-The pre-commit hook in `.githooks/` runs `ruff check` and `ruff format --check` on the
-staged versions of the staged `.py` files and fails the commit on any finding. It copies
-the index's Python files and `pyproject.toml` to a temporary directory inside the
-checkout, since `scripts/ruff.sh` mounts only the checkout.
+The `check` job in `.github/workflows/ci.yml` runs every hook except `export-diagram` on all
+files of each pull request and fails on any finding and on any file a hook would change.
 
 `.claude/settings.json` registers `.claude/hooks/ruff.sh` as a Claude Code PostToolUse
-hook for `Edit`, `Write` and `MultiEdit`. On a `.py` file inside the project it runs
-`ruff check --fix` and `ruff format`. Findings that remain and formatter failures go to
+hook for `Edit`, `Write` and `MultiEdit`. On a `.py` file inside the project it runs the
+`ruff-check` and `ruff-format` hooks, then `ruff-check` again. Findings that remain go to
 stderr with exit status 2, which Claude Code returns to Claude.
 
 `.git-blame-ignore-revs` lists commits that only reformat code. `git blame` skips them after
@@ -489,12 +485,12 @@ jobsearch/              the package: scrape, commute, rubric, evaluation, discov
 ui/                     read-only web UI over the evaluations database, its own container
 evals/                  the eval harness
 tests/                  unit/ (offline), e2e/ (live, needs keys) and ui/ (browser, ui container)
-scripts/                check_setup.py, recompile_rubric.py, export_diagram.sh, ruff.sh
+scripts/                check_setup.py, recompile_rubric.py, export_diagram.sh
 data.example/           example user's data, committed: the template for data/
 data/                   user data, gitignored: personalization files, generated caches,
                         the evaluations database and the eval set
 docs/                   architecture, evals; structurizr/ holds the C4 container diagram
-.githooks/              pre-commit: ruff on staged Python files, re-renders the system diagram
+.pre-commit-config.yaml lint, format, secret and workflow checks; re-renders the system diagram
 .claude/                Claude Code project settings, skills and the ruff hook
 pyproject.toml          ruff configuration
 .git-blame-ignore-revs  reformat-only commits skipped by git blame
