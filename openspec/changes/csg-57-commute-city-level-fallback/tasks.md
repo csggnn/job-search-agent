@@ -25,5 +25,5 @@
 
 ## 5. Checks
 
-- [ ] 5.1 Run `podman-compose exec job-search python3 -m unittest discover -s tests/unit`, `scripts/ruff.sh check .` and `scripts/ruff.sh format --check .`. Verify all pass.
+- [ ] 5.1 Run `podman-compose exec job-search python3 -m unittest discover -s tests/unit` and `uvx pre-commit run --all-files`. Verify both pass.
 - [ ] 5.2 Run `podman-compose exec job-search python3 evaluate_job_post.py <url> --force` on an ad with no findable street address, e.g. a recruiter ad. Verify the printed commute is labelled city-level and `sqlite3 data/evaluations.db` shows `commute_approximate = 1` for that row.

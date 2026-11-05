@@ -131,6 +131,20 @@ cp -r <personal-checkout>/data <other-checkout>/data
 ```
 The copy does not follow later runs in the source checkout. Copying again replaces it.
 
+## Development
+
+Development needs [uv](https://docs.astral.sh/uv/), which runs pre-commit and its hooks,
+and [Node.js](https://nodejs.org/), which runs the pinned OpenSpec CLI, besides podman.
+Running the agent needs only podman. One-time setup in each clone:
+
+```
+uvx pre-commit install
+npm ci --ignore-scripts
+```
+
+`uvx pre-commit run --all-files` runs the lint, format and security checks. `CLAUDE.md`
+lists the test commands and what CI runs.
+
 ## What to expect
 
 `propose_jobs.py <n>` searches the job boards, pre-selects the most promising ads, evaluates
