@@ -149,9 +149,9 @@ runs the unit suite in the container. `check` and `unit-tests` are required befo
 match `openspec update` at the pinned version. The `.claude/skills/openspec-*` files are
 generated. Dependabot updates GitHub Actions, pre-commit hooks, pip and npm packages and
 Docker base images weekly. `.github/workflows/openspec-regenerate.yml` regenerates the
-OpenSpec files on a Dependabot bump and enables auto-merge.
-`.github/workflows/dependabot-automerge.yml` enables auto-merge on every Dependabot pull
-request without a major version update.
+OpenSpec files on a Dependabot bump. `.github/workflows/dependabot-automerge.yml` enables
+auto-merge on a Dependabot pull request with a minor or patch update and disables it for
+any other update.
 
 Evals:
 

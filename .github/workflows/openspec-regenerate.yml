@@ -1,7 +1,8 @@
 name: OpenSpec regenerate
 
 # Regenerates the OpenSpec files on a Dependabot pull request that bumps the pinned
-# OpenSpec version, approves the workflow runs of the new commit and enables auto-merge.
+# OpenSpec version and approves the workflow runs of the new commit, including
+# dependabot-automerge.yml, which sets auto-merge.
 # Runs triggered by a github-actions[bot] commit wait for approval while the bot has no
 # commit on main (fork pull request approval policy: first-time contributors). A merge
 # commit keeps the bot's commit on main.
@@ -18,11 +19,9 @@ jobs:
     permissions:
       contents: write
       actions: write
-      pull-requests: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       HEAD_REF: ${{ github.head_ref }}
-      PR_URL: ${{ github.event.pull_request.html_url }}
     steps:
       - name: Check out the pull request branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,6 +51,3 @@ jobs:
               gh api -X POST "repos/${GITHUB_REPOSITORY}/actions/runs/${id}/approve" || true
             done
           done
-
-      - name: Enable auto-merge
-        run: gh pr merge "$PR_URL" --auto --merge
