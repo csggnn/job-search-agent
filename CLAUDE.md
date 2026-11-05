@@ -150,6 +150,8 @@ match `openspec update` at the pinned version. The `.claude/skills/openspec-*` f
 generated. Dependabot updates GitHub Actions, pre-commit hooks, pip and npm packages and
 Docker base images weekly. `.github/workflows/openspec-regenerate.yml` regenerates the
 OpenSpec files on a Dependabot bump and enables auto-merge.
+`.github/workflows/dependabot-automerge.yml` enables auto-merge on every Dependabot pull
+request without a major version update.
 
 Evals:
 
