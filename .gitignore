@@ -26,3 +26,7 @@ docs/structurizr/.structurizr/
 
 # OpenSpec CLI, pinned in package.json
 node_modules/
+
+# Caches and installs written by container runs that mount the checkout as $HOME
+.cache/
+.local/

@@ -1,0 +1,40 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+        # Written by Structurizr. A change requires a new containers.png.
+        exclude: ^docs/structurizr/workspace\.json$
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.32.0
+    hooks:
+      - id: zizmor
+  - repo: local
+    hooks:
+      # Renders docs/structurizr/containers.png with podman. CI skips it: the Diagram
+      # workflow checks that the PNG changed with its source.
+      - id: export-diagram
+        name: export structurizr diagram
+        entry: scripts/export_diagram.sh
+        language: system
+        pass_filenames: false
+        files: ^docs/structurizr/workspace\.(dsl|json)$
