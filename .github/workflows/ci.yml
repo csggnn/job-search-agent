@@ -1,23 +1,41 @@
-name: OpenSpec
+name: CI
 
 on:
+  push:
+    branches: [master]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  openspec:
+  check:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
       - name: Check out the code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      # export-diagram needs podman and the UI image. The Diagram workflow checks the PNG.
+      - name: Run pre-commit hooks
+        env:
+          SKIP: export-diagram
+        run: uvx pre-commit@4.7.0 run --all-files --show-diff-on-failure
+
       - name: Install OpenSpec
+        if: ${{ !cancelled() }}
         run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Validate OpenSpec changes and specs
+        if: ${{ !cancelled() }}
         run: npx openspec validate --all --no-interactive
 
       - name: Check generated OpenSpec files match the pinned version
