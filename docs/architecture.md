@@ -450,7 +450,8 @@ pipeline image does not contain the UI's packages.
 **Tests and CI.** `tests/ui/test_browser_ui.py` drives the UI with headless Chromium against
 databases it builds from `ui/columns.py` under a temporary directory. It reads no user data.
 `.github/workflows/ui-tests.yml` runs it on pull requests that change `ui/**`, `tests/ui/**`
-or `docker-compose.yml`. The contract test runs in `unit-tests.yml` on every pull request.
+or `docker-compose.yml`. The contract test runs in the `unit-tests` job of `ci.yml` on every
+pull request.
 
 ## Static analysis
 

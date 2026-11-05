@@ -4,7 +4,7 @@ repos:
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
-        # Written by Structurizr. A change requires a new containers.png.
+        # exception: written by Structurizr. A change requires a new containers.png.
         exclude: ^docs/structurizr/workspace\.json$
       - id: check-yaml
       - id: check-toml
@@ -30,8 +30,8 @@ repos:
       - id: zizmor
   - repo: local
     hooks:
-      # Renders docs/structurizr/containers.png with podman. CI skips it: the Diagram
-      # workflow checks that the PNG changed with its source.
+      # exception: renders docs/structurizr/containers.png with podman. CI skips it: the
+      # Diagram workflow checks that the PNG changed with its source.
       - id: export-diagram
         name: export structurizr diagram
         entry: scripts/export_diagram.sh

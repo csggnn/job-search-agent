@@ -143,8 +143,8 @@ In Claude Code, `.claude/hooks/ruff.sh` runs the ruff hooks on each edited `.py`
 returns the findings ruff cannot fix.
 
 CI (`.github/workflows/ci.yml`) runs the hooks except `export-diagram`, and the OpenSpec
-checks, in the `check` job on pull requests and pushes to `master`. `check` and
-`unit-tests` are required before merge. `package.json` pins the OpenSpec CLI. CI runs
+checks, in the `check` job on pull requests and pushes to `master`. The `unit-tests` job
+runs the unit suite in the container. `check` and `unit-tests` are required before merge. `package.json` pins the OpenSpec CLI. CI runs
 `npx openspec validate --all --no-interactive` and checks that the files under `.claude/`
 match `openspec update` at the pinned version. The `.claude/skills/openspec-*` files are
 generated. Dependabot updates GitHub Actions, pre-commit hooks, pip and npm packages and
